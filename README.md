@@ -1,34 +1,72 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Nook
 
-## Getting Started
+Nook is a browser-based way to explore and furnish a room with interactive 3D products.
 
-First, run the development server:
+## Status
+
+The project foundation is initialized: it uses Next.js 16, React 19, TypeScript,
+pnpm, Vitest, and a vinext runtime target for Cloudflare Workers. This repository
+does **not** yet include product work packages for the 3D scene, WebMCP tools,
+provider integrations, or cart behavior. There is no live demo and no working
+Shopify, Tripo, Room AI, or WebMCP integration yet.
+
+## Prerequisites
+
+- Node.js compatible with the checked-in toolchain
+- pnpm 10.27.0 (the package manager recorded in `package.json`)
+- Desktop Chrome with WebMCP support for future WebMCP work; other browsers or
+  environments may be useful for general development but do not satisfy that
+  requirement.
+
+## Setup
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+pnpm install --frozen-lockfile
+cp .env.example .env.local
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+`.env.example` contains only safe, non-secret defaults. Keep credentials in a
+local environment file; never commit them.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Commands
 
-## Learn More
+| Command | Purpose |
+| --- | --- |
+| `pnpm dev` | Start the Next.js development server. |
+| `pnpm build` | Build the vinext Cloudflare Workers target. |
+| `pnpm build:next` | Run the Next.js compatibility build. |
+| `pnpm start` | Start the Next.js production server. |
+| `pnpm typecheck` | Type-check without emitting files. |
+| `pnpm lint` | Run ESLint. |
+| `pnpm test` | Run the Vitest suite once. |
+| `pnpm test:watch` | Run Vitest in watch mode. |
+| `pnpm test:e2e` | Run Playwright end-to-end tests. |
+| `pnpm cf-typegen` | Generate Cloudflare Worker types. |
+| `pnpm dev:vinext` | Start vinext locally on port 3001. |
+| `pnpm build:vinext` | Build the vinext Cloudflare Workers target. |
+| `pnpm start:vinext` | Start the built vinext Worker with Wrangler. |
+| `pnpm deploy:vinext` | Deploy the vinext Worker (only when explicitly authorized). |
 
-To learn more about Next.js, take a look at the following resources:
+## Runtime targets
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+`pnpm dev`, `pnpm start`, and `pnpm build:next` use the standard Next.js path.
+`pnpm dev:vinext`, `pnpm build` (or `pnpm build:vinext`), and
+`pnpm start:vinext` use vinext and Wrangler for the Cloudflare Workers target.
+The two paths are kept so compatibility can be checked while the Worker runtime
+is developed.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Environment variables
 
-## Deploy on Vercel
+Copy `.env.example` to `.env.local` and set only the values needed for the work
+you are doing. `COMMERCE_PROVIDER=demo` and `ASSET_PROVIDER=cached` are safe
+defaults that avoid live-provider assumptions. The remaining provider values are
+intentionally empty until their future integrations are implemented.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Contributing
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+See [CONTRIBUTING.md](CONTRIBUTING.md). All contributions require tests where
+applicable and must keep secrets and room photos out of git.
+
+## License
+
+MIT. See [LICENSE](LICENSE).
