@@ -1,9 +1,13 @@
 @import "tailwindcss";
 
 :root {
-  --canvas: #f4f0e8;
-  --ink: #1d1b18;
-  --accent: #854f3f;
+  --limestone: #f2efe8;
+  --paper: #fbfaf6;
+  --warm-divider: #d8d2c7;
+  --ink: #242722;
+  --muted-text: #6f736b;
+  --moss: #5e6b4e;
+  --terracotta: #c8784e;
 }
 
 * {
@@ -12,9 +16,34 @@
 
 body {
   margin: 0;
-  background: var(--canvas);
+  min-height: 100svh;
+  background: var(--limestone);
   color: var(--ink);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-ui), Arial, sans-serif;
+  text-rendering: optimizeLegibility;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+:focus-visible {
+  outline: 2px solid var(--moss);
+  outline-offset: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
 
 .shell {
@@ -30,7 +59,7 @@ body {
 
 .eyebrow {
   margin: 0 0 1rem;
-  color: var(--accent);
+  color: var(--moss);
   font-size: 0.875rem;
   font-weight: 700;
   letter-spacing: 0.16em;
@@ -39,7 +68,7 @@ body {
 
 h1 {
   margin: 0;
-  font-family: Georgia, "Times New Roman", serif;
+  font-family: var(--font-editorial), Georgia, serif;
   font-size: clamp(2.75rem, 8vw, 5.5rem);
   font-weight: 400;
   letter-spacing: -0.04em;
@@ -60,5 +89,5 @@ h1 {
 }
 
 .demo-link:hover {
-  color: var(--accent);
+  color: var(--terracotta);
 }
