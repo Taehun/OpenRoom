@@ -7,10 +7,11 @@ const packageJson = JSON.parse(
 ) as {
   dependencies?: Record<string, string>;
   devDependencies?: Record<string, string>;
+  engines?: Record<string, string>;
   scripts?: Record<string, string>;
 };
 
-test("keeps the required MVP packages and test commands available", () => {
+test("keeps the required MVP packages and reproducible test toolchain available", () => {
   expect(packageJson.dependencies).toEqual(
     expect.objectContaining({
       "@react-three/drei": expect.any(String),
@@ -35,7 +36,13 @@ test("keeps the required MVP packages and test commands available", () => {
 
   expect(packageJson.scripts).toMatchObject({
     test: "vitest run",
-    "test:e2e": "playwright test",
+    "test:e2e": expect.stringContaining("playwright test"),
     "test:watch": "vitest",
   });
+
+  expect(packageJson.engines).toMatchObject({ node: "24.13.1" });
+  expect(packageJson.devDependencies?.["@types/node"]).toMatch(/^\^24\./);
+  expect(
+    readFileSync(resolve(import.meta.dirname, "../../.node-version"), "utf8").trim(),
+  ).toBe("24.13.1");
 });

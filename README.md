@@ -12,7 +12,7 @@ Shopify, Tripo, Room AI, or WebMCP integration yet.
 
 ## Prerequisites
 
-- Node.js compatible with the checked-in toolchain
+- Node.js 24.13.1 (recorded in `package.json` and `.node-version`)
 - pnpm 10.27.0 (the package manager recorded in `package.json`)
 - Desktop Chrome with WebMCP support for future WebMCP work; other browsers or
   environments may be useful for general development but do not satisfy that
@@ -54,6 +54,12 @@ local environment file; never commit them.
 `pnpm start:vinext` use vinext and Wrangler for the Cloudflare Workers target.
 The two paths are kept so compatibility can be checked while the Worker runtime
 is developed.
+
+Before running `pnpm test:e2e`, install the project’s Chromium browser once:
+
+```bash
+pnpm exec playwright install chromium
+```
 
 ## Environment variables
 

@@ -8,7 +8,7 @@ export default function Home() {
           Nook is being prepared for deliberate, spatial commerce experiences.
         </p>
         <a className="demo-link" href="/demo">
-          Preview the demo
+          Deterministic demo coming soon
         </a>
       </section>
     </main>
