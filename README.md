@@ -4,11 +4,15 @@ Nook is a browser-based way to explore and furnish a room with interactive 3D pr
 
 ## Status
 
-The project foundation is initialized: it uses Next.js 16, React 19, TypeScript,
-pnpm, Vitest, and a vinext runtime target for Cloudflare Workers. This repository
-does **not** yet include product work packages for the 3D scene, WebMCP tools,
-provider integrations, or cart behavior. There is no live demo and no working
-Shopify, Tripo, Room AI, or WebMCP integration yet.
+The project foundation uses Next.js 16, React 19, TypeScript, pnpm, Vitest, and
+a vinext runtime target for Cloudflare Workers. It now includes a deterministic,
+UI-only spatial commerce shell at `/demo`: object inspection, local product
+previews, Agent activity, and a cart review are local, reversible interface
+states. The room image is an approximate visualization, not a 3D scene.
+
+R3F rendering, WebMCP tools and Agent orchestration, Shopify integration,
+Tripo integration, room upload and analysis, and any external cart writes remain
+future work. The demo makes no provider calls or external cart requests.
 
 ## Prerequisites
 
@@ -33,6 +37,7 @@ local environment file; never commit them.
 | Command | Purpose |
 | --- | --- |
 | `pnpm dev` | Start the Next.js development server. |
+| `/demo` | Open the local deterministic UI demo after starting `pnpm dev`. |
 | `pnpm build` | Build the vinext Cloudflare Workers target. |
 | `pnpm build:next` | Run the Next.js compatibility build. |
 | `pnpm start` | Start the Next.js production server. |
