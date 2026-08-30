@@ -255,6 +255,16 @@
   color: var(--ink);
 }
 
+.toolButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.toolButton:disabled:hover {
+  background: transparent;
+  color: var(--muted-text);
+}
+
 .toolButtonActive {
   box-shadow: inset 2px 0 var(--moss);
 }

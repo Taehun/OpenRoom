@@ -1,10 +1,11 @@
 import Link from "next/link";
-import type { Dispatch } from "react";
+import type { Dispatch, RefObject } from "react";
 import type { DemoAction, DemoState } from "./demo-types";
 import { NookIcon } from "./nook-icon";
 import styles from "./demo-workspace.module.css";
 
 interface WorkspaceHeaderProps {
+  cartButtonRef: RefObject<HTMLButtonElement | null>;
   dispatch: Dispatch<DemoAction>;
   state: DemoState;
 }
@@ -13,7 +14,11 @@ function formatRoomTotal(totalMinor: number) {
   return `$${Math.round(totalMinor / 100).toLocaleString("en-US")}`;
 }
 
-export function WorkspaceHeader({ dispatch, state }: WorkspaceHeaderProps) {
+export function WorkspaceHeader({
+  cartButtonRef,
+  dispatch,
+  state,
+}: WorkspaceHeaderProps) {
   return (
     <header className={styles.header}>
       <div className={styles.brandBlock}>
@@ -65,6 +70,7 @@ export function WorkspaceHeader({ dispatch, state }: WorkspaceHeaderProps) {
           aria-label="View cart"
           className={styles.cartButton}
           onClick={() => dispatch({ type: "open-cart" })}
+          ref={cartButtonRef}
           type="button"
         >
           <NookIcon name="cart" />

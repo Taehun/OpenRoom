@@ -1,4 +1,4 @@
-import type { Dispatch } from "react";
+import { useEffect, useRef, type Dispatch, type KeyboardEvent } from "react";
 import { CART_ITEMS } from "./demo-data";
 import type { DemoAction } from "./demo-types";
 import { NookIcon } from "./nook-icon";
@@ -18,6 +18,40 @@ const CART_TOTAL_MINOR = CART_ITEMS.reduce(
 );
 
 export function CartApprovalSheet({ dispatch }: CartApprovalSheetProps) {
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    closeButtonRef.current?.focus();
+  }, []);
+
+  function handleKeyDown(event: KeyboardEvent<HTMLElement>) {
+    if (event.key !== "Tab") return;
+
+    const focusableElements = Array.from(
+      event.currentTarget.querySelectorAll<HTMLElement>(
+        'a[href], button:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+      ),
+    );
+    const firstFocusableElement = focusableElements[0];
+    const lastFocusableElement = focusableElements.at(-1);
+
+    if (!firstFocusableElement || !lastFocusableElement) {
+      event.preventDefault();
+      return;
+    }
+
+    if (event.shiftKey && document.activeElement === firstFocusableElement) {
+      event.preventDefault();
+      lastFocusableElement.focus();
+    } else if (
+      !event.shiftKey &&
+      document.activeElement === lastFocusableElement
+    ) {
+      event.preventDefault();
+      firstFocusableElement.focus();
+    }
+  }
+
   return (
     <div className={styles.sheetLayer}>
       <div className={styles.sheetScrim} aria-hidden="true" />
@@ -25,6 +59,7 @@ export function CartApprovalSheet({ dispatch }: CartApprovalSheetProps) {
         aria-labelledby="cart-sheet-title"
         aria-modal="true"
         className={styles.cartSheet}
+        onKeyDown={handleKeyDown}
         role="dialog"
       >
         <header className={styles.sheetHeader}>
@@ -34,9 +69,9 @@ export function CartApprovalSheet({ dispatch }: CartApprovalSheetProps) {
           </div>
           <button
             aria-label="Close cart review"
-            autoFocus
             className={styles.iconButton}
             onClick={() => dispatch({ type: "close-cart" })}
+            ref={closeButtonRef}
             title="Close cart review (Escape)"
             type="button"
           >

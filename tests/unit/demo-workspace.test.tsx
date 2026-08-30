@@ -34,7 +34,8 @@ test("opens a four-item approval sheet and confirms without an external cart req
   const user = userEvent.setup();
   render(<DemoWorkspace />);
 
-  await user.click(screen.getByRole("button", { name: "View cart" }));
+  const viewCart = screen.getByRole("button", { name: "View cart" });
+  await user.click(viewCart);
 
   const sheet = screen.getByRole("dialog", { name: "Review your room" });
   expect(within(sheet).getAllByRole("listitem")).toHaveLength(4);
@@ -52,7 +53,51 @@ test("opens a four-item approval sheet and confirms without an external cart req
   expect(
     screen.getByText("Demo only — no external cart was created."),
   ).toBeVisible();
+  expect(viewCart).toHaveFocus();
   expect(fetchSpy).not.toHaveBeenCalled();
+});
+
+test("keeps keyboard focus inside the cart approval sheet", async () => {
+  const user = userEvent.setup();
+  render(<DemoWorkspace />);
+
+  await user.click(screen.getByRole("button", { name: "View cart" }));
+
+  const sheet = screen.getByRole("dialog", { name: "Review your room" });
+  const close = within(sheet).getByRole("button", {
+    name: "Close cart review",
+  });
+  const continueToShopify = within(sheet).getByRole("button", {
+    name: "Continue to Shopify · $626",
+  });
+  const keepEditing = within(sheet).getByRole("button", {
+    name: "Keep editing",
+  });
+
+  expect(close).toHaveFocus();
+  await user.tab();
+  expect(continueToShopify).toHaveFocus();
+  await user.tab();
+  expect(keepEditing).toHaveFocus();
+  await user.tab();
+  expect(close).toHaveFocus();
+});
+
+test("hides the workspace from assistive technology and restores the cart trigger on close", async () => {
+  const user = userEvent.setup();
+  render(<DemoWorkspace />);
+
+  const viewCart = screen.getByRole("button", { name: "View cart" });
+  await user.click(viewCart);
+
+  expect(
+    screen.queryByRole("button", { name: "Run Agent move" }),
+  ).not.toBeInTheDocument();
+
+  await user.click(
+    screen.getByRole("button", { name: "Close cart review" }),
+  );
+  expect(viewCart).toHaveFocus();
 });
 
 test("Escape closes the cart before clearing the selected object", async () => {
@@ -71,6 +116,20 @@ test("Escape closes the cart before clearing the selected object", async () => {
 
   await user.keyboard("{Escape}");
   expect(coffeeTable).toHaveAttribute("aria-pressed", "false");
+});
+
+test("marks unavailable transform tools as disabled with an explanation", () => {
+  render(<DemoWorkspace />);
+
+  const description = "Move and Rotate are not available in this read-only demo workspace.";
+  expect(screen.getByRole("button", { name: "Move tool" })).toBeDisabled();
+  expect(screen.getByRole("button", { name: "Rotate tool" })).toBeDisabled();
+  expect(screen.getByRole("button", { name: "Move tool" })).toHaveAccessibleDescription(
+    description,
+  );
+  expect(screen.getByRole("button", { name: "Rotate tool" })).toHaveAccessibleDescription(
+    description,
+  );
 });
 
 test("runs the Agent move and supports keyboard undo", async () => {

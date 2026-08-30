@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useReducer } from "react";
+import { useEffect, useReducer, useRef } from "react";
 import { CartApprovalSheet } from "./cart-approval-sheet";
 import { ContextPanel } from "./context-panel";
 import { createInitialDemoState, demoReducer } from "./demo-state";
@@ -14,6 +14,16 @@ export function DemoWorkspace() {
     undefined,
     createInitialDemoState,
   );
+  const cartButtonRef = useRef<HTMLButtonElement | null>(null);
+  const wasCartOpenRef = useRef(false);
+
+  useEffect(() => {
+    if (wasCartOpenRef.current && !state.isCartOpen) {
+      cartButtonRef.current?.focus();
+    }
+
+    wasCartOpenRef.current = state.isCartOpen;
+  }, [state.isCartOpen]);
 
   useEffect(() => {
     function handleWorkspaceKeyDown(event: KeyboardEvent) {
@@ -42,26 +52,32 @@ export function DemoWorkspace() {
 
   return (
     <div className={styles.workspace}>
-      <WorkspaceHeader dispatch={dispatch} state={state} />
-      <div className={styles.desktopNotice} role="note">
-        Nook’s room editor is desktop-first. Use a viewport at least 1280px
-        wide for the complete atelier.
-      </div>
-      <div className={styles.workspaceBody}>
-        <RoomCanvas dispatch={dispatch} state={state} />
-        <ContextPanel dispatch={dispatch} state={state} />
+      <div aria-hidden={state.isCartOpen || undefined} inert={state.isCartOpen}>
+        <WorkspaceHeader
+          cartButtonRef={cartButtonRef}
+          dispatch={dispatch}
+          state={state}
+        />
+        <div className={styles.desktopNotice} role="note">
+          Nook’s room editor is desktop-first. Use a viewport at least 1280px
+          wide for the complete atelier.
+        </div>
+        <div className={styles.workspaceBody}>
+          <RoomCanvas dispatch={dispatch} state={state} />
+          <ContextPanel dispatch={dispatch} state={state} />
+        </div>
+
+        <div
+          aria-atomic="true"
+          aria-live="polite"
+          className={styles.liveRegion}
+          role="status"
+        >
+          {state.announcement}
+        </div>
       </div>
 
       {state.isCartOpen ? <CartApprovalSheet dispatch={dispatch} /> : null}
-
-      <div
-        aria-atomic="true"
-        aria-live="polite"
-        className={styles.liveRegion}
-        role="status"
-      >
-        {state.announcement}
-      </div>
     </div>
   );
 }

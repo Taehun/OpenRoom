@@ -33,6 +33,9 @@ export function RoomCanvas({ dispatch, state }: RoomCanvasProps) {
     <div className={styles.canvasShell}>
       <aside className={styles.toolRail} aria-label="Room tools">
         <div className={styles.toolButtons}>
+          <p className={styles.visuallyHidden} id="transform-tools-unavailable">
+            Move and Rotate are not available in this read-only demo workspace.
+          </p>
           <button
             aria-label="Select tool"
             aria-pressed="true"
@@ -45,9 +48,11 @@ export function RoomCanvas({ dispatch, state }: RoomCanvasProps) {
           </button>
           <button
             aria-label="Move tool"
+            aria-describedby="transform-tools-unavailable"
             aria-pressed="false"
             className={styles.toolButton}
-            title="Move"
+            disabled
+            title="Unavailable in this read-only demo"
             type="button"
           >
             <NookIcon name="move" />
@@ -55,9 +60,11 @@ export function RoomCanvas({ dispatch, state }: RoomCanvasProps) {
           </button>
           <button
             aria-label="Rotate tool"
+            aria-describedby="transform-tools-unavailable"
             aria-pressed="false"
             className={styles.toolButton}
-            title="Rotate"
+            disabled
+            title="Unavailable in this read-only demo"
             type="button"
           >
             <NookIcon name="rotate" />
