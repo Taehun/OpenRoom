@@ -269,6 +269,35 @@ describe("WebMCP Core 6 handlers", () => {
     fetchSpy.mockRestore();
   });
 
+  test("does not draft an explicit placeholder carrying product metadata", async () => {
+    const seed = structuredClone(createSceneStore().getState().scene);
+    const table = seed.objects.find(({ id }) => id === "table_01");
+    if (!table) throw new Error("Expected the demo table");
+    table.product = {
+      id: "oak-frame-table",
+      variantId: "demo-variant-oak-frame-table",
+      title: "Oak Frame Table",
+      category: "coffee_table",
+      price: { amountMinor: 16900, currency: "USD" },
+      dimensionsCm: { width: 105, height: 40, depth: 55 },
+      styleTags: ["japandi", "light-oak"],
+      color: "light-oak",
+      material: "oak",
+    };
+    table.source = "placeholder";
+    table.addedBy = "human";
+    const store = createSceneStore(seed);
+    const { context, drafts } = createContext(store);
+
+    const result = await execute(createCoreTools(context), "add_scene_to_cart", {
+      expectedRevision: 1,
+      objectIds: ["table_01"],
+    });
+
+    expect(errorCode(result)).toBe("NO_CART_ITEMS");
+    expect(drafts).toEqual([]);
+  });
+
   test("rejects an empty cart and missing explicit cart object IDs", async () => {
     const emptyStore = createSceneStore();
     const empty = await execute(

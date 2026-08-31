@@ -104,7 +104,7 @@ function sceneProduct(product: CatalogProduct): SceneProduct {
 
 function draftFor(scene: Scene, objects: readonly SceneObject[]): CartApprovalDraft {
   const items = objects.flatMap((object) => {
-    if (!object.product) return [];
+    if (object.source !== "product" || !object.product) return [];
     return [{
       objectId: object.id,
       productId: object.product.id,
