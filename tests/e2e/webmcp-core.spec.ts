@@ -4,14 +4,22 @@ interface BrowserToolResult {
   structuredContent: {
     ok: boolean;
     sceneRevision: number;
+    stateVersion: number;
     data?: unknown;
-    error?: { code: string; latestRevision?: number };
+    error?: {
+      code: string;
+      latestRevision?: number;
+      latestStateVersion?: number;
+    };
   };
 }
 
 interface BrowserTool {
   name: string;
-  execute(input: unknown, signal: AbortSignal): Promise<BrowserToolResult>;
+  execute(
+    input: unknown,
+    options: { signal: AbortSignal },
+  ): Promise<BrowserToolResult>;
 }
 
 declare global {
@@ -26,8 +34,20 @@ test("completes WebMCP Core 6 against the shared demo Scene", async ({
   page,
 }) => {
   const consoleErrors: string[] = [];
+  const externalRequestsDuringCart: string[] = [];
+  let appOrigin = "";
+  let trackCartRequests = false;
   page.on("console", (message) => {
     if (message.type() === "error") consoleErrors.push(message.text());
+  });
+  page.on("request", (request) => {
+    if (
+      trackCartRequests &&
+      appOrigin !== "" &&
+      new URL(request.url()).origin !== appOrigin
+    ) {
+      externalRequestsDuringCart.push(request.url());
+    }
   });
   await page.addInitScript(() => {
     window.__webMcpActiveToolNames = new Set();
@@ -53,6 +73,7 @@ test("completes WebMCP Core 6 against the shared demo Scene", async ({
   });
 
   await page.goto("/demo");
+  appOrigin = new URL(page.url()).origin;
   await expect
     .poll(() =>
       page.evaluate(() => Object.keys(window.__webMcpTools).length),
@@ -67,24 +88,26 @@ test("completes WebMCP Core 6 against the shared demo Scene", async ({
   const selection = await page.evaluate(() =>
     window.__webMcpTools.get_selection?.execute(
       {},
-      new AbortController().signal,
+      { signal: new AbortController().signal },
     ),
   );
   expect(selection?.structuredContent).toMatchObject({
     ok: true,
     sceneRevision: 1,
+    stateVersion: 1,
     data: { id: "table_01" },
   });
 
   const search = await page.evaluate(() =>
     window.__webMcpTools.search_products?.execute(
       { category: "coffee_table" },
-      new AbortController().signal,
+      { signal: new AbortController().signal },
     ),
   );
   expect(search?.structuredContent).toMatchObject({
     ok: true,
     sceneRevision: 1,
+    stateVersion: 1,
   });
   const results = search?.structuredContent.data as
     | { results: Array<{ id: string }> }
@@ -93,12 +116,13 @@ test("completes WebMCP Core 6 against the shared demo Scene", async ({
 
   const replacement = await page.evaluate((productId) =>
     window.__webMcpTools.replace_object?.execute(
-      { productId, expectedRevision: 1 },
-      new AbortController().signal,
+      { productId, expectedRevision: 1, expectedStateVersion: 1 },
+      { signal: new AbortController().signal },
     ), results?.results[1]?.id);
   expect(replacement?.structuredContent).toMatchObject({
     ok: true,
     sceneRevision: 2,
+    stateVersion: 2,
   });
   const diagnostics = page.getByRole("status", { name: "Scene diagnostics" });
   await expect(diagnostics).toContainText(
@@ -110,14 +134,16 @@ test("completes WebMCP Core 6 against the shared demo Scene", async ({
       {
         objectId: "lamp_01",
         expectedRevision: 1,
+        expectedStateVersion: 2,
         position: { x: 0, z: 0 },
       },
-      new AbortController().signal,
+      { signal: new AbortController().signal },
     ),
   );
   expect(staleMove?.structuredContent).toMatchObject({
     ok: false,
     sceneRevision: 2,
+    stateVersion: 2,
     error: {
       code: "SCENE_REVISION_CONFLICT",
       latestRevision: 2,
@@ -134,15 +160,17 @@ test("completes WebMCP Core 6 against the shared demo Scene", async ({
       return fetch(...args);
     };
   });
+  trackCartRequests = true;
   const cart = await page.evaluate(() =>
     window.__webMcpTools.add_scene_to_cart?.execute(
-      { expectedRevision: 2 },
-      new AbortController().signal,
+      { expectedRevision: 2, expectedStateVersion: 2 },
+      { signal: new AbortController().signal },
     ),
   );
   expect(cart?.structuredContent).toMatchObject({
     ok: true,
     sceneRevision: 2,
+    stateVersion: 2,
   });
   const dialog = page.getByRole("dialog", { name: "Review your room" });
   await expect(dialog.getByRole("listitem")).toHaveCount(1);
@@ -150,6 +178,8 @@ test("completes WebMCP Core 6 against the shared demo Scene", async ({
   await expect(dialog.getByText("$249 USD")).toBeVisible();
   await expect(dialog.getByText(/Scene revision 2/)).toBeVisible();
   expect(await page.evaluate(() => window.__webMcpFetchCount)).toBe(0);
+  trackCartRequests = false;
+  expect(externalRequestsDuringCart).toEqual([]);
 
   await page.keyboard.press("Escape");
   await page.getByRole("link", { name: "Nook home" }).click();

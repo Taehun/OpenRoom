@@ -16,7 +16,8 @@ This work targets the Chrome WebMCP Imperative API documented on 2026-09-01.
 - Register a `ModelContextTool` with `document.modelContext.registerTool()`.
 - Pass an `AbortSignal` in the registration options and abort it to unregister
   the tool. There is no separate `unregisterTool()` method in the current API.
-- Accept the execution `AbortSignal` supplied to the tool callback.
+- Accept the official execution callback shape `(input, { signal })` and call
+  `signal.throwIfAborted()` before any read callback or side effect.
 - Do not set `exposedTo`; Core 6 tools remain same-origin by default.
 - Return a serializable result with a concise MCP-style text `content` entry and
   a machine-readable `structuredContent` success/error envelope.
@@ -25,12 +26,12 @@ This work targets the Chrome WebMCP Imperative API documented on 2026-09-01.
 
 | Tool | Input | Effect | Annotations |
 | --- | --- | --- | --- |
-| `get_scene` | strict empty object | Return the current validated Scene JSON | `readOnlyHint: true`, `untrustedContentHint: false` |
-| `get_selection` | strict empty object | Return the selected Scene object or `NO_SELECTION` | `readOnlyHint: true`, `untrustedContentHint: false` |
+| `get_scene` | strict empty object | Return the current validated Scene JSON | `readOnlyHint: true`, `untrustedContentHint: true` |
+| `get_selection` | strict empty object | Return the selected Scene object or `NO_SELECTION` | `readOnlyHint: true`, `untrustedContentHint: true` |
 | `search_products` | optional category/query and limit `1..3` | Search the deterministic local demo catalog in stable catalog order | `readOnlyHint: true`, `untrustedContentHint: true` |
-| `replace_object` | optional object ID, product ID, expected revision | Replace the explicit or selected object through `applyCommand` | `readOnlyHint: false`, `untrustedContentHint: true` |
-| `move_object` | optional object ID, X/Z position, optional Y rotation, expected revision | Move the explicit or selected object through `applyCommand` | `readOnlyHint: false`, `untrustedContentHint: false` |
-| `add_scene_to_cart` | expected revision and optional object IDs | Build a local draft from product-backed, non-seed Scene objects and open the visible approval sheet | `readOnlyHint: false`, `untrustedContentHint: false` |
+| `replace_object` | optional object ID, product ID, expected revision and state version | Replace the explicit or selected object through `applyCommand` | `readOnlyHint: false`, `untrustedContentHint: true` |
+| `move_object` | optional object ID, X/Z position, optional Y rotation, expected revision and state version | Move the explicit or selected object through `applyCommand` | `readOnlyHint: false`, `untrustedContentHint: true` |
+| `add_scene_to_cart` | expected revision/state version and optional object IDs | Build a local draft from product-backed, non-seed Scene objects and open the visible approval sheet | `readOnlyHint: false`, `untrustedContentHint: true` |
 
 Every input JSON Schema uses `type: "object"` and
 `additionalProperties: false`. Runtime handlers independently parse the same
@@ -42,6 +43,12 @@ current Scene selection is used. An absent selection returns `NO_SELECTION`
 without mutation. `search_products` returns the three table fixtures in the
 existing `DEMO_PRODUCTS` order when no filter removes them, so “the second
 result” resolves deterministically to `travertine-plinth-table`.
+
+Every mutation also requires `expectedStateVersion`. The Zustand store starts
+this monotonic token at `1` and increments it for an actual selection change,
+successful command, undo, and reset. It never rolls back with Scene revision,
+so a revision ABA or omitted-target selection race returns
+`SCENE_REVISION_CONFLICT` before mutation.
 
 ## Shared Result Contract
 
@@ -55,17 +62,20 @@ interface ToolResult<T> {
         ok: true;
         tool: CoreToolName;
         sceneRevision: number;
+        stateVersion: number;
         data: T;
       }
     | {
         ok: false;
         tool: CoreToolName;
         sceneRevision: number;
+        stateVersion: number;
         error: {
           code: ToolErrorCode;
           message: string;
           retryable: boolean;
           latestRevision?: number;
+          latestStateVersion?: number;
           issues?: Array<{ path: string; message: string }>;
         };
       };
@@ -74,23 +84,27 @@ interface ToolResult<T> {
 ```
 
 Errors are structured and actionable: `INVALID_INPUT`, `NO_SELECTION`,
-`PRODUCT_NOT_FOUND`, `NO_CART_ITEMS`, plus the existing command-layer
+`PRODUCT_NOT_FOUND`, `CATALOG_DATA_INVALID`, `NO_CART_ITEMS`, plus the existing command-layer
 `OBJECT_NOT_FOUND`, `OBJECT_LOCKED`, `CATEGORY_MISMATCH`, and
-`SCENE_REVISION_CONFLICT`. A revision conflict includes the current revision and
-never mutates Scene state.
+`SCENE_REVISION_CONFLICT`. A conflict includes the current revision and state
+version and never mutates Scene state.
 
 ## Architecture and State Boundaries
 
 - `ToolContext` provides late-bound Scene reads, selection lookup, product
-  search/resolution, command application, and an approval-sheet callback.
+  search/resolution, the monotonic state version, command application, and an
+  approval-sheet callback.
 - Tool handlers do not import React components and never mutate Three.js
   objects.
 - `replace_object` and `move_object` call the existing Scene store
   `applyCommand()` exactly once per invocation with `actor: "agent"` and the
-  caller's `expectedRevision`.
-- Product fixtures are treated as untrusted output. Search and replacement
-  descriptors carry `untrustedContentHint: true`; schemas bound string lengths,
-  and error output never echoes arbitrary input values.
+  caller's `expectedRevision`, after checking `expectedStateVersion`.
+- Product fixtures are parsed and cloned through `CatalogProductSchema` before
+  output or command application. Malformed catalog data returns a structured
+  error. Because catalog text can later appear in Scene, selection, move, and
+  cart output, every Core 6 descriptor carries `untrustedContentHint: true`.
+  Schemas bound raw string lengths before trimming, and errors never echo
+  arbitrary input values.
 - One stable React hook registration lives inside the existing client-side
   Scene provider boundary. It registers the exact Core 6 once for that mount and
   aborts the shared registration controller during unmount or route change.
@@ -111,13 +125,19 @@ no `fetch` or external request.
   annotation values, structured result shape, handler errors, registration
   uniqueness, failure rollback, and abort cleanup.
 - A real-store journey searches, replaces the selected table with the second
-  result, and observes exactly one revision increment.
+  result, and observes exactly one `applyCommand` call and revision increment.
 - A stale move returns `SCENE_REVISION_CONFLICT` with the latest revision and no
   mutation.
+- ABA and selection-change tests prove a stale state version cannot target a
+  restored revision or newly selected object.
+- Aborted executions reject before Scene mutation or approval callbacks.
 - Component and Playwright journeys execute captured WebMCP descriptors, open
   the approval UI, record no external request, and prove cleanup on navigation.
 - Existing human selection, transforms, preview, Agent move, undo, reset, and
   cart tests remain green.
+- `tests/evals/webmcp-journeys.json` is a static eval manifest used to record
+  prompts and assertions; executable behavior is covered by unit/component/E2E
+  suites.
 - `pnpm run test`, `pnpm run test:e2e`, `pnpm run typecheck`, `pnpm run lint`,
   `pnpm run build`, `pnpm run build:next`, and `git diff --check` exit `0`.
 

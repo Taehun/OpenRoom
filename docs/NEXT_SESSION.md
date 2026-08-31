@@ -1,8 +1,8 @@
 # Nook Next Session Handoff
 
-Snapshot: 2026-09-01 KST. Task 4 is identified by the exact commit subject
-`feat(demo): connect WebMCP to cart approval`; its SHA is intentionally not
-self-referenced from inside that commit.
+Snapshot: 2026-09-01 KST. The final review repair is identified by the exact
+commit subject `fix(webmcp): harden execution and stale-state safety`; its SHA
+is intentionally not self-referenced from inside that commit.
 
 ## Current State
 
@@ -12,8 +12,13 @@ self-referenced from inside that commit.
 - WebMCP Core 6 is a feature-detected progressive enhancement. The complete
   human demo still works when `document.modelContext` is absent.
 - All six tools use the same late-bound Scene store as the human UI. Replacement
-  and movement remain revision-aware, and cart calls only open visible local
-  approval state.
+  and movement remain revision-aware. A monotonic `stateVersion` increments for
+  actual selection changes, successful commands, undo, and reset, preventing
+  revision ABA and selection-target races without changing Scene JSON or the
+  command layer. Cart calls only open visible local approval state.
+- Tool execution matches `(input, { signal })` and aborts before any read or
+  side effect. Catalog results are Zod-parsed/cloned, and all Core 6 descriptors
+  conservatively mark possible catalog-derived output as untrusted.
 - The four-item human fixture cart remains `$626 USD`; the optional WebMCP draft
   renders only eligible Scene products and remains UI-only.
 - Merge, push, pull request creation, deployment, and external provider calls
@@ -66,11 +71,28 @@ pnpm exec playwright test tests/e2e/webmcp-core.spec.ts --config=playwright.conf
   proved the stale move left revision 2 unchanged, counted zero fetch calls, and
   used the `Nook home` Next Link to prove every active registration aborted.
 
+## Final Review Repair RED / GREEN Evidence
+
+Targeted command:
+
+```bash
+pnpm exec vitest run tests/unit/tool-contracts.test.ts tests/unit/scene-store.test.ts tests/unit/webmcp-tools.test.ts tests/unit/demo-workspace.test.tsx
+```
+
+- RED: exit `1`; 4 files failed with 30 failed and 19 passed tests. Failures
+  specifically showed missing `stateVersion`, raw padded strings accepted,
+  direct `AbortSignal` callback behavior, unparsed catalog data, stale ABA /
+  selection races, and incomplete untrusted annotations.
+- GREEN: exit `0`; all 4 files and 49 tests passed.
+- The handler journey spies `applyCommand` and proves the second-result
+  replacement invokes exactly one command. Abort tests prove zero mutation and
+  zero approval callbacks.
+
 ## Verification Matrix
 
 The required commands ran in this exact order and exited `0`:
 
-1. `pnpm run test` — 10 files passed; 61 tests passed.
+1. `pnpm run test` — 10 files passed; 69 tests passed.
 2. `pnpm run test:e2e` — 3 Chromium tests passed.
 3. `pnpm run typecheck` — TypeScript completed with no diagnostics.
 4. `pnpm run lint` — ESLint completed with no diagnostics.
@@ -79,6 +101,10 @@ The required commands ran in this exact order and exited `0`:
 6. `pnpm run build:next` — Next.js 16.3.3 compiled, type-checked, and generated
    4/4 static pages; `/` and `/demo` are static.
 7. `git diff --check` — clean.
+
+The updated E2E journey uses the official `{ signal }` execution options,
+carries `expectedStateVersion`, and records both zero fetch calls and zero
+cross-origin browser requests during dynamic cart approval.
 
 ## Known Residuals
 

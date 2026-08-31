@@ -20,6 +20,7 @@ function createContext(
   const drafts: CartApprovalDraft[] = [];
   const context: ToolContext = {
     getScene: () => store.getState().scene,
+    getStateVersion: () => store.getState().stateVersion,
     getSelection: () => {
       const { scene } = store.getState();
       return scene.objects.find(({ id }) => id === scene.selectedObjectId) ?? null;
@@ -59,7 +60,7 @@ async function execute(
 ) {
   const tool = tools.find((candidate) => candidate.name === name);
   if (!tool) throw new Error(`Missing ${name}`);
-  return tool.execute(input, new AbortController().signal);
+  return tool.execute(input, { signal: new AbortController().signal });
 }
 
 function errorCode(result: Awaited<ReturnType<ModelContextTool["execute"]>>) {
@@ -72,6 +73,7 @@ describe("WebMCP Core 6 handlers", () => {
     const store = createSceneStore();
     const { context } = createContext(store);
     const tools = createCoreTools(context);
+    const applyCommand = vi.spyOn(context, "applyCommand");
 
     const search = await execute(tools, "search_products", {
       category: "coffee_table",
@@ -80,12 +82,17 @@ describe("WebMCP Core 6 handlers", () => {
     if (!search.structuredContent.ok) return;
     expect((search.structuredContent.data as { results: CatalogProduct[] }).results[1]?.id)
       .toBe("travertine-plinth-table");
+    expect((search.structuredContent.data as { results: CatalogProduct[] }).results[0])
+      .not.toBe(DEMO_PRODUCTS[0]);
+    expect(search.structuredContent.stateVersion).toBe(1);
 
     const replace = await execute(tools, "replace_object", {
       productId: "travertine-plinth-table",
       expectedRevision: 1,
+      expectedStateVersion: 1,
     });
     expect(replace.structuredContent.ok).toBe(true);
+    expect(applyCommand).toHaveBeenCalledTimes(1);
     expect(store.getState().scene.revision).toBe(2);
     expect(store.getState().scene.objects.find(({ id }) => id === "table_01")
       ?.product?.id).toBe("travertine-plinth-table");
@@ -93,6 +100,7 @@ describe("WebMCP Core 6 handlers", () => {
     const staleMove = await execute(tools, "move_object", {
       objectId: "lamp_01",
       expectedRevision: 1,
+      expectedStateVersion: 2,
       position: { x: 0, z: 0 },
     });
     expect(staleMove.structuredContent.ok).toBe(false);
@@ -105,6 +113,70 @@ describe("WebMCP Core 6 handlers", () => {
     expect(store.getState().scene.revision).toBe(2);
   });
 
+  test("rejects a revision ABA with the monotonic state version", async () => {
+    const store = createSceneStore();
+    const before = structuredClone(store.getState().scene);
+    store.getState().applyCommand({
+      expectedRevision: 1,
+      actor: "human",
+      command: { type: "set-style", style: "warm japandi" },
+    });
+    expect(store.getState().undo()).toBe(true);
+    expect(store.getState()).toMatchObject({
+      stateVersion: 3,
+      scene: { revision: 1 },
+    });
+    const { context } = createContext(store);
+    const applyCommand = vi.spyOn(context, "applyCommand");
+
+    const result = await execute(createCoreTools(context), "move_object", {
+      objectId: "lamp_01",
+      expectedRevision: 1,
+      expectedStateVersion: 1,
+      position: { x: 0, z: 0 },
+    });
+
+    expect(result.structuredContent).toMatchObject({
+      ok: false,
+      sceneRevision: 1,
+      stateVersion: 3,
+      error: {
+        code: "SCENE_REVISION_CONFLICT",
+        latestRevision: 1,
+        latestStateVersion: 3,
+      },
+    });
+    expect(applyCommand).not.toHaveBeenCalled();
+    expect(store.getState().scene).toEqual(before);
+  });
+
+  test("rejects an omitted-target mutation after selection changes", async () => {
+    const store = createSceneStore();
+    store.getState().selectObject("chair_01");
+    const { context } = createContext(store);
+    const applyCommand = vi.spyOn(context, "applyCommand");
+
+    const result = await execute(createCoreTools(context), "replace_object", {
+      productId: "oak-frame-table",
+      expectedRevision: 1,
+      expectedStateVersion: 1,
+    });
+
+    expect(result.structuredContent).toMatchObject({
+      ok: false,
+      sceneRevision: 1,
+      stateVersion: 2,
+      error: {
+        code: "SCENE_REVISION_CONFLICT",
+        latestRevision: 1,
+        latestStateVersion: 2,
+      },
+    });
+    expect(applyCommand).not.toHaveBeenCalled();
+    expect(store.getState().scene.objects.find(({ id }) => id === "chair_01")?.source)
+      .toBe("placeholder");
+  });
+
   test("returns INVALID_INPUT without invoking a command", async () => {
     const store = createSceneStore();
     const { context } = createContext(store);
@@ -112,6 +184,7 @@ describe("WebMCP Core 6 handlers", () => {
 
     const result = await execute(createCoreTools(context), "move_object", {
       expectedRevision: 1,
+      expectedStateVersion: 1,
       position: { x: 21, z: 0 },
     });
 
@@ -120,6 +193,7 @@ describe("WebMCP Core 6 handlers", () => {
       ok: false,
       tool: "move_object",
       sceneRevision: 1,
+      stateVersion: 1,
       error: { retryable: true, issues: [{ path: "position.x" }] },
     });
     expect(applyCommand).not.toHaveBeenCalled();
@@ -133,6 +207,7 @@ describe("WebMCP Core 6 handlers", () => {
     const result = await execute(createCoreTools(context), "replace_object", {
       productId: "oak-frame-table",
       expectedRevision: 1,
+      expectedStateVersion: 2,
     });
 
     expect(errorCode(result)).toBe("NO_SELECTION");
@@ -146,9 +221,92 @@ describe("WebMCP Core 6 handlers", () => {
     const result = await execute(createCoreTools(context), "replace_object", {
       productId: "missing-table",
       expectedRevision: 1,
+      expectedStateVersion: 1,
     });
 
     expect(errorCode(result)).toBe("PRODUCT_NOT_FOUND");
+    expect(store.getState().scene.revision).toBe(1);
+  });
+
+  test("returns structured errors for malformed catalog search results", async () => {
+    const malformedCatalog = [{
+      ...DEMO_PRODUCTS[0],
+      description: "x".repeat(501),
+    }] as unknown as readonly CatalogProduct[];
+    const store = createSceneStore();
+    const { context } = createContext(store, malformedCatalog);
+
+    const result = await execute(createCoreTools(context), "search_products", {});
+
+    expect(result.structuredContent).toMatchObject({
+      ok: false,
+      sceneRevision: 1,
+      stateVersion: 1,
+      error: {
+        code: "CATALOG_DATA_INVALID",
+        retryable: false,
+        issues: [{ path: "0.description" }],
+      },
+    });
+  });
+
+  test("returns a structured error for a malformed resolved product", async () => {
+    const malformedCatalog = [{
+      ...DEMO_PRODUCTS[0],
+      description: `${"x".repeat(500)} `,
+    }] as unknown as readonly CatalogProduct[];
+    const store = createSceneStore();
+    const { context } = createContext(store, malformedCatalog);
+    const applyCommand = vi.spyOn(context, "applyCommand");
+
+    const result = await execute(createCoreTools(context), "replace_object", {
+      productId: DEMO_PRODUCTS[0].id,
+      expectedRevision: 1,
+      expectedStateVersion: 1,
+    });
+
+    expect(errorCode(result)).toBe("CATALOG_DATA_INVALID");
+    expect(applyCommand).not.toHaveBeenCalled();
+    expect(store.getState().scene.revision).toBe(1);
+  });
+
+  test("aborts a mutation before reading or applying Scene state", async () => {
+    const store = createSceneStore();
+    const { context } = createContext(store);
+    const getScene = vi.spyOn(context, "getScene");
+    const getStateVersion = vi.spyOn(context, "getStateVersion");
+    const applyCommand = vi.spyOn(context, "applyCommand");
+    const controller = new AbortController();
+    controller.abort();
+    const tool = createCoreTools(context).find(({ name }) => name === "replace_object");
+    if (!tool) throw new Error("Missing replace_object");
+
+    await expect(tool.execute({
+      productId: "travertine-plinth-table",
+      expectedRevision: 1,
+      expectedStateVersion: 1,
+    }, { signal: controller.signal })).rejects.toMatchObject({ name: "AbortError" });
+
+    expect(getScene).not.toHaveBeenCalled();
+    expect(getStateVersion).not.toHaveBeenCalled();
+    expect(applyCommand).not.toHaveBeenCalled();
+    expect(store.getState().scene.revision).toBe(1);
+  });
+
+  test("aborts cart execution before opening approval", async () => {
+    const store = createSceneStore();
+    const { context, drafts } = createContext(store);
+    const controller = new AbortController();
+    controller.abort();
+    const tool = createCoreTools(context).find(({ name }) => name === "add_scene_to_cart");
+    if (!tool) throw new Error("Missing add_scene_to_cart");
+
+    await expect(tool.execute({
+      expectedRevision: 1,
+      expectedStateVersion: 1,
+    }, { signal: controller.signal })).rejects.toMatchObject({ name: "AbortError" });
+
+    expect(drafts).toEqual([]);
     expect(store.getState().scene.revision).toBe(1);
   });
 
@@ -158,6 +316,7 @@ describe("WebMCP Core 6 handlers", () => {
     const missing = await execute(createCoreTools(missingContext), "move_object", {
       objectId: "missing_01",
       expectedRevision: 1,
+      expectedStateVersion: 1,
       position: { x: 0, z: 0 },
     });
     expect(errorCode(missing)).toBe("OBJECT_NOT_FOUND");
@@ -172,6 +331,7 @@ describe("WebMCP Core 6 handlers", () => {
       objectId: "table_01",
       productId: "oak-frame-table",
       expectedRevision: 2,
+      expectedStateVersion: 2,
     });
     expect(errorCode(locked)).toBe("OBJECT_LOCKED");
 
@@ -185,7 +345,12 @@ describe("WebMCP Core 6 handlers", () => {
     const mismatch = await execute(
       createCoreTools(createContext(createSceneStore(), mismatchCatalog).context),
       "replace_object",
-      { objectId: "table_01", productId: "oak-chair", expectedRevision: 1 },
+      {
+        objectId: "table_01",
+        productId: "oak-chair",
+        expectedRevision: 1,
+        expectedStateVersion: 1,
+      },
     );
     expect(errorCode(mismatch)).toBe("CATEGORY_MISMATCH");
   });
@@ -203,6 +368,7 @@ describe("WebMCP Core 6 handlers", () => {
         ok: true,
         tool: "get_scene",
         sceneRevision: 1,
+        stateVersion: 1,
         data: { id: "demo-living-room", revision: 1 },
       },
     });
@@ -213,6 +379,7 @@ describe("WebMCP Core 6 handlers", () => {
         ok: true,
         tool: "get_selection",
         sceneRevision: 1,
+        stateVersion: 1,
         data: { id: "table_01" },
       },
     });
@@ -237,9 +404,11 @@ describe("WebMCP Core 6 handlers", () => {
     await execute(tools, "replace_object", {
       productId: "travertine-plinth-table",
       expectedRevision: 1,
+      expectedStateVersion: 1,
     });
     const result = await execute(tools, "add_scene_to_cart", {
       expectedRevision: 2,
+      expectedStateVersion: 2,
       objectIds: ["table_01", "sofa_01"],
     });
 
@@ -247,6 +416,7 @@ describe("WebMCP Core 6 handlers", () => {
       ok: true,
       tool: "add_scene_to_cart",
       sceneRevision: 2,
+      stateVersion: 2,
       data: {
         draft: {
           id: "scene-demo-living-room-rev-2",
@@ -291,6 +461,7 @@ describe("WebMCP Core 6 handlers", () => {
 
     const result = await execute(createCoreTools(context), "add_scene_to_cart", {
       expectedRevision: 1,
+      expectedStateVersion: 1,
       objectIds: ["table_01"],
     });
 
@@ -303,7 +474,7 @@ describe("WebMCP Core 6 handlers", () => {
     const empty = await execute(
       createCoreTools(createContext(emptyStore).context),
       "add_scene_to_cart",
-      { expectedRevision: 1 },
+      { expectedRevision: 1, expectedStateVersion: 1 },
     );
     expect(errorCode(empty)).toBe("NO_CART_ITEMS");
 
@@ -311,14 +482,22 @@ describe("WebMCP Core 6 handlers", () => {
     const missing = await execute(
       createCoreTools(createContext(missingStore).context),
       "add_scene_to_cart",
-      { expectedRevision: 1, objectIds: ["missing_01"] },
+      {
+        expectedRevision: 1,
+        expectedStateVersion: 1,
+        objectIds: ["missing_01"],
+      },
     );
     expect(errorCode(missing)).toBe("OBJECT_NOT_FOUND");
 
     const placeholder = await execute(
       createCoreTools(createContext(createSceneStore()).context),
       "add_scene_to_cart",
-      { expectedRevision: 1, objectIds: ["table_01"] },
+      {
+        expectedRevision: 1,
+        expectedStateVersion: 1,
+        objectIds: ["table_01"],
+      },
     );
     expect(errorCode(placeholder)).toBe("NO_CART_ITEMS");
   });
@@ -335,12 +514,12 @@ describe("WebMCP Core 6 handlers", () => {
       "add_scene_to_cart",
     ]);
     expect(tools.map(({ annotations }) => annotations)).toEqual([
-      { readOnlyHint: true, untrustedContentHint: false },
-      { readOnlyHint: true, untrustedContentHint: false },
+      { readOnlyHint: true, untrustedContentHint: true },
+      { readOnlyHint: true, untrustedContentHint: true },
       { readOnlyHint: true, untrustedContentHint: true },
       { readOnlyHint: false, untrustedContentHint: true },
-      { readOnlyHint: false, untrustedContentHint: false },
-      { readOnlyHint: false, untrustedContentHint: false },
+      { readOnlyHint: false, untrustedContentHint: true },
+      { readOnlyHint: false, untrustedContentHint: true },
     ]);
   });
 });

@@ -54,6 +54,7 @@ function DemoWorkspaceContent() {
   const toolContext = useMemo<ToolContext>(
     () => ({
       getScene: () => sceneStore.getState().scene,
+      getStateVersion: () => sceneStore.getState().stateVersion,
       getSelection: () => {
         const { scene: currentScene } = sceneStore.getState();
         return (

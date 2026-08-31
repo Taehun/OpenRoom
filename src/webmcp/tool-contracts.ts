@@ -12,10 +12,11 @@ export const CORE_TOOL_NAMES = [
 
 export type CoreToolName = (typeof CORE_TOOL_NAMES)[number];
 
-const objectId = z.string().trim().min(1).max(64);
-const productId = z.string().trim().min(1).max(80);
-const query = z.string().trim().min(1).max(80).optional();
+const objectId = z.string().max(64).trim().min(1);
+const productId = z.string().max(80).trim().min(1);
+const query = z.string().max(80).trim().min(1).optional();
 const expectedRevision = z.number().int().min(1);
+const expectedStateVersion = z.number().int().min(1);
 const coordinate = z.number().finite().min(-20).max(20);
 const rotationYDegrees = z.number().finite().min(-360).max(360).optional();
 const limit = z.number().int().min(1).max(3).default(3);
@@ -40,6 +41,7 @@ export const replaceObjectInputSchema = z
     objectId: objectId.optional(),
     productId,
     expectedRevision,
+    expectedStateVersion,
   })
   .strict();
 export type ReplaceObjectInput = z.infer<typeof replaceObjectInputSchema>;
@@ -57,6 +59,7 @@ export const moveObjectInputSchema = z
     position,
     rotationYDegrees,
     expectedRevision,
+    expectedStateVersion,
   })
   .strict();
 export type MoveObjectInput = z.infer<typeof moveObjectInputSchema>;
@@ -64,6 +67,7 @@ export type MoveObjectInput = z.infer<typeof moveObjectInputSchema>;
 export const addSceneToCartInputSchema = z
   .object({
     expectedRevision,
+    expectedStateVersion,
     objectIds: z.array(objectId).min(1).max(20).superRefine((ids, context) => {
       if (new Set(ids).size !== ids.length) {
         context.addIssue({
@@ -114,8 +118,9 @@ export const REPLACE_OBJECT_JSON_SCHEMA = {
     objectId: { type: "string", minLength: 1, maxLength: 64, pattern: "\\S" },
     productId: { type: "string", minLength: 1, maxLength: 80, pattern: "\\S" },
     expectedRevision: { type: "integer", minimum: 1 },
+    expectedStateVersion: { type: "integer", minimum: 1 },
   },
-  required: ["productId", "expectedRevision"],
+  required: ["productId", "expectedRevision", "expectedStateVersion"],
   additionalProperties: false,
 } as const satisfies JsonSchema;
 
@@ -134,8 +139,9 @@ export const MOVE_OBJECT_JSON_SCHEMA = {
     },
     rotationYDegrees: { type: "number", minimum: -360, maximum: 360 },
     expectedRevision: { type: "integer", minimum: 1 },
+    expectedStateVersion: { type: "integer", minimum: 1 },
   },
-  required: ["position", "expectedRevision"],
+  required: ["position", "expectedRevision", "expectedStateVersion"],
   additionalProperties: false,
 } as const satisfies JsonSchema;
 
@@ -143,6 +149,7 @@ export const ADD_SCENE_TO_CART_JSON_SCHEMA = {
   type: "object",
   properties: {
     expectedRevision: { type: "integer", minimum: 1 },
+    expectedStateVersion: { type: "integer", minimum: 1 },
     objectIds: {
       type: "array",
       items: { type: "string", minLength: 1, maxLength: 64, pattern: "\\S" },
@@ -151,6 +158,6 @@ export const ADD_SCENE_TO_CART_JSON_SCHEMA = {
       uniqueItems: true,
     },
   },
-  required: ["expectedRevision"],
+  required: ["expectedRevision", "expectedStateVersion"],
   additionalProperties: false,
 } as const satisfies JsonSchema;

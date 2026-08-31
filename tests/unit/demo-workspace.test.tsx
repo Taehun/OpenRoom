@@ -50,7 +50,7 @@ test("connects the Core 6 journey to the shared Scene and approval UI", async ()
 
   const search = await tool("search_products").execute(
     { category: "coffee_table" },
-    new AbortController().signal,
+    { signal: new AbortController().signal },
   );
   if (!search.structuredContent.ok) throw new Error("Expected search success");
   const results = (
@@ -61,8 +61,12 @@ test("connects the Core 6 journey to the shared Scene and approval UI", async ()
 
   await act(async () => {
     await tool("replace_object").execute(
-      { productId: results[1]?.id, expectedRevision: 1 },
-      new AbortController().signal,
+      {
+        productId: results[1]?.id,
+        expectedRevision: 1,
+        expectedStateVersion: 1,
+      },
+      { signal: new AbortController().signal },
     );
   });
   expect(
@@ -73,8 +77,8 @@ test("connects the Core 6 journey to the shared Scene and approval UI", async ()
 
   await act(async () => {
     await tool("add_scene_to_cart").execute(
-      { expectedRevision: 2 },
-      new AbortController().signal,
+      { expectedRevision: 2, expectedStateVersion: 2 },
+      { signal: new AbortController().signal },
     );
   });
   const sheet = screen.getByRole("dialog", { name: "Review your room" });

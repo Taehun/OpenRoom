@@ -77,6 +77,7 @@ function createToolContext(): ToolContext {
   const store = createSceneStore();
   return {
     getScene: () => store.getState().scene,
+    getStateVersion: () => store.getState().stateVersion,
     getSelection: () => null,
     searchProducts: () => [],
     resolveProduct: () => undefined,

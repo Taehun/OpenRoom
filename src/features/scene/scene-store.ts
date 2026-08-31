@@ -20,6 +20,7 @@ export interface SceneStoreState {
   toolMode: ToolMode;
   isTransforming: boolean;
   resetVersion: number;
+  stateVersion: number;
   selectObject(objectId: string | null): void;
   setToolMode(mode: ToolMode): void;
   setTransforming(isTransforming: boolean): void;
@@ -49,6 +50,7 @@ export function createSceneStore(seed: Scene = createDemoScene()): SceneStore {
     toolMode: "select",
     isTransforming: false,
     resetVersion: 0,
+    stateVersion: 1,
 
     selectObject(objectId) {
       set((state) => {
@@ -58,10 +60,11 @@ export function createSceneStore(seed: Scene = createDemoScene()): SceneStore {
         ) {
           return state;
         }
+        if (state.scene.selectedObjectId === objectId) return state;
 
         const scene = cloneScene(state.scene);
         scene.selectedObjectId = objectId;
-        return { scene };
+        return { scene, stateVersion: state.stateVersion + 1 };
       });
     },
 
@@ -82,6 +85,7 @@ export function createSceneStore(seed: Scene = createDemoScene()): SceneStore {
         history: [...state.history, cloneScene(result.previousScene)].slice(
           -HISTORY_LIMIT,
         ),
+        stateVersion: state.stateVersion + 1,
       }));
       return result;
     },
@@ -116,11 +120,12 @@ export function createSceneStore(seed: Scene = createDemoScene()): SceneStore {
         restoredScene.selectedObjectId = currentScene.selectedObjectId;
       }
 
-      set({
+      set((state) => ({
         scene: restoredScene,
         history: history.slice(0, -1),
         isTransforming: false,
-      });
+        stateVersion: state.stateVersion + 1,
+      }));
       return true;
     },
 
@@ -131,6 +136,7 @@ export function createSceneStore(seed: Scene = createDemoScene()): SceneStore {
         toolMode: "select",
         isTransforming: false,
         resetVersion: state.resetVersion + 1,
+        stateVersion: state.stateVersion + 1,
       }));
     },
   }));

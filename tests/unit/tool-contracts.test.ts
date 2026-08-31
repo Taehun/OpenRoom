@@ -39,7 +39,7 @@ describe("WebMCP Core 6 contracts", () => {
     [
       "move_object coordinate",
       moveObjectInputSchema,
-      { expectedRevision: 1, position: { x: 21, z: 0 } },
+      { expectedRevision: 1, expectedStateVersion: 1, position: { x: 21, z: 0 } },
     ],
   ])("rejects invalid %s input", (_name, schema, input) => {
     expect(schema.safeParse(input).success).toBe(false);
@@ -62,6 +62,11 @@ describe("WebMCP Core 6 contracts", () => {
       },
     });
     expect(ADD_SCENE_TO_CART_JSON_SCHEMA.additionalProperties).toBe(false);
+    expect(REPLACE_OBJECT_JSON_SCHEMA.required).toContain("expectedStateVersion");
+    expect(MOVE_OBJECT_JSON_SCHEMA.required).toContain("expectedStateVersion");
+    expect(ADD_SCENE_TO_CART_JSON_SCHEMA.required).toContain(
+      "expectedStateVersion",
+    );
     expect(MOVE_OBJECT_JSON_SCHEMA.properties.position.additionalProperties).toBe(
       false,
     );
@@ -77,13 +82,24 @@ describe("WebMCP Core 6 contracts", () => {
         productId: "table",
         expectedRevision: 1,
       }).success,
-    ).toBe(true);
+    ).toBe(false);
     expect(
-      addSceneToCartInputSchema.safeParse({ expectedRevision: 1 }).success,
+      replaceObjectInputSchema.safeParse({
+        productId: "table",
+        expectedRevision: 1,
+        expectedStateVersion: 1,
+      }).success,
     ).toBe(true);
     expect(
       addSceneToCartInputSchema.safeParse({
         expectedRevision: 1,
+        expectedStateVersion: 1,
+      }).success,
+    ).toBe(true);
+    expect(
+      addSceneToCartInputSchema.safeParse({
+        expectedRevision: 1,
+        expectedStateVersion: 1,
         objectIds: ["table", "table"],
       }).success,
     ).toBe(false);
@@ -96,24 +112,28 @@ describe("WebMCP Core 6 contracts", () => {
         objectId: "   ",
         productId: "product",
         expectedRevision: 1,
+        expectedStateVersion: 1,
       }).success,
     ).toBe(false);
     expect(
       replaceObjectInputSchema.safeParse({
         productId: "   ",
         expectedRevision: 1,
+        expectedStateVersion: 1,
       }).success,
     ).toBe(false);
     expect(
       moveObjectInputSchema.safeParse({
         objectId: "   ",
         expectedRevision: 1,
+        expectedStateVersion: 1,
         position: { x: 0, z: 0 },
       }).success,
     ).toBe(false);
     expect(
       addSceneToCartInputSchema.safeParse({
         expectedRevision: 1,
+        expectedStateVersion: 1,
         objectIds: ["   "],
       }).success,
     ).toBe(false);
@@ -127,10 +147,27 @@ describe("WebMCP Core 6 contracts", () => {
     );
   });
 
+  test("applies raw string bounds before trimming", () => {
+    expect(searchProductsInputSchema.safeParse({ query: `${"q".repeat(80)} ` }).success)
+      .toBe(false);
+    expect(replaceObjectInputSchema.safeParse({
+      objectId: `${"o".repeat(64)} `,
+      productId: "product",
+      expectedRevision: 1,
+      expectedStateVersion: 1,
+    }).success).toBe(false);
+    expect(replaceObjectInputSchema.safeParse({
+      productId: `${"p".repeat(80)} `,
+      expectedRevision: 1,
+      expectedStateVersion: 1,
+    }).success).toBe(false);
+  });
+
   test("returns the typed success envelope without an error marker", () => {
     const result: ToolResult<{ value: string }> = toolSuccess(
       "get_scene",
       4,
+      9,
       { value: "scene" },
       "Scene returned.",
     );
@@ -142,6 +179,7 @@ describe("WebMCP Core 6 contracts", () => {
       ok: true,
       tool: "get_scene",
       sceneRevision: 4,
+      stateVersion: 9,
       data: { value: "scene" },
     });
     expect(result.content[0].text).not.toContain("raw-input");
@@ -151,10 +189,15 @@ describe("WebMCP Core 6 contracts", () => {
     const result = toolError(
       "move_object",
       7,
+      11,
       "SCENE_REVISION_CONFLICT",
       "The Scene changed; retry with the latest revision.",
       true,
-      { latestRevision: 8, issues: [{ path: "expectedRevision", message: "stale" }] },
+      {
+        latestRevision: 8,
+        latestStateVersion: 12,
+        issues: [{ path: "expectedRevision", message: "stale" }],
+      },
     );
 
     expect(result.isError).toBe(true);
@@ -163,10 +206,12 @@ describe("WebMCP Core 6 contracts", () => {
       ok: false,
       tool: "move_object",
       sceneRevision: 7,
+      stateVersion: 11,
       error: {
         code: "SCENE_REVISION_CONFLICT",
         retryable: true,
         latestRevision: 8,
+        latestStateVersion: 12,
         issues: [{ path: "expectedRevision", message: "stale" }],
       },
     });
@@ -176,23 +221,25 @@ describe("WebMCP Core 6 contracts", () => {
   test("normalizes Zod issues for invalid input", () => {
     const parsed = moveObjectInputSchema.safeParse({
       expectedRevision: 1,
+      expectedStateVersion: 1,
       position: { x: 21, z: 0 },
     });
     if (parsed.success) throw new Error("expected invalid input");
 
-    const result = invalidInputResult("move_object", 3, parsed.error);
+    const result = invalidInputResult("move_object", 3, 6, parsed.error);
     expect(result.isError).toBe(true);
     expect(result.structuredContent).toMatchObject({
       ok: false,
       tool: "move_object",
       sceneRevision: 3,
+      stateVersion: 6,
       error: { code: "INVALID_INPUT", retryable: true },
     });
     const error = result.structuredContent.ok ? null : result.structuredContent.error;
     expect(error?.issues?.[0]?.path).toBe("position.x");
   });
 
-  test("contains the named evaluation journeys", () => {
+  test("describes the named static evaluation-manifest journeys", () => {
     expect(journeys.map((journey) => journey.id)).toEqual(
       expect.arrayContaining([
         "replace-second-result",

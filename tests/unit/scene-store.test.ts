@@ -9,6 +9,7 @@ describe("createSceneStore", () => {
     store.getState().selectObject("chair_01");
     expect(store.getState().scene.selectedObjectId).toBe("chair_01");
     expect(store.getState().scene.revision).toBe(1);
+    expect(store.getState().stateVersion).toBe(2);
 
     const result = store.getState().applyCommand({
       expectedRevision: 1,
@@ -17,9 +18,11 @@ describe("createSceneStore", () => {
     });
     expect(result.ok).toBe(true);
     expect(store.getState().scene.revision).toBe(2);
+    expect(store.getState().stateVersion).toBe(3);
     expect(store.getState().history).toHaveLength(1);
     expect(store.getState().undo()).toBe(true);
     expect(store.getState().scene.revision).toBe(1);
+    expect(store.getState().stateVersion).toBe(4);
     expect(store.getState().scene.selectedObjectId).toBe("chair_01");
     expect(store.getState().history).toHaveLength(0);
   });
@@ -35,6 +38,7 @@ describe("createSceneStore", () => {
     expect(result.ok).toBe(false);
     expect(store.getState().scene.revision).toBe(1);
     expect(store.getState().history).toHaveLength(0);
+    expect(store.getState().stateVersion).toBe(1);
   });
 
   test("keeps a revision-neutral selection made after the command through undo", () => {
@@ -51,9 +55,12 @@ describe("createSceneStore", () => {
     });
     store.getState().selectObject("lamp_01");
 
+    expect(store.getState().stateVersion).toBe(3);
+
     expect(store.getState().undo()).toBe(true);
     expect(store.getState().scene.revision).toBe(1);
     expect(store.getState().scene.selectedObjectId).toBe("lamp_01");
+    expect(store.getState().stateVersion).toBe(4);
   });
 
   test("caps command history at thirty snapshots", () => {
@@ -72,6 +79,7 @@ describe("createSceneStore", () => {
     expect(store.getState().history).toHaveLength(30);
     expect(store.getState().history[0].revision).toBe(6);
     expect(store.getState().history[29].revision).toBe(35);
+    expect(store.getState().stateVersion).toBe(36);
   });
 
   test("commits one transform as one command and one history entry", () => {
@@ -92,6 +100,7 @@ describe("createSceneStore", () => {
     expect(result.ok).toBe(true);
     expect(store.getState().history).toHaveLength(1);
     expect(store.getState().scene.revision).toBe(2);
+    expect(store.getState().stateVersion).toBe(2);
     const chair = store
       .getState()
       .scene.objects.find(({ id }) => id === "chair_01")!;
@@ -113,6 +122,7 @@ describe("createSceneStore", () => {
     store.getState().reset();
 
     expect(store.getState().resetVersion).toBe(1);
+    expect(store.getState().stateVersion).toBe(4);
     expect(store.getState().scene.revision).toBe(1);
     expect(store.getState().scene.selectedObjectId).toBe("table_01");
     expect(store.getState().scene.styleIntent).toBeNull();
@@ -128,5 +138,23 @@ describe("createSceneStore", () => {
 
     expect(store.getState().scene.selectedObjectId).toBe("table_01");
     expect(store.getState().scene.revision).toBe(1);
+    expect(store.getState().stateVersion).toBe(1);
+  });
+
+  test("increments stateVersion only for actual selection changes", () => {
+    const store = createSceneStore();
+
+    store.getState().selectObject("table_01");
+    expect(store.getState().stateVersion).toBe(1);
+
+    store.getState().selectObject("chair_01");
+    expect(store.getState().stateVersion).toBe(2);
+
+    store.getState().selectObject("chair_01");
+    store.getState().selectObject("missing_01");
+    expect(store.getState().stateVersion).toBe(2);
+
+    store.getState().selectObject(null);
+    expect(store.getState().stateVersion).toBe(3);
   });
 });

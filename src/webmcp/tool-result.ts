@@ -6,6 +6,7 @@ export type ToolErrorCode =
   | "INVALID_INPUT"
   | "NO_SELECTION"
   | "PRODUCT_NOT_FOUND"
+  | "CATALOG_DATA_INVALID"
   | "NO_CART_ITEMS"
   | SceneCommandErrorCode;
 
@@ -15,6 +16,7 @@ export interface ToolSuccess<T> {
   ok: true;
   tool: CoreToolName;
   sceneRevision: number;
+  stateVersion: number;
   data: T;
 }
 
@@ -22,11 +24,13 @@ export interface ToolFailure {
   ok: false;
   tool: CoreToolName;
   sceneRevision: number;
+  stateVersion: number;
   error: {
     code: ToolErrorCode;
     message: string;
     retryable: boolean;
     latestRevision?: number;
+    latestStateVersion?: number;
     issues?: ToolIssue[];
   };
 }
@@ -44,17 +48,19 @@ function textContent(text: string): [{ type: "text"; text: string }] {
 export function toolSuccess<T>(
   tool: CoreToolName,
   sceneRevision: number,
+  stateVersion: number,
   data: T,
   text = "Tool completed successfully.",
 ): ToolResult<T> {
   return {
     content: textContent(text),
-    structuredContent: { ok: true, tool, sceneRevision, data },
+    structuredContent: { ok: true, tool, sceneRevision, stateVersion, data },
   };
 }
 
 export type ToolErrorDetails = {
   latestRevision?: number;
+  latestStateVersion?: number;
   issues?: readonly (ToolIssue | ZodIssue)[];
 };
 
@@ -68,6 +74,7 @@ function normalizeIssues(issues: readonly (ToolIssue | ZodIssue)[]): ToolIssue[]
 export function toolError(
   tool: CoreToolName,
   sceneRevision: number,
+  stateVersion: number,
   code: ToolErrorCode,
   message: string,
   retryable: boolean,
@@ -76,22 +83,26 @@ export function toolError(
 export function toolError(
   tool: CoreToolName,
   sceneRevision: number,
+  stateVersion: number,
   error: {
     code: ToolErrorCode;
     message: string;
     retryable: boolean;
     latestRevision?: number;
+    latestStateVersion?: number;
     issues?: readonly (ToolIssue | ZodIssue)[];
   },
 ): ToolResult<never>;
 export function toolError(
   tool: CoreToolName,
   sceneRevision: number,
+  stateVersion: number,
   codeOrError: ToolErrorCode | {
     code: ToolErrorCode;
     message: string;
     retryable: boolean;
     latestRevision?: number;
+    latestStateVersion?: number;
     issues?: readonly (ToolIssue | ZodIssue)[];
   },
   message?: string,
@@ -113,11 +124,20 @@ export function toolError(
     ...(error.latestRevision === undefined
       ? {}
       : { latestRevision: error.latestRevision }),
+    ...(error.latestStateVersion === undefined
+      ? {}
+      : { latestStateVersion: error.latestStateVersion }),
     ...(error.issues === undefined ? {} : { issues: normalizeIssues(error.issues) }),
   };
   return {
     content: textContent(error.message),
-    structuredContent: { ok: false, tool, sceneRevision, error: normalized },
+    structuredContent: {
+      ok: false,
+      tool,
+      sceneRevision,
+      stateVersion,
+      error: normalized,
+    },
     isError: true,
   };
 }
@@ -125,11 +145,13 @@ export function toolError(
 export function invalidInputResult(
   tool: CoreToolName,
   sceneRevision: number,
+  stateVersion: number,
   error: ZodError,
 ): ToolResult<never> {
   return toolError(
     tool,
     sceneRevision,
+    stateVersion,
     "INVALID_INPUT",
     "Input validation failed.",
     true,

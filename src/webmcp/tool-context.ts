@@ -11,7 +11,7 @@ import {
 import type { SearchProductsInput } from "./tool-contracts";
 
 export const CatalogProductSchema = SceneProductSchema.extend({
-  description: z.string().trim().min(1).max(500),
+  description: z.string().max(500).trim().min(1),
 }).strict();
 
 export type CatalogProduct = z.infer<typeof CatalogProductSchema>;
@@ -35,6 +35,7 @@ export interface CartApprovalDraft {
 
 export interface ToolContext {
   getScene(): Scene;
+  getStateVersion(): number;
   getSelection(): SceneObject | null;
   searchProducts(input: SearchProductsInput): readonly CatalogProduct[];
   resolveProduct(productId: string): CatalogProduct | undefined;

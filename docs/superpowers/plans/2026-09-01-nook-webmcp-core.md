@@ -16,10 +16,13 @@
 - Feature-detect `document.modelContext`; unsupported browsers retain the complete human UI with no error.
 - Register exactly `get_scene`, `get_selection`, `search_products`, `replace_object`, `move_object`, and `add_scene_to_cart`.
 - Unregister with the current API's registration `AbortSignal`; do not invent `unregisterTool()`.
+- Match the execution callback `(input, { signal })` and abort before reads or side effects.
 - Validate every input with strict Zod and a narrow JSON Schema with `additionalProperties: false`.
 - Return the shared MCP-style `ToolResult` containing text `content` and a typed `structuredContent` success/error envelope.
 - Handle no selection, stale revision, missing object, locked object, category mismatch, missing product, and an empty cart draft without arbitrary mutation.
 - Treat demo product text as untrusted and annotate every tool accurately.
+- Preserve Scene revision semantics while using a monotonic Zustand
+  `stateVersion` concurrency token for every mutation.
 - `add_scene_to_cart` opens approval UI only and performs no external cart or network write.
 - Keep the existing four-item `$626 USD` human cart flow unchanged.
 - Add no dependency and do not change `pnpm-lock.yaml`.
@@ -27,7 +30,7 @@
 
 ---
 
-### Task 1: Shared Results, Contracts, and Evals
+### Task 1: Shared Results, Contracts, and Eval Manifest
 
 **Files:**
 - Create: `src/webmcp/tool-result.ts`
@@ -56,6 +59,7 @@ expect(getSceneInputSchema.safeParse({ extra: true }).success).toBe(false);
 expect(searchProductsInputSchema.safeParse({ limit: 0 }).success).toBe(false);
 expect(moveObjectInputSchema.safeParse({
   expectedRevision: 1,
+  expectedStateVersion: 1,
   position: { x: 21, z: 0 },
 }).success).toBe(false);
 expect(MOVE_OBJECT_JSON_SCHEMA.additionalProperties).toBe(false);
@@ -64,8 +68,9 @@ expect(MOVE_OBJECT_JSON_SCHEMA.properties.position.additionalProperties).toBe(fa
 
 Also assert that success has `isError === undefined`, error has
 `isError === true`, both have one text content item, and their
-`structuredContent` branches contain the tool name and Scene revision. Import
-`tests/evals/webmcp-journeys.json` and assert it contains the three named
+`structuredContent` branches contain the tool name, Scene revision, and
+monotonic state version. Import `tests/evals/webmcp-journeys.json` and assert
+the static manifest contains the three named
 journeys `replace-second-result`, `stale-move-conflict`, and
 `cart-approval-only`.
 
@@ -78,7 +83,7 @@ pnpm exec vitest run tests/unit/tool-contracts.test.ts
 ```
 
 Expected: FAIL because `src/webmcp/tool-result.ts`,
-`src/webmcp/tool-contracts.ts`, and the eval fixture do not exist.
+`src/webmcp/tool-contracts.ts`, and the static eval manifest do not exist.
 
 - [ ] **Step 3: Implement the result envelope**
 
@@ -93,25 +98,27 @@ accepts a `ZodError`, uses `issue.path.join(".") || "input"`, and returns
 Use these bounds in both Zod and JSON Schema:
 
 ```ts
-const objectId = z.string().trim().min(1).max(64);
-const productId = z.string().trim().min(1).max(80);
-const query = z.string().trim().min(1).max(80).optional();
+const objectId = z.string().max(64).trim().min(1);
+const productId = z.string().max(80).trim().min(1);
+const query = z.string().max(80).trim().min(1).optional();
 const expectedRevision = z.number().int().min(1);
+const expectedStateVersion = z.number().int().min(1);
 const coordinate = z.number().finite().min(-20).max(20);
 const rotationYDegrees = z.number().finite().min(-360).max(360).optional();
 const limit = z.number().int().min(1).max(3).default(3);
 ```
 
 `search_products` accepts optional `category`, `query`, and `limit`.
-`replace_object` requires `productId` and `expectedRevision` with optional
-`objectId`. `move_object` requires `position` and `expectedRevision` with
-optional `objectId` and rotation. `add_scene_to_cart` requires
-`expectedRevision` and accepts `objectIds` as a unique `1..20` item array.
+`replace_object` requires `productId`, `expectedRevision`, and
+`expectedStateVersion` with optional `objectId`. `move_object` requires
+`position`, `expectedRevision`, and `expectedStateVersion` with optional
+`objectId` and rotation. `add_scene_to_cart` requires `expectedRevision` plus
+`expectedStateVersion` and accepts `objectIds` as a unique `1..20` item array.
 Empty-input schemas are strict empty objects.
 
-- [ ] **Step 5: Add the eval fixture**
+- [ ] **Step 5: Add the static eval manifest**
 
-Record three JSON objects with `id`, `prompt`, `expectedTools`, and
+Record three non-executable JSON manifest objects with `id`, `prompt`, `expectedTools`, and
 `assertions`. The replace journey prompt is “Replace this table with the second
 result” and requires one revision increment; the move journey requires a stale
 revision conflict and no mutation; the cart journey requires a visible approval
@@ -161,6 +168,7 @@ expect(search.structuredContent.data.results[1].id)
 const replace = await execute("replace_object", {
   productId: "travertine-plinth-table",
   expectedRevision: 1,
+  expectedStateVersion: 1,
 });
 expect(replace.structuredContent.ok).toBe(true);
 expect(store.getState().scene.revision).toBe(2);
@@ -170,6 +178,7 @@ expect(store.getState().scene.objects.find(({ id }) => id === "table_01")
 const staleMove = await execute("move_object", {
   objectId: "lamp_01",
   expectedRevision: 1,
+  expectedStateVersion: 2,
   position: { x: 0, z: 0 },
 });
 expect(staleMove.structuredContent.error).toMatchObject({
@@ -182,7 +191,9 @@ expect(store.getState().scene.revision).toBe(2);
 Add independent tests for malformed input, no selection, missing product,
 missing object, locked object, category mismatch, empty cart, explicit cart
 object IDs, annotation values, and all output envelopes. Spy on `globalThis.fetch`
-during `add_scene_to_cart` and assert it is not called.
+during `add_scene_to_cart` and assert it is not called. Also prove revision ABA
+and selection changes conflict through `stateVersion`, catalog data is parsed
+and cloned, and aborted executions perform no command or approval callback.
 
 - [ ] **Step 2: Run the handler test and record RED**
 
@@ -201,6 +212,7 @@ Define:
 ```ts
 interface ToolContext {
   getScene(): Scene;
+  getStateVersion(): number;
   getSelection(): SceneObject | null;
   searchProducts(input: SearchProductsInput): readonly CatalogProduct[];
   resolveProduct(productId: string): CatalogProduct | undefined;
@@ -210,31 +222,34 @@ interface ToolContext {
 ```
 
 `CatalogProduct` extends the validated Scene product metadata with a bounded
-description. A cart item contains `objectId`, `productId`, `variantId`, `title`,
+description. Handlers parse and clone search/resolution results through its Zod
+schema and return `CATALOG_DATA_INVALID` for malformed data. A cart item contains `objectId`, `productId`, `variantId`, `title`,
 quantity `1`, and the USD price. A draft ID is
 `scene-${scene.id}-rev-${scene.revision}` and includes `sceneId`,
 `sceneRevision`, items, and `totalMinor`.
 
 - [ ] **Step 4: Implement thin handlers**
 
-For every descriptor, parse input with its Task 1 Zod schema before reading or
-mutating state. `get_scene` returns `SceneSchema.parse(context.getScene())`.
+For every descriptor, call `signal.throwIfAborted()`, then parse input with its
+Task 1 Zod schema before mutating state. `get_scene` returns
+`SceneSchema.parse(context.getScene())`.
 `get_selection` returns `NO_SELECTION` if null. Search delegates to the context
 and preserves returned order.
 
 Replacement and movement resolve an omitted object ID from selection, then call
 `context.applyCommand()` once with `actor: "agent"`. Map command errors without
 changing their codes or retryability; include `latestRevision` for revision
-conflicts. Cart compares `expectedRevision`, resolves explicit IDs or all
+conflicts. All mutations compare the monotonic `expectedStateVersion` before
+selection-dependent work; cart also compares `expectedRevision`, resolves explicit IDs or all
 product-backed non-seed objects, rejects missing objects and empty drafts, calls
 `openCartApproval()` once, and does not call `fetch`.
 
 - [ ] **Step 5: Apply exact security annotations**
 
-Use the annotation matrix from the spec. Search and replacement carry
-`untrustedContentHint: true` because catalog titles/descriptions are untrusted.
-All other tools use `untrustedContentHint: false`. Only the three read/search
-tools use `readOnlyHint: true`.
+Use the annotation matrix from the spec. Every descriptor carries
+`untrustedContentHint: true` because catalog titles/descriptions can flow into
+later Scene, selection, move, and cart output. Only the three read/search tools
+use `readOnlyHint: true`.
 
 - [ ] **Step 6: Verify GREEN and commit**
 
@@ -303,6 +318,17 @@ Expected: FAIL because registration and hook modules do not exist.
 Mirror only the current spec surface used by Nook:
 
 ```ts
+interface ModelContextToolExecutionOptions {
+  signal: AbortSignal;
+}
+
+interface ModelContextTool {
+  execute(
+    input: unknown,
+    options: ModelContextToolExecutionOptions,
+  ): Promise<ToolResult<unknown>>;
+}
+
 interface ModelContext {
   registerTool(
     tool: ModelContextTool,
@@ -366,10 +392,10 @@ git commit -m "feat(webmcp): manage tool registration lifecycle"
 
 Install a fake `document.modelContext`, render `DemoWorkspace`, await exactly six
 captured tools, execute `search_products`, then execute `replace_object` with
-the second result and revision `1`. Assert Scene diagnostics become
+the second result, revision `1`, and state version `1`. Assert Scene diagnostics become
 `Revision 2 · table_01 · travertine-plinth-table`.
 
-Execute `add_scene_to_cart` with revision `2`, assert the visible approval
+Execute `add_scene_to_cart` with revision/state version `2`, assert the visible approval
 dialog lists one Travertine Plinth Table at `$249 USD`, and assert a fetch spy
 has no calls. Unmount and assert all registration signals are aborted. Add a
 reducer test proving close, confirm, and reset clear an agent cart draft while
@@ -389,7 +415,7 @@ WebMCP cart draft.
 - [ ] **Step 3: Wire the stable ToolContext**
 
 Create the context with `useMemo([sceneStore])`. Every function reads
-`sceneStore.getState()` at call time. Search filters the existing
+`sceneStore.getState()` at call time, including `getStateVersion`. Search filters the existing
 `DEMO_PRODUCTS` by optional exact category and case-insensitive query across
 title, description, style tags, color, and material, then applies `limit` while
 preserving catalog order. Product resolution looks up the same array.
@@ -411,16 +437,17 @@ Create a Playwright init script that defines `document.modelContext` before
 navigation. Its fake `registerTool()` stores exact descriptors on `window` and
 removes them when the registration signal aborts. The test executes:
 
-1. `get_selection` at revision `1`;
+1. `get_selection` at revision/state version `1`;
 2. `search_products({ category: "coffee_table" })`;
-3. `replace_object` with result index `1` and revision `1`;
-4. a stale `move_object` with revision `1` and verifies the latest revision is
+3. `replace_object` with result index `1`, revision `1`, and state version `1`;
+4. a stale `move_object` with revision `1`, state version `2`, and verifies the latest revision is
    `2` and diagnostics did not change;
-5. `add_scene_to_cart({ expectedRevision: 2 })` and verifies approval UI;
+5. `add_scene_to_cart({ expectedRevision: 2, expectedStateVersion: 2 })` and verifies approval UI;
 6. navigation to `/` and verifies the captured active tool set is empty.
 
-After `/demo` is loaded, wrap `window.fetch` with a counter before the cart tool
-call and assert zero calls. Also assert no application console errors.
+After `/demo` is loaded, wrap `window.fetch` with a counter and track external
+browser requests before the cart tool call; assert both stay empty. Also assert
+no application console errors.
 
 Run once before Steps 3-4 to capture the expected failure, then again after
 implementation:

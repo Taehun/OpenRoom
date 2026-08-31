@@ -16,8 +16,12 @@ Product previews, Agent activity, and the four-item cart remain deterministic
 local demo behavior. WebMCP Core 6 is a progressive enhancement backed by the
 same shared Scene store: supported browsers can read the Scene, search the local
 catalog, apply revision-aware replacement and movement commands, and open a
-visible cart draft. Cart calls remain approval-only, and neither the human nor
-WebMCP path makes an external cart request.
+visible cart draft. Mutation calls also carry a monotonic Scene state version,
+so selection changes and revision ABA after undo/reset cannot retarget stale
+requests. The descriptors use the current `(input, { signal })` callback,
+validate catalog output before exposing it, and treat all possible catalog text
+as untrusted. Cart calls remain approval-only, and neither the human nor WebMCP
+path makes an external cart request.
 
 Shopify integration, generated GLB assets and Tripo integration, room upload and
 analysis, persistence, R2, D1, and external cart writes remain future work.
