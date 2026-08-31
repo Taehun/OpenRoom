@@ -101,12 +101,23 @@ export function createSceneStore(seed: Scene = createDemoScene()): SceneStore {
     },
 
     undo() {
+      const currentScene = get().scene;
       const history = get().history;
       const previousScene = history.at(-1);
       if (!previousScene) return false;
 
+      const restoredScene = cloneScene(previousScene);
+      if (
+        currentScene.selectedObjectId === null ||
+        restoredScene.objects.some(
+          ({ id }) => id === currentScene.selectedObjectId,
+        )
+      ) {
+        restoredScene.selectedObjectId = currentScene.selectedObjectId;
+      }
+
       set({
-        scene: cloneScene(previousScene),
+        scene: restoredScene,
         history: history.slice(0, -1),
         isTransforming: false,
       });

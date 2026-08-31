@@ -37,6 +37,25 @@ describe("createSceneStore", () => {
     expect(store.getState().history).toHaveLength(0);
   });
 
+  test("keeps a revision-neutral selection made after the command through undo", () => {
+    const store = createSceneStore();
+
+    store.getState().applyCommand({
+      expectedRevision: 1,
+      actor: "agent",
+      command: {
+        type: "move",
+        objectId: "lamp_01",
+        position: { x: 2.1, z: -1.8 },
+      },
+    });
+    store.getState().selectObject("lamp_01");
+
+    expect(store.getState().undo()).toBe(true);
+    expect(store.getState().scene.revision).toBe(1);
+    expect(store.getState().scene.selectedObjectId).toBe("lamp_01");
+  });
+
   test("caps command history at thirty snapshots", () => {
     const store = createSceneStore();
 

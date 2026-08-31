@@ -187,7 +187,6 @@ test("runs the Agent move and supports keyboard undo", async () => {
     screen.getByRole("heading", { name: "Object inspector" }),
   ).toBeVisible();
   expect(screen.getByText("Revision 1")).toBeVisible();
-  await user.click(screen.getByRole("button", { name: "Floor lamp" }));
   expect(screen.getByText("X 2.73 · Y 0.80 · Z −2.13")).toBeVisible();
 });
 
