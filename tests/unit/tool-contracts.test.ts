@@ -6,6 +6,8 @@ import {
   CORE_TOOL_NAMES,
   GET_SCENE_JSON_SCHEMA,
   MOVE_OBJECT_JSON_SCHEMA,
+  REPLACE_OBJECT_JSON_SCHEMA,
+  SEARCH_PRODUCTS_JSON_SCHEMA,
   addSceneToCartInputSchema,
   getSceneInputSchema,
   moveObjectInputSchema,
@@ -85,6 +87,44 @@ describe("WebMCP Core 6 contracts", () => {
         objectIds: ["table", "table"],
       }).success,
     ).toBe(false);
+  });
+
+  test("rejects whitespace-only IDs and queries in both contract layers", () => {
+    expect(searchProductsInputSchema.safeParse({ query: "   " }).success).toBe(false);
+    expect(
+      replaceObjectInputSchema.safeParse({
+        objectId: "   ",
+        productId: "product",
+        expectedRevision: 1,
+      }).success,
+    ).toBe(false);
+    expect(
+      replaceObjectInputSchema.safeParse({
+        productId: "   ",
+        expectedRevision: 1,
+      }).success,
+    ).toBe(false);
+    expect(
+      moveObjectInputSchema.safeParse({
+        objectId: "   ",
+        expectedRevision: 1,
+        position: { x: 0, z: 0 },
+      }).success,
+    ).toBe(false);
+    expect(
+      addSceneToCartInputSchema.safeParse({
+        expectedRevision: 1,
+        objectIds: ["   "],
+      }).success,
+    ).toBe(false);
+
+    expect(SEARCH_PRODUCTS_JSON_SCHEMA.properties.query.pattern).toBe("\\S");
+    expect(REPLACE_OBJECT_JSON_SCHEMA.properties.objectId.pattern).toBe("\\S");
+    expect(REPLACE_OBJECT_JSON_SCHEMA.properties.productId.pattern).toBe("\\S");
+    expect(MOVE_OBJECT_JSON_SCHEMA.properties.objectId.pattern).toBe("\\S");
+    expect(ADD_SCENE_TO_CART_JSON_SCHEMA.properties.objectIds.items.pattern).toBe(
+      "\\S",
+    );
   });
 
   test("returns the typed success envelope without an error marker", () => {

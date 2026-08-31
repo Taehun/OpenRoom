@@ -102,7 +102,7 @@ export const SEARCH_PRODUCTS_JSON_SCHEMA = {
       type: "string",
       enum: ["sofa", "coffee_table", "rug", "floor_lamp", "chair", "plant"],
     },
-    query: { type: "string", minLength: 1, maxLength: 80 },
+    query: { type: "string", minLength: 1, maxLength: 80, pattern: "\\S" },
     limit: { type: "integer", minimum: 1, maximum: 3, default: 3 },
   },
   additionalProperties: false,
@@ -111,8 +111,8 @@ export const SEARCH_PRODUCTS_JSON_SCHEMA = {
 export const REPLACE_OBJECT_JSON_SCHEMA = {
   type: "object",
   properties: {
-    objectId: { type: "string", minLength: 1, maxLength: 64 },
-    productId: { type: "string", minLength: 1, maxLength: 80 },
+    objectId: { type: "string", minLength: 1, maxLength: 64, pattern: "\\S" },
+    productId: { type: "string", minLength: 1, maxLength: 80, pattern: "\\S" },
     expectedRevision: { type: "integer", minimum: 1 },
   },
   required: ["productId", "expectedRevision"],
@@ -122,7 +122,7 @@ export const REPLACE_OBJECT_JSON_SCHEMA = {
 export const MOVE_OBJECT_JSON_SCHEMA = {
   type: "object",
   properties: {
-    objectId: { type: "string", minLength: 1, maxLength: 64 },
+    objectId: { type: "string", minLength: 1, maxLength: 64, pattern: "\\S" },
     position: {
       type: "object",
       properties: {
@@ -145,7 +145,7 @@ export const ADD_SCENE_TO_CART_JSON_SCHEMA = {
     expectedRevision: { type: "integer", minimum: 1 },
     objectIds: {
       type: "array",
-      items: { type: "string", minLength: 1, maxLength: 64 },
+      items: { type: "string", minLength: 1, maxLength: 64, pattern: "\\S" },
       minItems: 1,
       maxItems: 20,
       uniqueItems: true,
