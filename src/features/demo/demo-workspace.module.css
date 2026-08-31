@@ -339,9 +339,25 @@
   pointer-events: none;
 }
 
-.roomImage {
-  object-fit: cover;
-  object-position: center;
+.sceneViewport {
+  position: absolute;
+  inset: 0;
+}
+
+.sceneViewport > div,
+.sceneViewport canvas {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+.sceneLoading {
+  display: grid;
+  height: 100%;
+  place-items: center;
+  background: #d8d2c7;
+  color: var(--muted-text);
+  font-size: 0.76rem;
+  letter-spacing: 0.02em;
 }
 
 .canvasTopbar {
@@ -366,52 +382,19 @@
   letter-spacing: 0.02em;
 }
 
-.tableSelection {
+.sceneSelectionLabel {
   position: absolute;
   z-index: 3;
-  top: 52%;
-  left: 36.5%;
-  width: 31%;
-  height: 23%;
-  border: 2px solid var(--moss);
-  border-radius: 4px;
-  transform: perspective(600px) rotateX(8deg) rotate(-1deg);
-  box-shadow: 0 0 0 1px rgba(251, 250, 246, 0.76);
-  pointer-events: none;
-}
-
-.tableSelection::before,
-.tableSelection::after {
-  position: absolute;
-  width: 6px;
-  height: 6px;
-  border: 1px solid var(--paper);
-  background: var(--moss);
-  content: "";
-}
-
-.tableSelection::before {
-  top: -4px;
-  left: -4px;
-}
-
-.tableSelection::after {
-  right: -4px;
-  bottom: -4px;
-}
-
-.tableSelection span {
-  position: absolute;
-  bottom: calc(100% + 8px);
-  left: -2px;
-  min-width: max-content;
+  top: 54px;
+  left: 18px;
   padding: 7px 10px;
   border-radius: 5px;
   background: var(--moss);
   color: white;
   font-size: 0.7rem;
   font-weight: 700;
-  transform: rotate(1deg);
+  box-shadow: 0 0 0 1px rgba(251, 250, 246, 0.76);
+  pointer-events: none;
 }
 
 .selectionHint {

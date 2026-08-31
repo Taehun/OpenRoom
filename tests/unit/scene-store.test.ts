@@ -93,6 +93,7 @@ describe("createSceneStore", () => {
 
     store.getState().reset();
 
+    expect(store.getState().resetVersion).toBe(1);
     expect(store.getState().scene.revision).toBe(1);
     expect(store.getState().scene.selectedObjectId).toBe("table_01");
     expect(store.getState().scene.styleIntent).toBeNull();

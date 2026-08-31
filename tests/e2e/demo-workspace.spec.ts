@@ -10,9 +10,18 @@ test("completes the deterministic spatial commerce UI journey", async ({
   await page.setViewportSize({ width: 1280, height: 720 });
   await page.goto("/demo");
 
+  await expect(page.locator('canvas[data-testid="scene-canvas"]')).toBeVisible();
   await expect(
     page.getByRole("heading", { name: "Object inspector" }),
   ).toBeVisible();
+  await page.getByRole("button", { name: "Chair" }).click();
+  await expect(page.getByText("Lounge chair")).toBeVisible();
+  await page.getByRole("button", { name: "Move tool" }).click();
+  await expect(page.getByRole("button", { name: "Move tool" })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  await page.getByRole("button", { name: "Coffee table" }).click();
   await page.getByRole("button", { name: "Find alternatives" }).click();
   await page.getByRole("button", { name: "Preview Oak Frame Table" }).click();
   await expect(page.getByText("Previewing Oak Frame Table")).toBeVisible();
@@ -20,6 +29,14 @@ test("completes the deterministic spatial commerce UI journey", async ({
   await expect(
     page.getByRole("heading", { name: "Agent activity" }),
   ).toBeVisible();
+  await page.keyboard.press("Control+z");
+  await expect(
+    page.getByRole("status", { name: "Scene diagnostics" }),
+  ).toContainText("Revision 2");
+  await page.getByRole("button", { name: "Reset Demo" }).click();
+  await expect(
+    page.getByRole("status", { name: "Scene diagnostics" }),
+  ).toContainText("Revision 1 · table_01 · placeholder");
   await page.getByRole("button", { name: "View cart" }).click();
   const dialog = page.getByRole("dialog", { name: "Review your room" });
   await expect(dialog.getByRole("listitem")).toHaveCount(4);

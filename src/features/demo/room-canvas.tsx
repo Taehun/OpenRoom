@@ -1,5 +1,6 @@
-import Image from "next/image";
+import dynamic from "next/dynamic";
 import type { Dispatch, FormEvent } from "react";
+import { useSceneStore } from "../scene/scene-context";
 import type { Scene } from "../scene/scene-schema";
 import type { DemoAction, DemoState } from "./demo-types";
 import { NookIcon } from "./nook-icon";
@@ -14,6 +15,16 @@ const ROOM_OBJECTS = [
   { id: "plant_01", label: "Plant", abbreviation: "PL" },
 ] as const;
 
+const SceneCanvas = dynamic(
+  () => import("../scene/scene-canvas").then((module) => module.SceneCanvas),
+  {
+    ssr: false,
+    loading: () => (
+      <div className={styles.sceneLoading}>Building your room…</div>
+    ),
+  },
+);
+
 interface RoomCanvasProps {
   dispatch: Dispatch<DemoAction>;
   scene: Scene;
@@ -21,6 +32,8 @@ interface RoomCanvasProps {
 }
 
 export function RoomCanvas({ dispatch, scene, state }: RoomCanvasProps) {
+  const toolMode = useSceneStore((store) => store.toolMode);
+  const setToolMode = useSceneStore((store) => store.setToolMode);
   const selectedObject = scene.objects.find(
     ({ id }) => id === scene.selectedObjectId,
   );
@@ -37,13 +50,15 @@ export function RoomCanvas({ dispatch, scene, state }: RoomCanvasProps) {
     <div className={styles.canvasShell}>
       <aside className={styles.toolRail} aria-label="Room tools">
         <div className={styles.toolButtons}>
-          <p className={styles.visuallyHidden} id="transform-tools-unavailable">
-            Move and Rotate are not available in this read-only demo workspace.
-          </p>
           <button
             aria-label="Select tool"
-            aria-pressed="true"
-            className={styles.toolButtonActive}
+            aria-pressed={toolMode === "select"}
+            className={
+              toolMode === "select"
+                ? styles.toolButtonActive
+                : styles.toolButton
+            }
+            onClick={() => setToolMode("select")}
             title="Select"
             type="button"
           >
@@ -52,11 +67,12 @@ export function RoomCanvas({ dispatch, scene, state }: RoomCanvasProps) {
           </button>
           <button
             aria-label="Move tool"
-            aria-describedby="transform-tools-unavailable"
-            aria-pressed="false"
-            className={styles.toolButton}
-            disabled
-            title="Unavailable in this read-only demo"
+            aria-pressed={toolMode === "move"}
+            className={
+              toolMode === "move" ? styles.toolButtonActive : styles.toolButton
+            }
+            onClick={() => setToolMode("move")}
+            title="Move selected object"
             type="button"
           >
             <NookIcon name="move" />
@@ -64,11 +80,14 @@ export function RoomCanvas({ dispatch, scene, state }: RoomCanvasProps) {
           </button>
           <button
             aria-label="Rotate tool"
-            aria-describedby="transform-tools-unavailable"
-            aria-pressed="false"
-            className={styles.toolButton}
-            disabled
-            title="Unavailable in this read-only demo"
+            aria-pressed={toolMode === "rotate"}
+            className={
+              toolMode === "rotate"
+                ? styles.toolButtonActive
+                : styles.toolButton
+            }
+            onClick={() => setToolMode("rotate")}
+            title="Rotate selected object"
             type="button"
           >
             <NookIcon name="rotate" />
@@ -110,17 +129,18 @@ export function RoomCanvas({ dispatch, scene, state }: RoomCanvasProps) {
 
       <main className={styles.canvas} aria-label="Room canvas">
         <figure className={styles.roomFigure}>
-          <Image
-            alt="Warm living room with a cream sofa, oak coffee table, woven rug, floor lamp, chair, and potted plant."
-            className={styles.roomImage}
-            fill
-            preload
-            sizes="(min-width: 1280px) calc(100vw - 432px), 66vw"
-            src="/demo/nook-room.png"
-          />
+          <div
+            aria-label="Interactive 3D room"
+            className={styles.sceneViewport}
+            role="region"
+          >
+            <SceneCanvas
+              onObjectSelected={() => dispatch({ type: "show-inspector" })}
+            />
+          </div>
           <figcaption className={styles.visuallyHidden}>
-            Approximate room visualization. Use the object list to inspect every
-            scene object.
+            Approximate interactive room visualization. Use the object list as
+            a non-WebGL control path.
           </figcaption>
 
           <div className={styles.canvasTopbar}>
@@ -128,13 +148,11 @@ export function RoomCanvas({ dispatch, scene, state }: RoomCanvasProps) {
             <span>Approximate visualization</span>
           </div>
 
-          {scene.selectedObjectId === "table_01" ? (
-            <div className={styles.tableSelection} aria-hidden="true">
-              <span>
-                {previewProduct
-                  ? `Previewing ${previewProduct.title}`
-                  : "Coffee table · selected"}
-              </span>
+          {selectedObject ? (
+            <div className={styles.sceneSelectionLabel} aria-hidden="true">
+              {selectedObject.id === "table_01" && previewProduct
+                ? `Previewing ${previewProduct.title}`
+                : `${ROOM_OBJECTS.find(({ id }) => id === selectedObject.id)?.label ?? "Object"} · selected`}
             </div>
           ) : null}
 

@@ -33,6 +33,16 @@ test("moves from object inspection to product preview", async () => {
   ).toHaveTextContent("Revision 2 · table_01 · oak-frame-table");
 });
 
+test("exposes the interactive 3D room and its accessible object controls", () => {
+  render(<DemoWorkspace />);
+
+  expect(
+    screen.getByRole("region", { name: "Interactive 3D room" }),
+  ).toBeVisible();
+  expect(screen.getByRole("region", { name: "Objects in room" })).toBeVisible();
+  expect(screen.getByRole("button", { name: "Coffee table" })).toBeVisible();
+});
+
 test("uses Scene selection without incrementing revision", async () => {
   const user = userEvent.setup();
   render(<DemoWorkspace />);
@@ -135,18 +145,25 @@ test("Escape closes the cart before clearing the selected object", async () => {
   expect(coffeeTable).toHaveAttribute("aria-pressed", "false");
 });
 
-test("marks unavailable transform tools as disabled with an explanation", () => {
+test("activates move and rotate tools for Scene transforms", async () => {
+  const user = userEvent.setup();
   render(<DemoWorkspace />);
 
-  const description = "Move and Rotate are not available in this read-only demo workspace.";
-  expect(screen.getByRole("button", { name: "Move tool" })).toBeDisabled();
-  expect(screen.getByRole("button", { name: "Rotate tool" })).toBeDisabled();
-  expect(screen.getByRole("button", { name: "Move tool" })).toHaveAccessibleDescription(
-    description,
-  );
-  expect(screen.getByRole("button", { name: "Rotate tool" })).toHaveAccessibleDescription(
-    description,
-  );
+  const select = screen.getByRole("button", { name: "Select tool" });
+  const move = screen.getByRole("button", { name: "Move tool" });
+  const rotate = screen.getByRole("button", { name: "Rotate tool" });
+
+  expect(select).toHaveAttribute("aria-pressed", "true");
+  expect(move).toBeEnabled();
+  expect(rotate).toBeEnabled();
+
+  await user.click(move);
+  expect(move).toHaveAttribute("aria-pressed", "true");
+  expect(select).toHaveAttribute("aria-pressed", "false");
+
+  await user.click(rotate);
+  expect(rotate).toHaveAttribute("aria-pressed", "true");
+  expect(move).toHaveAttribute("aria-pressed", "false");
 });
 
 test("runs the Agent move and supports keyboard undo", async () => {

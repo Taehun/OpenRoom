@@ -19,6 +19,7 @@ export interface SceneStoreState {
   history: Scene[];
   toolMode: ToolMode;
   isTransforming: boolean;
+  resetVersion: number;
   selectObject(objectId: string | null): void;
   setToolMode(mode: ToolMode): void;
   setTransforming(isTransforming: boolean): void;
@@ -47,6 +48,7 @@ export function createSceneStore(seed: Scene = createDemoScene()): SceneStore {
     history: [],
     toolMode: "select",
     isTransforming: false,
+    resetVersion: 0,
 
     selectObject(objectId) {
       set((state) => {
@@ -112,12 +114,13 @@ export function createSceneStore(seed: Scene = createDemoScene()): SceneStore {
     },
 
     reset() {
-      set({
+      set((state) => ({
         scene: cloneScene(canonicalSeed),
         history: [],
         toolMode: "select",
         isTransforming: false,
-      });
+        resetVersion: state.resetVersion + 1,
+      }));
     },
   }));
 }
