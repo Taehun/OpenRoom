@@ -13,19 +13,21 @@ movement, undo, and canonical reset all use the same revision-aware scene
 command layer.
 
 Product previews, Agent activity, and the four-item cart remain deterministic
-local demo behavior. The demo makes no provider calls or external cart requests.
+local demo behavior. WebMCP Core 6 is a progressive enhancement backed by the
+same shared Scene store: supported browsers can read the Scene, search the local
+catalog, apply revision-aware replacement and movement commands, and open a
+visible cart draft. Cart calls remain approval-only, and neither the human nor
+WebMCP path makes an external cart request.
 
-WebMCP tool registration and Agent orchestration, Shopify integration, generated
-GLB assets and Tripo integration, room upload and analysis, persistence, R2,
-D1, and external cart writes remain future work.
+Shopify integration, generated GLB assets and Tripo integration, room upload and
+analysis, persistence, R2, D1, and external cart writes remain future work.
 
 ## Prerequisites
 
 - Node.js 24.13.1 (recorded in `package.json` and `.node-version`)
 - pnpm 10.27.0 (the package manager recorded in `package.json`)
-- Desktop Chrome with WebMCP support for future WebMCP work; other browsers or
-  environments may be useful for general development but do not satisfy that
-  requirement.
+- Desktop Chrome with WebMCP support to use the Core 6 enhancement. Browsers
+  without `document.modelContext` retain the complete human demo.
 
 ## Setup
 

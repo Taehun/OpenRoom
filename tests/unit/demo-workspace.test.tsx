@@ -1,11 +1,91 @@
-import { cleanup, render, screen, within } from "@testing-library/react";
+import {
+  act,
+  cleanup,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, expect, test, vi } from "vitest";
 import { DemoWorkspace } from "../../src/features/demo/demo-workspace";
+import type { ModelContextTool } from "../../src/webmcp/tool-handlers";
+
+interface CapturedRegistration {
+  signal: AbortSignal;
+  tool: ModelContextTool;
+}
 
 afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
+  Reflect.deleteProperty(document, "modelContext");
+});
+
+test("connects the Core 6 journey to the shared Scene and approval UI", async () => {
+  const registrations: CapturedRegistration[] = [];
+  Object.defineProperty(document, "modelContext", {
+    configurable: true,
+    value: {
+      async registerTool(
+        tool: ModelContextTool,
+        options?: { signal?: AbortSignal },
+      ) {
+        if (!options?.signal) throw new Error("Expected a registration signal");
+        registrations.push({ signal: options.signal, tool });
+      },
+    },
+  });
+  const fetchSpy = vi.spyOn(globalThis, "fetch");
+  const { unmount } = render(<DemoWorkspace />);
+
+  await waitFor(() => expect(registrations).toHaveLength(6));
+  const tool = (name: ModelContextTool["name"]) => {
+    const descriptor = registrations.find(
+      (registration) => registration.tool.name === name,
+    )?.tool;
+    if (!descriptor) throw new Error(`Missing ${name}`);
+    return descriptor;
+  };
+
+  const search = await tool("search_products").execute(
+    { category: "coffee_table" },
+    new AbortController().signal,
+  );
+  if (!search.structuredContent.ok) throw new Error("Expected search success");
+  const results = (
+    search.structuredContent.data as {
+      results: Array<{ id: string }>;
+    }
+  ).results;
+
+  await act(async () => {
+    await tool("replace_object").execute(
+      { productId: results[1]?.id, expectedRevision: 1 },
+      new AbortController().signal,
+    );
+  });
+  expect(
+    screen.getByRole("status", { name: "Scene diagnostics" }),
+  ).toHaveTextContent(
+    "Revision 2 · table_01 · travertine-plinth-table",
+  );
+
+  await act(async () => {
+    await tool("add_scene_to_cart").execute(
+      { expectedRevision: 2 },
+      new AbortController().signal,
+    );
+  });
+  const sheet = screen.getByRole("dialog", { name: "Review your room" });
+  expect(within(sheet).getAllByRole("listitem")).toHaveLength(1);
+  expect(within(sheet).getByText("Travertine Plinth Table")).toBeVisible();
+  expect(within(sheet).getByText("$249 USD")).toBeVisible();
+  expect(within(sheet).getByText(/Scene revision 2/)).toBeVisible();
+  expect(fetchSpy).not.toHaveBeenCalled();
+
+  unmount();
+  expect(registrations.every(({ signal }) => signal.aborted)).toBe(true);
 });
 
 test("moves from object inspection to product preview", async () => {

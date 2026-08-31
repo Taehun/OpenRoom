@@ -1,4 +1,5 @@
 import type { SceneProduct } from "../scene/scene-schema";
+import type { CartApprovalDraft } from "../../webmcp/tool-context";
 
 export type DemoMode = "inspector" | "products" | "activity";
 
@@ -19,6 +20,7 @@ export interface DemoToast {
 export interface DemoState {
   mode: DemoMode;
   isCartOpen: boolean;
+  cartDraft: CartApprovalDraft | null;
   toast: DemoToast | null;
   announcement: string | null;
 }
@@ -30,7 +32,7 @@ export type DemoAction =
   | { type: "select-object"; objectId: string | null }
   | { type: "preview-product"; productId: string }
   | { type: "run-agent-move" }
-  | { type: "open-cart" }
+  | { type: "open-cart"; draft?: CartApprovalDraft }
   | { type: "close-cart" }
   | { type: "confirm-demo-cart" }
   | { type: "undo" }

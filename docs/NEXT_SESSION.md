@@ -1,128 +1,104 @@
 # Nook Next Session Handoff
 
-Snapshot: 2026-09-01 KST. Scene Core implementation commit: `55b0f9c`.
+Snapshot: 2026-09-01 KST. Task 4 is identified by the exact commit subject
+`feat(demo): connect WebMCP to cart approval`; its SHA is intentionally not
+self-referenced from inside that commit.
 
 ## Current State
 
-- Feature branch: `feat/scene-core`
-- Worktree: `/Users/taehun/Projects/WebMCP/.worktrees/scene-core`
-- Base branch: `main` at the original fork point `9eb00b4`
-- The feature worktree and `main` were clean at session wrap.
-- Scene Core is committed locally but has not been merged or pushed.
-- Verified baseline: 30 Vitest tests, 2 Playwright tests, typecheck, lint,
-  vinext build, Next.js build, and diff check passed.
+- Feature branch: `feat/webmcp-core`
+- Worktree: `/Users/taehun/Projects/WebMCP/.worktrees/webmcp-core`
+- Base branch: `main` at `454f007cf623c112a2cbb54093683e5f90faddfd`
+- WebMCP Core 6 is a feature-detected progressive enhancement. The complete
+  human demo still works when `document.modelContext` is absent.
+- All six tools use the same late-bound Scene store as the human UI. Replacement
+  and movement remain revision-aware, and cart calls only open visible local
+  approval state.
+- The four-item human fixture cart remains `$626 USD`; the optional WebMCP draft
+  renders only eligible Scene products and remains UI-only.
+- Merge, push, pull request creation, deployment, and external provider calls
+  were not performed.
 
-Implemented behavior includes validated Scene JSON, deterministic room
-generation, revision-aware commands, Zustand history/undo/reset, an editable R3F
-room, object selection, Move/Rotate TransformControls, fixture product
-replacement, deterministic Agent lamp movement, and local cart approval UI.
+## Known Commit Chain
 
-## First Action
+Scene Core and branch preparation:
 
-Resolve how to integrate `feat/scene-core` before starting another feature:
+- `b6a82d88ea45fd0231230715416d0687efdefdc3` — `docs: plan deterministic scene core`
+- `ac9b815b17ba1c551dc213962dea9e054e1ef9e3` — `feat(scene): add deterministic room and command core`
+- `649cca65bc205b4b53f2c8ad894065ef0eea51a4` — `feat(scene): add shared Zustand command store`
+- `299da6d78e544e81f0c0e2afe41ee98da00eea80` — `feat(demo): connect the workspace to shared Scene state`
+- `b2d5a981fdba0e68ee4394de9266120e7ac1503c` — `feat(scene): render and edit the deterministic room in R3F`
+- `55b0f9c8e06e7e945e7ab0afbbede37545db8476` — `fix(scene): keep selection stable through undo`
+- `70e7a35aa93bee75220760dfe0c34a542c9d0de6` — `docs: record Scene Core handoff`
+- `454f007cf623c112a2cbb54093683e5f90faddfd` — `chore: exclude linked worktrees from lint`
 
-1. Recommended: merge it into `main` locally and rerun the full verification
-   matrix on the merged result.
-2. Alternatively, push the branch and open a pull request.
+WebMCP Core 6 before Task 4:
 
-Do not delete the worktree until the integration choice is complete and the
-merged or reviewed result is verified.
+- `120940748a81608190949930ea63449af84bfe46` — `docs: plan Nook WebMCP Core 6`
+- `71308c060a0166557709d001eadb17c84f376566` — `feat(webmcp): define Core 6 tool contracts`
+- `f8a82ebf20233aed348b2414e1a7a82383ea92e8` — `fix(webmcp): align JSON text contracts`
+- `6b46fe477b051d8ebc3801433154a009f669f98a` — `feat(webmcp): implement Scene Core 6 handlers`
+- `5a16b6b084743c5403a35719ff82c4057ee4fe13` — `fix(webmcp): exclude placeholders from cart drafts`
+- `0bde1521aa03ba3a29d61a6e61d795caa0645bf0` — `feat(webmcp): manage tool registration lifecycle`
 
-## Next Work Package: WebMCP Core 6
+## Task 4 RED / GREEN Evidence
 
-Goal: let a WebMCP-aware browser Agent read and modify the same Scene state used
-by the human UI without introducing a separate Agent backend.
-
-Before implementation, verify the current experimental WebMCP API and security
-guidance against official Chrome documentation. Do not rely on a remembered API
-shape.
-
-Implement these tools first:
-
-1. `get_scene`
-2. `get_selection`
-3. `search_products`
-4. `replace_object`
-5. `move_object`
-6. `add_scene_to_cart`
-
-### Required Behavior
-
-- Feature-detect `document.modelContext`; keep the human UI working when it is
-  unavailable.
-- Register each tool once and unregister it on route change or unmount.
-- Validate every input with narrow JSON Schema and Zod contracts.
-- Return the shared structured `ToolResult` success/error envelope.
-- Treat product fixture text as untrusted data.
-- Route `replace_object` and `move_object` through the existing revision-aware
-  Scene command layer with `expectedRevision`.
-- Return safe errors for no selection, stale revision, missing object, locked
-  object, and category mismatch without arbitrary mutation.
-- Start `search_products` with the deterministic demo catalog; do not block the
-  WebMCP proof on Shopify.
-- `add_scene_to_cart` must only create a draft and open the visible approval
-  sheet. It must not perform an external cart write before explicit user click.
-- Avoid a generic `execute({ action, params })` escape hatch.
-
-### Expected Files
-
-```text
-src/webmcp/tool-result.ts
-src/webmcp/tool-contracts.ts
-src/webmcp/register-tools.ts
-src/webmcp/use-webmcp-tools.ts
-tests/unit/tool-contracts.test.ts
-tests/evals/webmcp-journeys.json
-```
-
-Keep handlers thin. `ToolContext` should expose Scene reads, selection, command
-application, product search, asset resolution, and cart approval callbacks rather
-than importing UI components or mutating Three.js objects.
-
-### Verification Gate
-
-- Exact Core 6 names register without duplicates.
-- Schemas reject additional properties and out-of-range values.
-- Read-only and untrusted-content annotations match the tool behavior.
-- Tool handlers return structured success and error results.
-- “Replace this table with the second result” changes the selected Scene object
-  through WebMCP and increments the revision once.
-- A stale move returns a revision conflict and the latest revision.
-- “Add everything new to cart” opens approval UI with no external request.
-- Cleanup removes all registered handlers.
-- Existing human selection, transform, replacement, undo, reset, and cart E2E
-  remain green.
-
-Run at minimum:
+Component command:
 
 ```bash
-pnpm run test
-pnpm run test:e2e
-pnpm run typecheck
-pnpm run lint
-pnpm run build
-pnpm run build:next
-git diff --check
+pnpm exec vitest run tests/unit/demo-state.test.ts tests/unit/demo-workspace.test.tsx
 ```
 
-## After WebMCP Core
+- RED: exit `1`; 2 files failed, with 3 failed and 12 passed tests. The initial
+  reducer state lacked `cartDraft`, an agent draft was not retained, and the
+  rendered workspace captured 0 rather than 6 tool registrations.
+- GREEN: exit `0`; 2 files passed and all 15 tests passed.
 
-1. Implement `CommerceProvider`, `DemoProvider`, and `ShopifyProvider` plus the
-   approved cart route. Keep DemoProvider as the deterministic fallback.
-2. Implement cached product assets, R2/D1 bindings, and then the optional Tripo
-   live-generation showcase.
-3. Add room upload/analysis only after the shared Scene, Agent, and commerce
-   journey is green.
+Browser command:
+
+```bash
+pnpm exec playwright test tests/e2e/webmcp-core.spec.ts --config=playwright.config.ts
+```
+
+- RED: exit `1`; 1 test failed because the pre-implementation workspace
+  registered 0 rather than 6 tools.
+- GREEN: exit `0`; 1 Chromium test passed. It executed the captured descriptors,
+  proved the stale move left revision 2 unchanged, counted zero fetch calls, and
+  used the `Nook home` Next Link to prove every active registration aborted.
+
+## Verification Matrix
+
+The required commands ran in this exact order and exited `0`:
+
+1. `pnpm run test` — 10 files passed; 61 tests passed.
+2. `pnpm run test:e2e` — 3 Chromium tests passed.
+3. `pnpm run typecheck` — TypeScript completed with no diagnostics.
+4. `pnpm run lint` — ESLint completed with no diagnostics.
+5. `pnpm run build` — vinext completed all five build phases and emitted `/`
+   and `/demo`.
+6. `pnpm run build:next` — Next.js 16.3.3 compiled, type-checked, and generated
+   4/4 static pages; `/` and `/demo` are static.
+7. `git diff --check` — clean.
 
 ## Known Residuals
 
-- Three/drei currently emits an upstream `THREE.Clock` deprecation warning;
-  browser verification captured zero application console errors.
-- Real TransformControls drag/release was manually verified in Chromium, while
-  automated coverage currently tests the store transaction and browser journey
-  rather than pixel-coordinate dragging.
-- vinext reports a client chunk larger than 500 kB because of the 3D stack; track
-  it during asset/performance work without changing locked dependencies before
-  the submission.
-- Aggregate `verify:fast` and `verify:full` package scripts may be added after
-  Scene Core is merged, but are not required for the next feature.
+- Three/drei emits the upstream `THREE.Clock` deprecation warning during browser
+  runs; the WebMCP journey records zero application console errors.
+- Playwright/Next dev emits `NO_COLOR` / `FORCE_COLOR` process warnings.
+- vinext reports a client chunk larger than 500 kB because of the 3D stack.
+- vinext's Node process also emits the upstream `punycode` deprecation warning.
+- The WebMCP API is still experimental and browser-gated; unsupported browsers
+  intentionally run the unchanged human path.
+- No generic execute tool, Shopify/Tripo/R2/D1 integration, upload, persistence,
+  external request, or deployment is part of this package.
+
+## Next Work Packages
+
+1. Integrate `feat/webmcp-core` through the chosen local merge or pull-request
+   workflow, then rerun the full matrix on the integrated result.
+2. Implement `CommerceProvider`, `DemoProvider`, and `ShopifyProvider` with an
+   explicitly approved server cart route; keep `DemoProvider` deterministic.
+3. Add cached product assets and R2/D1 bindings, then the optional Tripo
+   live-generation showcase.
+4. Add room upload and analysis only after the shared Scene, WebMCP, and
+   commerce journey remains green.

@@ -6,6 +6,7 @@ export { CART_ITEMS, DEMO_PRODUCTS } from "./demo-data";
 const INITIAL_STATE: DemoState = {
   mode: "inspector",
   isCartOpen: false,
+  cartDraft: null,
   toast: null,
   announcement: null,
 };
@@ -33,13 +34,14 @@ export function demoReducer(state: DemoState, action: DemoAction): DemoState {
         toast: { message: "Lamp moved to match your layout" },
       };
     case "open-cart":
-      return { ...state, isCartOpen: true };
+      return { ...state, isCartOpen: true, cartDraft: action.draft ?? null };
     case "close-cart":
-      return { ...state, isCartOpen: false };
+      return { ...state, isCartOpen: false, cartDraft: null };
     case "confirm-demo-cart":
       return {
         ...state,
         isCartOpen: false,
+        cartDraft: null,
         announcement: "Demo only — no external cart was created.",
       };
     case "undo":

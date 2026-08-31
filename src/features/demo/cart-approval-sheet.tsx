@@ -3,9 +3,11 @@ import { CART_ITEMS } from "./demo-data";
 import type { DemoAction } from "./demo-types";
 import { NookIcon } from "./nook-icon";
 import styles from "./demo-workspace.module.css";
+import type { CartApprovalDraft } from "../../webmcp/tool-context";
 
 interface CartApprovalSheetProps {
   dispatch: Dispatch<DemoAction>;
+  draft?: CartApprovalDraft | null;
 }
 
 function formatPrice(priceMinor: number) {
@@ -17,8 +19,13 @@ const CART_TOTAL_MINOR = CART_ITEMS.reduce(
   0,
 );
 
-export function CartApprovalSheet({ dispatch }: CartApprovalSheetProps) {
+export function CartApprovalSheet({
+  dispatch,
+  draft,
+}: CartApprovalSheetProps) {
   const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const totalMinor = draft?.totalMinor ?? CART_TOTAL_MINOR;
+  const total = formatPrice(totalMinor);
 
   useEffect(() => {
     closeButtonRef.current?.focus();
@@ -80,23 +87,37 @@ export function CartApprovalSheet({ dispatch }: CartApprovalSheetProps) {
         </header>
 
         <p className={styles.sheetIntro}>
-          Nook has prepared these four fixtures for your approval. Nothing has
-          been sent to Shopify.
+          {draft
+            ? `Nook has prepared ${draft.items.length} Scene item${draft.items.length === 1 ? "" : "s"} from Scene revision ${draft.sceneRevision} for your approval. Nothing has been sent to Shopify.`
+            : "Nook has prepared these four fixtures for your approval. Nothing has been sent to Shopify."}
         </p>
 
         <ul className={styles.cartItems}>
-          {CART_ITEMS.map((item, index) => (
-            <li key={item.id}>
-              <span className={styles.cartThumbnail} aria-hidden="true">
-                {String(index + 1).padStart(2, "0")}
-              </span>
-              <span className={styles.cartItemCopy}>
-                <strong>{item.name}</strong>
-                <small>Qty 1 · Demo fixture</small>
-              </span>
-              <strong>{formatPrice(item.priceMinor)}</strong>
-            </li>
-          ))}
+          {draft
+            ? draft.items.map((item, index) => (
+                <li key={item.objectId}>
+                  <span className={styles.cartThumbnail} aria-hidden="true">
+                    {String(index + 1).padStart(2, "0")}
+                  </span>
+                  <span className={styles.cartItemCopy}>
+                    <strong>{item.title}</strong>
+                    <small>Qty {item.quantity} · Scene product</small>
+                  </span>
+                  <strong>{formatPrice(item.price.amountMinor)}</strong>
+                </li>
+              ))
+            : CART_ITEMS.map((item, index) => (
+                <li key={item.id}>
+                  <span className={styles.cartThumbnail} aria-hidden="true">
+                    {String(index + 1).padStart(2, "0")}
+                  </span>
+                  <span className={styles.cartItemCopy}>
+                    <strong>{item.name}</strong>
+                    <small>Qty 1 · Demo fixture</small>
+                  </span>
+                  <strong>{formatPrice(item.priceMinor)}</strong>
+                </li>
+              ))}
         </ul>
 
         <div className={styles.cartTotal}>
@@ -104,7 +125,7 @@ export function CartApprovalSheet({ dispatch }: CartApprovalSheetProps) {
             <strong>Estimated total</strong>
             <small>Taxes and delivery calculated later</small>
           </span>
-          <strong>{formatPrice(CART_TOTAL_MINOR)} USD</strong>
+          <strong>{total} USD</strong>
         </div>
 
         <div className={styles.sheetDisclosure}>
@@ -117,13 +138,17 @@ export function CartApprovalSheet({ dispatch }: CartApprovalSheetProps) {
 
         <div className={styles.sheetActions}>
           <button
-            aria-label="Continue to Shopify · $626"
+            aria-label={
+              draft
+                ? `Approve Scene cart · ${total}`
+                : "Continue to Shopify · $626"
+            }
             className={styles.commerceButton}
             onClick={() => dispatch({ type: "confirm-demo-cart" })}
             type="button"
           >
-            <span>Continue to Shopify</span>
-            <strong>$626</strong>
+            <span>{draft ? "Approve Scene cart" : "Continue to Shopify"}</span>
+            <strong>{total}</strong>
           </button>
           <button
             className={styles.cancelButton}

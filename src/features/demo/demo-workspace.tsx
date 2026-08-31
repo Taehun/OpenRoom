@@ -4,6 +4,7 @@ import {
   type Dispatch,
   useCallback,
   useEffect,
+  useMemo,
   useReducer,
   useRef,
 } from "react";
@@ -20,6 +21,8 @@ import type { DemoAction } from "./demo-types";
 import { RoomCanvas } from "./room-canvas";
 import { WorkspaceHeader } from "./workspace-header";
 import styles from "./demo-workspace.module.css";
+import type { ToolContext } from "../../webmcp/tool-context";
+import { useWebMcpTools } from "../../webmcp/use-webmcp-tools";
 
 export function DemoWorkspace() {
   return (
@@ -48,6 +51,49 @@ function DemoWorkspaceContent() {
   const selectedObject = scene.objects.find(
     ({ id }) => id === scene.selectedObjectId,
   );
+  const toolContext = useMemo<ToolContext>(
+    () => ({
+      getScene: () => sceneStore.getState().scene,
+      getSelection: () => {
+        const { scene: currentScene } = sceneStore.getState();
+        return (
+          currentScene.objects.find(
+            ({ id }) => id === currentScene.selectedObjectId,
+          ) ?? null
+        );
+      },
+      searchProducts: ({ category, query, limit }) => {
+        const normalizedQuery = query?.toLowerCase();
+        return DEMO_PRODUCTS.filter(
+          (product) =>
+            category === undefined || product.category === category,
+        )
+          .filter(
+            (product) =>
+              normalizedQuery === undefined ||
+              [
+                product.title,
+                product.description,
+                ...product.styleTags,
+                product.color ?? "",
+                product.material ?? "",
+              ].some((value) =>
+                value.toLowerCase().includes(normalizedQuery),
+              ),
+          )
+          .slice(0, limit);
+      },
+      resolveProduct: (productId) =>
+        DEMO_PRODUCTS.find((product) => product.id === productId),
+      applyCommand: (request) =>
+        sceneStore.getState().applyCommand(request),
+      openCartApproval: (draft) =>
+        dispatch({ type: "open-cart", draft }),
+    }),
+    [sceneStore],
+  );
+
+  useWebMcpTools(toolContext);
 
   const routeAction = useCallback<Dispatch<DemoAction>>(
     (action) => {
@@ -188,7 +234,9 @@ function DemoWorkspaceContent() {
         </output>
       </div>
 
-      {state.isCartOpen ? <CartApprovalSheet dispatch={routeAction} /> : null}
+      {state.isCartOpen ? (
+        <CartApprovalSheet dispatch={routeAction} draft={state.cartDraft} />
+      ) : null}
     </div>
   );
 }
