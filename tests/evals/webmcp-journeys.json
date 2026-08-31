@@ -1,0 +1,30 @@
+[
+  {
+    "id": "replace-second-result",
+    "prompt": "Replace this table with the second result",
+    "expectedTools": ["get_selection", "search_products", "replace_object"],
+    "assertions": [
+      "search_products returns the deterministic catalog order",
+      "replace_object applies the second result to the selected table",
+      "Scene revision increments exactly once"
+    ]
+  },
+  {
+    "id": "stale-move-conflict",
+    "prompt": "Move the lamp using the stale revision",
+    "expectedTools": ["move_object"],
+    "assertions": [
+      "move_object returns SCENE_REVISION_CONFLICT with the latest revision",
+      "The Scene is not mutated"
+    ]
+  },
+  {
+    "id": "cart-approval-only",
+    "prompt": "Add the product-backed scene objects to the cart",
+    "expectedTools": ["add_scene_to_cart"],
+    "assertions": [
+      "A visible approval dialog is opened",
+      "No external requests are made"
+    ]
+  }
+]
