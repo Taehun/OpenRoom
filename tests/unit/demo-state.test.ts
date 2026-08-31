@@ -1,38 +1,53 @@
 import { describe, expect, test } from "vitest";
-import { createInitialDemoState, demoReducer } from "../../src/features/demo/demo-state";
+
+import {
+  createInitialDemoState,
+  demoReducer,
+} from "../../src/features/demo/demo-state";
 
 describe("demoReducer", () => {
-  test("previews the selected product as a reversible scene change", () => {
-    const initial = createInitialDemoState();
-    const products = demoReducer(initial, { type: "show-products" });
-    const preview = demoReducer(products, {
+  test("owns only panel, cart, toast, and announcement state", () => {
+    expect(createInitialDemoState()).toEqual({
+      mode: "inspector",
+      isCartOpen: false,
+      toast: null,
+      announcement: null,
+    });
+
+    const preview = demoReducer(createInitialDemoState(), {
       type: "preview-product",
       productId: "oak-frame-table",
     });
-
-    expect(preview).toMatchObject({
+    expect(preview).toEqual({
       mode: "products",
-      previewProductId: "oak-frame-table",
-      provider: "Cached",
-      revision: 2,
-      roomTotalMinor: 16900,
+      isCartOpen: false,
+      toast: null,
+      announcement: null,
     });
-    expect(demoReducer(preview, { type: "undo" })).toMatchObject({
-      mode: "products",
-      previewProductId: null,
-      revision: 1,
-      roomTotalMinor: 0,
-    });
+    expect(preview).not.toHaveProperty("revision");
+    expect(preview).not.toHaveProperty("history");
   });
 
-  test("records an agent move and reset returns the canonical revision", () => {
+  test("records Agent disclosure and reset restores the canonical UI state", () => {
     const moved = demoReducer(createInitialDemoState(), {
       type: "run-agent-move",
     });
-    expect(moved).toMatchObject({ mode: "activity", revision: 2 });
+    expect(moved.mode).toBe("activity");
     expect(moved.toast?.message).toBe("Lamp moved to match your layout");
     expect(demoReducer(moved, { type: "reset" })).toEqual(
       createInitialDemoState(),
+    );
+  });
+
+  test("keeps cart confirmation local and explicit", () => {
+    const opened = demoReducer(createInitialDemoState(), {
+      type: "open-cart",
+    });
+    const confirmed = demoReducer(opened, { type: "confirm-demo-cart" });
+
+    expect(confirmed.isCartOpen).toBe(false);
+    expect(confirmed.announcement).toBe(
+      "Demo only — no external cart was created.",
     );
   });
 });

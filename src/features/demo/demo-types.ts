@@ -1,9 +1,8 @@
+import type { SceneProduct } from "../scene/scene-schema";
+
 export type DemoMode = "inspector" | "products" | "activity";
 
-export interface DemoProduct {
-  id: string;
-  name: string;
-  priceMinor: number;
+export interface DemoProduct extends SceneProduct {
   description: string;
 }
 
@@ -17,20 +16,11 @@ export interface DemoToast {
   message: string;
 }
 
-export interface DemoHistorySnapshot {
+export interface DemoState {
   mode: DemoMode;
-  revision: number;
-  selectedObjectId: string | null;
-  previewProductId: string | null;
   isCartOpen: boolean;
-  provider: string;
-  roomTotalMinor: number;
   toast: DemoToast | null;
   announcement: string | null;
-}
-
-export interface DemoState extends DemoHistorySnapshot {
-  history: DemoHistorySnapshot | null;
 }
 
 export type DemoAction =

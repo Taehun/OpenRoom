@@ -1,6 +1,6 @@
 import Image from "next/image";
 import type { Dispatch, FormEvent } from "react";
-import { DEMO_PRODUCTS } from "./demo-data";
+import type { Scene } from "../scene/scene-schema";
 import type { DemoAction, DemoState } from "./demo-types";
 import { NookIcon } from "./nook-icon";
 import styles from "./demo-workspace.module.css";
@@ -16,13 +16,17 @@ const ROOM_OBJECTS = [
 
 interface RoomCanvasProps {
   dispatch: Dispatch<DemoAction>;
+  scene: Scene;
   state: DemoState;
 }
 
-export function RoomCanvas({ dispatch, state }: RoomCanvasProps) {
-  const previewProduct = DEMO_PRODUCTS.find(
-    ({ id }) => id === state.previewProductId,
+export function RoomCanvas({ dispatch, scene, state }: RoomCanvasProps) {
+  const selectedObject = scene.objects.find(
+    ({ id }) => id === scene.selectedObjectId,
   );
+  const previewProduct = scene.objects.find(
+    ({ id }) => id === "table_01",
+  )?.product;
 
   function runAgentMove(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -76,7 +80,7 @@ export function RoomCanvas({ dispatch, state }: RoomCanvasProps) {
           <h2 className={styles.visuallyHidden}>Objects in room</h2>
           <ul className={styles.objectList}>
             {ROOM_OBJECTS.map((object) => {
-              const isSelected = state.selectedObjectId === object.id;
+              const isSelected = scene.selectedObjectId === object.id;
 
               return (
                 <li key={object.id}>
@@ -124,17 +128,17 @@ export function RoomCanvas({ dispatch, state }: RoomCanvasProps) {
             <span>Approximate visualization</span>
           </div>
 
-          {state.selectedObjectId === "table_01" ? (
+          {scene.selectedObjectId === "table_01" ? (
             <div className={styles.tableSelection} aria-hidden="true">
               <span>
                 {previewProduct
-                  ? `Previewing ${previewProduct.name}`
+                  ? `Previewing ${previewProduct.title}`
                   : "Coffee table · selected"}
               </span>
             </div>
           ) : null}
 
-          {state.selectedObjectId === null ? (
+          {selectedObject === undefined ? (
             <p className={styles.selectionHint}>Selection cleared</p>
           ) : null}
 

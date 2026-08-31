@@ -27,6 +27,23 @@ test("moves from object inspection to product preview", async () => {
   );
   expect(screen.getByText("Previewing Oak Frame Table")).toBeVisible();
   expect(screen.getByText("Revision 2")).toBeVisible();
+  expect(screen.getAllByText("$169")).not.toHaveLength(0);
+  expect(
+    screen.getByRole("status", { name: "Scene diagnostics" }),
+  ).toHaveTextContent("Revision 2 · table_01 · oak-frame-table");
+});
+
+test("uses Scene selection without incrementing revision", async () => {
+  const user = userEvent.setup();
+  render(<DemoWorkspace />);
+
+  await user.click(screen.getByRole("button", { name: "Chair" }));
+
+  expect(screen.getByText("Lounge chair")).toBeVisible();
+  expect(screen.getByText("Revision 1")).toBeVisible();
+  expect(
+    screen.getByRole("status", { name: "Scene diagnostics" }),
+  ).toHaveTextContent("Revision 1 · chair_01 · placeholder");
 });
 
 test("opens a four-item approval sheet and confirms without an external cart request", async () => {
@@ -145,11 +162,16 @@ test("runs the Agent move and supports keyboard undo", async () => {
   expect(screen.getByText("Lamp moved to match your layout")).toBeVisible();
   expect(screen.getByText("Revision 2")).toBeVisible();
 
+  await user.click(screen.getByRole("button", { name: "Floor lamp" }));
+  expect(screen.getByText("X 2.31 · Y 0.80 · Z −2.13")).toBeVisible();
+
   await user.keyboard("{Control>}z{/Control}");
   expect(
     screen.getByRole("heading", { name: "Object inspector" }),
   ).toBeVisible();
   expect(screen.getByText("Revision 1")).toBeVisible();
+  await user.click(screen.getByRole("button", { name: "Floor lamp" }));
+  expect(screen.getByText("X 2.73 · Y 0.80 · Z −2.13")).toBeVisible();
 });
 
 test("Reset Demo restores the canonical inspector state", async () => {
@@ -167,6 +189,9 @@ test("Reset Demo restores the canonical inspector state", async () => {
   ).toBeVisible();
   expect(screen.getByText("Revision 1")).toBeVisible();
   expect(screen.getByText("$0")).toBeVisible();
+  expect(
+    screen.getByRole("status", { name: "Scene diagnostics" }),
+  ).toHaveTextContent("Revision 1 · table_01 · placeholder");
   expect(
     screen.queryByText("Previewing Oak Frame Table"),
   ).not.toBeInTheDocument();

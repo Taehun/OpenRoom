@@ -1,13 +1,17 @@
 import Link from "next/link";
 import type { Dispatch, RefObject } from "react";
-import type { DemoAction, DemoState } from "./demo-types";
+import type { Scene } from "../scene/scene-schema";
+import type { DemoAction } from "./demo-types";
 import { NookIcon } from "./nook-icon";
 import styles from "./demo-workspace.module.css";
 
 interface WorkspaceHeaderProps {
   cartButtonRef: RefObject<HTMLButtonElement | null>;
+  canUndo: boolean;
   dispatch: Dispatch<DemoAction>;
-  state: DemoState;
+  provider: string;
+  roomTotalMinor: number;
+  scene: Scene;
 }
 
 function formatRoomTotal(totalMinor: number) {
@@ -16,8 +20,11 @@ function formatRoomTotal(totalMinor: number) {
 
 export function WorkspaceHeader({
   cartButtonRef,
+  canUndo,
   dispatch,
-  state,
+  provider,
+  roomTotalMinor,
+  scene,
 }: WorkspaceHeaderProps) {
   return (
     <header className={styles.header}>
@@ -28,7 +35,7 @@ export function WorkspaceHeader({
         <span className={styles.headerDivider} aria-hidden="true" />
         <div className={styles.roomIdentity}>
           <strong>Living room</strong>
-          <span>Revision {state.revision}</span>
+          <span>Revision {scene.revision}</span>
         </div>
       </div>
 
@@ -37,19 +44,19 @@ export function WorkspaceHeader({
           <span className={styles.statusDot} aria-hidden="true" />
           <span>
             <small>Provider</small>
-            <strong>{state.provider}</strong>
+            <strong>{provider}</strong>
           </span>
         </div>
         <div className={styles.roomTotal}>
           <small>Room total</small>
-          <strong>{formatRoomTotal(state.roomTotalMinor)}</strong>
+          <strong>{formatRoomTotal(roomTotalMinor)}</strong>
         </div>
       </div>
 
       <div className={styles.headerActions}>
         <button
           className={styles.quietButton}
-          disabled={!state.history}
+          disabled={!canUndo}
           onClick={() => dispatch({ type: "undo" })}
           title="Undo last scene change (Cmd/Ctrl+Z)"
           type="button"

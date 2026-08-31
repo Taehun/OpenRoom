@@ -1,4 +1,5 @@
 import type { Dispatch } from "react";
+import type { Scene, SceneObject } from "../scene/scene-schema";
 import { DEMO_PRODUCTS } from "./demo-data";
 import type { DemoAction, DemoState } from "./demo-types";
 import { NookIcon } from "./nook-icon";
@@ -6,6 +7,7 @@ import styles from "./demo-workspace.module.css";
 
 interface ContextPanelProps {
   dispatch: Dispatch<DemoAction>;
+  scene: Scene;
   state: DemoState;
 }
 
@@ -22,14 +24,39 @@ function formatPrice(priceMinor: number) {
   return `$${Math.round(priceMinor / 100).toLocaleString("en-US")}`;
 }
 
+function formatCoordinate(value: number) {
+  const magnitude = Math.abs(value).toFixed(2);
+  return value < 0 ? `−${magnitude}` : magnitude;
+}
+
+function formatDimensions(object: SceneObject) {
+  const { width, height, depth } = object.dimensionsM;
+  return `${Math.round(width * 100)} × ${Math.round(depth * 100)} × ${Math.round(height * 100)} cm`;
+}
+
+function formatPosition(object: SceneObject) {
+  const [x, y, z] = object.position;
+  return `X ${formatCoordinate(x)} · Y ${formatCoordinate(y)} · Z ${formatCoordinate(z)}`;
+}
+
+function formatRotation(object: SceneObject) {
+  return object.rotation
+    .map((radians) => `${Math.round((radians * 180) / Math.PI)}°`)
+    .join(" · ");
+}
+
 function InspectorPanel({
   dispatch,
-  state,
+  scene,
 }: {
   dispatch: Dispatch<DemoAction>;
-  state: DemoState;
+  scene: Scene;
 }) {
-  if (!state.selectedObjectId) {
+  const selectedObject = scene.objects.find(
+    ({ id }) => id === scene.selectedObjectId,
+  );
+
+  if (!selectedObject) {
     return (
       <div className={styles.emptyInspector}>
         <span className={styles.panelEyebrow}>Selection</span>
@@ -39,7 +66,14 @@ function InspectorPanel({
     );
   }
 
-  const selectedName = OBJECT_NAMES[state.selectedObjectId] ?? "Room object";
+  const selectedName = OBJECT_NAMES[selectedObject.id] ?? "Room object";
+  const style = selectedObject.product
+    ? [selectedObject.product.material, selectedObject.product.color]
+        .filter(Boolean)
+        .join(" · ")
+    : selectedObject.styleTags.length > 0
+      ? selectedObject.styleTags.join(" · ")
+      : "Placeholder · Natural";
 
   return (
     <section className={styles.inspectorPanel} aria-labelledby="inspector-title">
@@ -52,19 +86,19 @@ function InspectorPanel({
       <dl className={styles.objectSummary}>
         <div>
           <dt>Dimensions</dt>
-          <dd>120 × 60 × 38 cm</dd>
+          <dd>{formatDimensions(selectedObject)}</dd>
         </div>
         <div>
           <dt>Position</dt>
-          <dd>X 0.00 · Y 0.00 · Z −0.84</dd>
+          <dd>{formatPosition(selectedObject)}</dd>
         </div>
         <div>
           <dt>Rotation</dt>
-          <dd>0° · 0° · 0°</dd>
+          <dd>{formatRotation(selectedObject)}</dd>
         </div>
         <div>
           <dt>Style</dt>
-          <dd>Warm oak · Natural</dd>
+          <dd>{style}</dd>
         </div>
       </dl>
 
@@ -73,7 +107,7 @@ function InspectorPanel({
           〼
         </span>
         <span>
-          <strong>Placement locked</strong>
+          <strong>{selectedObject.locked ? "Placement locked" : "Placement editable"}</strong>
           <small>Preview swaps preserve this transform.</small>
         </span>
       </div>
@@ -91,11 +125,14 @@ function InspectorPanel({
 
 function ProductsPanel({
   dispatch,
-  state,
+  scene,
 }: {
   dispatch: Dispatch<DemoAction>;
-  state: DemoState;
+  scene: Scene;
 }) {
+  const tableProductId = scene.objects.find(({ id }) => id === "table_01")
+    ?.product?.id;
+
   return (
     <section
       aria-labelledby="products-title"
@@ -121,7 +158,7 @@ function ProductsPanel({
 
       <div className={styles.productList}>
         {DEMO_PRODUCTS.map((product, index) => {
-          const isPreviewing = product.id === state.previewProductId;
+          const isPreviewing = product.id === tableProductId;
 
           return (
             <article
@@ -137,8 +174,8 @@ function ProductsPanel({
               </div>
               <div className={styles.productCopy}>
                 <div className={styles.productTitleRow}>
-                  <h3>{product.name}</h3>
-                  <strong>{formatPrice(product.priceMinor)}</strong>
+                  <h3>{product.title}</h3>
+                  <strong>{formatPrice(product.price.amountMinor)}</strong>
                 </div>
                 <p>{product.description}</p>
                 <button
@@ -156,7 +193,7 @@ function ProductsPanel({
                   }
                   type="button"
                 >
-                  {isPreviewing ? "Active preview" : `Preview ${product.name}`}
+                  {isPreviewing ? "Active preview" : `Preview ${product.title}`}
                 </button>
               </div>
             </article>
@@ -169,10 +206,10 @@ function ProductsPanel({
 
 function ActivityPanel({
   dispatch,
-  state,
+  scene,
 }: {
   dispatch: Dispatch<DemoAction>;
-  state: DemoState;
+  scene: Scene;
 }) {
   return (
     <section className={styles.activityPanel} aria-labelledby="activity-title">
@@ -201,7 +238,7 @@ function ActivityPanel({
           </span>
           <div>
             <strong>get_scene</strong>
-            <p>Read 6 objects from revision {state.revision - 1}.</p>
+            <p>Read 6 objects from revision {scene.revision - 1}.</p>
           </div>
           <span className={styles.completeState}>Complete</span>
         </li>
@@ -223,7 +260,7 @@ function ActivityPanel({
         </span>
         <span>
           <small>Scene committed</small>
-          <strong>Agent result · rev {state.revision}</strong>
+          <strong>Agent result · rev {scene.revision}</strong>
         </span>
       </div>
       <p className={styles.activityDisclosure}>
@@ -233,17 +270,17 @@ function ActivityPanel({
   );
 }
 
-export function ContextPanel({ dispatch, state }: ContextPanelProps) {
+export function ContextPanel({ dispatch, scene, state }: ContextPanelProps) {
   return (
     <aside className={styles.contextPanel} aria-label="Room context">
       {state.mode === "inspector" ? (
-        <InspectorPanel dispatch={dispatch} state={state} />
+        <InspectorPanel dispatch={dispatch} scene={scene} />
       ) : null}
       {state.mode === "products" ? (
-        <ProductsPanel dispatch={dispatch} state={state} />
+        <ProductsPanel dispatch={dispatch} scene={scene} />
       ) : null}
       {state.mode === "activity" ? (
-        <ActivityPanel dispatch={dispatch} state={state} />
+        <ActivityPanel dispatch={dispatch} scene={scene} />
       ) : null}
     </aside>
   );
