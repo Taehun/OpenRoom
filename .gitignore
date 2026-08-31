@@ -17,6 +17,7 @@
 
 # local agent workflow scratch
 /.superpowers/
+/.worktrees/
 
 # next.js
 /.next/
