@@ -5,14 +5,19 @@ Nook is a browser-based way to explore and furnish a room with interactive 3D pr
 ## Status
 
 The project foundation uses Next.js 16, React 19, TypeScript, pnpm, Vitest, and
-a vinext runtime target for Cloudflare Workers. It now includes a deterministic,
-UI-only spatial commerce shell at `/demo`: object inspection, local product
-previews, Agent activity, and a cart review are local, reversible interface
-states. The room image is an approximate visualization, not a 3D scene.
+a vinext runtime target for Cloudflare Workers. `/demo` now uses validated Scene
+JSON as its source of truth, a shared Zustand command/history store, and an
+editable React Three Fiber room rendered with semantic furniture primitives.
+Selection, Move/Rotate tools, TransformControls, product replacement, Agent lamp
+movement, undo, and canonical reset all use the same revision-aware scene
+command layer.
 
-R3F rendering, WebMCP tools and Agent orchestration, Shopify integration,
-Tripo integration, room upload and analysis, and any external cart writes remain
-future work. The demo makes no provider calls or external cart requests.
+Product previews, Agent activity, and the four-item cart remain deterministic
+local demo behavior. The demo makes no provider calls or external cart requests.
+
+WebMCP tool registration and Agent orchestration, Shopify integration, generated
+GLB assets and Tripo integration, room upload and analysis, persistence, R2,
+D1, and external cart writes remain future work.
 
 ## Prerequisites
 
@@ -37,7 +42,7 @@ local environment file; never commit them.
 | Command | Purpose |
 | --- | --- |
 | `pnpm dev` | Start the Next.js development server. |
-| `/demo` | Open the local deterministic UI demo after starting `pnpm dev`. |
+| `/demo` | Open the local deterministic editable 3D room after starting `pnpm dev`. |
 | `pnpm build` | Build the vinext Cloudflare Workers target. |
 | `pnpm build:next` | Run the Next.js compatibility build. |
 | `pnpm start` | Start the Next.js production server. |
