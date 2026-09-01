@@ -120,14 +120,20 @@ test("moves from object inspection to product preview", async () => {
   ).toHaveTextContent("Revision 2 · table_01 · oak-frame-table");
 });
 
-test("exposes the editable room photo with exactly six object controls", () => {
+test("exposes six photo controls and six object-rail controls", () => {
   render(<DemoWorkspace />);
 
+  const stage = screen.getByRole("region", { name: "Editable room photo" });
+  const objectRail = screen.getByRole("region", { name: "Objects in room" });
+  expect(stage).toBeVisible();
+  expect(objectRail).toBeVisible();
   expect(
-    screen.getByRole("region", { name: "Editable room photo" }),
-  ).toBeVisible();
+    within(stage).getAllByRole("button", {
+      name: /sofa|coffee table|rug|floor lamp|chair|plant/i,
+    }),
+  ).toHaveLength(6);
   expect(
-    screen.getAllByRole("button", {
+    within(objectRail).getAllByRole("button", {
       name: /sofa|coffee table|rug|floor lamp|chair|plant/i,
     }),
   ).toHaveLength(6);
@@ -146,7 +152,8 @@ test("shows three alternatives for the selected chair category", async () => {
   const user = userEvent.setup();
   render(<DemoWorkspace />);
 
-  await user.click(screen.getByRole("button", { name: "Chair" }));
+  const stage = screen.getByRole("region", { name: "Editable room photo" });
+  await user.click(within(stage).getByRole("button", { name: "Chair" }));
   await user.click(screen.getByRole("button", { name: "Find alternatives" }));
 
   const products = screen.getByRole("region", {
@@ -163,7 +170,8 @@ test("uses Scene selection without incrementing revision", async () => {
   const user = userEvent.setup();
   render(<DemoWorkspace />);
 
-  await user.click(screen.getByRole("button", { name: "Chair" }));
+  const objectRail = screen.getByRole("region", { name: "Objects in room" });
+  await user.click(within(objectRail).getByRole("button", { name: "Chair" }));
 
   expect(screen.getByText("Lounge chair")).toBeVisible();
   expect(screen.getByText("Revision 1")).toBeVisible();
@@ -247,7 +255,10 @@ test("Escape closes the cart before clearing the selected object", async () => {
   const user = userEvent.setup();
   render(<DemoWorkspace />);
 
-  const coffeeTable = screen.getByRole("button", { name: "Coffee table" });
+  const objectRail = screen.getByRole("region", { name: "Objects in room" });
+  const coffeeTable = within(objectRail).getByRole("button", {
+    name: "Coffee table",
+  });
   expect(coffeeTable).toHaveAttribute("aria-pressed", "true");
 
   await user.click(screen.getByRole("button", { name: "View cart" }));

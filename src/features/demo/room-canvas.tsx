@@ -7,6 +7,15 @@ import type { DemoAction, DemoState } from "./demo-types";
 import { NookIcon } from "./nook-icon";
 import styles from "./demo-workspace.module.css";
 
+const ROOM_OBJECTS = [
+  { id: "sofa_01", label: "Sofa", abbreviation: "SO" },
+  { id: "table_01", label: "Coffee table", abbreviation: "CT" },
+  { id: "rug_01", label: "Rug", abbreviation: "RG" },
+  { id: "lamp_01", label: "Floor lamp", abbreviation: "FL" },
+  { id: "chair_01", label: "Chair", abbreviation: "CH" },
+  { id: "plant_01", label: "Plant", abbreviation: "PL" },
+] as const;
+
 const PRIMARY_PROMPT =
   "Redesign this room as a warm minimal Japandi interior. Replace every outdated unlocked item with a coherent catalog result, keep the sofa on the left, and leave a clear path to the windows. Read the latest scene after each change.";
 
@@ -109,6 +118,36 @@ export function RoomCanvas({ dispatch, scene, state }: RoomCanvasProps) {
           </button>
         </div>
 
+        <section className={styles.objectSection} aria-label="Objects in room">
+          <h2 className={styles.visuallyHidden}>Objects in room</h2>
+          <ul className={styles.objectList}>
+            {ROOM_OBJECTS.map((object) => {
+              const isSelected = scene.selectedObjectId === object.id;
+
+              return (
+                <li key={object.id}>
+                  <button
+                    aria-label={object.label}
+                    aria-pressed={isSelected}
+                    className={
+                      isSelected
+                        ? styles.objectButtonSelected
+                        : styles.objectButton
+                    }
+                    onClick={() => {
+                      dispatch({ type: "select-object", objectId: object.id });
+                      dispatch({ type: "show-inspector" });
+                    }}
+                    title={object.label}
+                    type="button"
+                  >
+                    {object.abbreviation}
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
       </aside>
 
       <main className={styles.canvas} aria-label="Room canvas">

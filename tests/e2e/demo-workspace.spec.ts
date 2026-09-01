@@ -10,25 +10,31 @@ test("completes the deterministic spatial commerce UI journey", async ({
   await page.setViewportSize({ width: 1280, height: 720 });
   await page.goto("/demo");
 
+  const stage = page.getByRole("region", { name: "Editable room photo" });
+  const objectRail = page.getByRole("region", { name: "Objects in room" });
+  await expect(stage).toBeVisible();
+  await expect(objectRail).toBeVisible();
   await expect(
-    page.getByRole("region", { name: "Editable room photo" }),
-  ).toBeVisible();
+    stage.getByRole("button", {
+      name: /sofa|coffee table|rug|floor lamp|chair|plant/i,
+    }),
+  ).toHaveCount(6);
   await expect(
-    page.getByRole("button", {
+    objectRail.getByRole("button", {
       name: /sofa|coffee table|rug|floor lamp|chair|plant/i,
     }),
   ).toHaveCount(6);
   await expect(
     page.getByRole("heading", { name: "Object inspector" }),
   ).toBeVisible();
-  await page.getByRole("button", { name: "Chair" }).click();
+  await objectRail.getByRole("button", { name: "Chair" }).click();
   await expect(page.getByText("Lounge chair")).toBeVisible();
   await page.getByRole("button", { name: "Move tool" }).click();
   await expect(page.getByRole("button", { name: "Move tool" })).toHaveAttribute(
     "aria-pressed",
     "true",
   );
-  await page.getByRole("button", { name: "Coffee table" }).click();
+  await stage.getByRole("button", { name: "Coffee table" }).click();
   await page.getByRole("button", { name: "Find alternatives" }).click();
   await page.getByRole("button", { name: "Preview Oak Frame Table" }).click();
   await expect(page.getByText("Previewing Oak Frame Table")).toBeVisible();
@@ -41,6 +47,10 @@ test("completes the deterministic spatial commerce UI journey", async ({
   await expect(
     page.getByRole("status", { name: "Scene diagnostics" }),
   ).toContainText("Revision 2");
+  await page.keyboard.press("Control+z");
+  await expect(
+    page.getByRole("status", { name: "Scene diagnostics" }),
+  ).toContainText("Revision 1 · table_01 · placeholder");
   await page.getByRole("button", { name: "Reset Demo" }).click();
   await expect(
     page.getByRole("status", { name: "Scene diagnostics" }),

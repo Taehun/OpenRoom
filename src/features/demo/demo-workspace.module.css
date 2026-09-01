@@ -127,7 +127,9 @@
 .commerceButton,
 .cancelButton,
 .toolButton,
-.toolButtonActive {
+.toolButtonActive,
+.objectButton,
+.objectButtonSelected {
   border: 0;
   cursor: pointer;
 }
@@ -144,6 +146,8 @@
 .cancelButton:focus-visible,
 .toolButton:focus-visible,
 .toolButtonActive:focus-visible,
+.objectButton:focus-visible,
+.objectButtonSelected:focus-visible,
 .undoToast button:focus-visible,
 .brand:focus-visible {
   outline: 3px solid var(--moss);
@@ -262,6 +266,46 @@
 
 .toolButtonActive {
   box-shadow: inset 2px 0 var(--moss);
+}
+
+.objectSection {
+  width: 100%;
+  min-height: 0;
+  margin-top: 9px;
+}
+
+.objectList {
+  display: grid;
+  justify-items: center;
+  gap: 5px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.objectButton,
+.objectButtonSelected {
+  width: 36px;
+  height: 36px;
+  border: 1px solid transparent;
+  border-radius: 50%;
+  background: #ece8df;
+  color: var(--muted-text);
+  font-size: 0.58rem;
+  font-weight: 750;
+  letter-spacing: 0.03em;
+}
+
+.objectButton:hover {
+  border-color: var(--warm-divider);
+  color: var(--ink);
+}
+
+.objectButtonSelected {
+  border-color: var(--moss);
+  background: var(--moss);
+  color: white;
+  box-shadow: 0 0 0 2px var(--paper), 0 0 0 3px var(--moss);
 }
 
 .canvas {
