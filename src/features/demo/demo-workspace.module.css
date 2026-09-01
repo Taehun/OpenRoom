@@ -360,6 +360,140 @@
   letter-spacing: 0.02em;
 }
 
+.photoStage {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  background-color: #d8d2c7;
+  background-position: center;
+  background-size: cover;
+}
+
+.photoObject,
+.photoObjectSelected {
+  position: absolute;
+  top: var(--photo-top);
+  left: var(--photo-left);
+  width: var(--photo-width);
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: grab;
+  transform: translate(-50%, -100%) scale(var(--photo-scale))
+    rotate(var(--photo-rotation));
+  transform-origin: 50% 100%;
+  transition: filter 140ms ease, outline-color 140ms ease;
+  touch-action: none;
+}
+
+.photoObject:active,
+.photoObjectSelected:active {
+  cursor: grabbing;
+}
+
+.photoObject img,
+.photoObjectSelected img {
+  display: block;
+  width: 100%;
+  height: auto;
+  pointer-events: none;
+  user-select: none;
+}
+
+.photoObject:hover,
+.photoObjectSelected {
+  filter: drop-shadow(0 5px 7px rgba(36, 39, 34, 0.24));
+}
+
+.photoObjectSelected {
+  outline: 3px solid var(--moss);
+  outline-offset: 4px;
+}
+
+.photoObject:focus-visible,
+.photoObjectSelected:focus-visible,
+.rotationHandle:focus-visible {
+  outline: 3px solid var(--moss);
+  outline-offset: 4px;
+}
+
+.floorAnchor {
+  position: absolute;
+  bottom: -6px;
+  left: 50%;
+  width: 10px;
+  height: 10px;
+  border: 2px solid var(--paper);
+  border-radius: 50%;
+  background: var(--moss);
+  box-shadow: 0 0 0 1px var(--moss);
+  transform: translateX(-50%);
+}
+
+.photoLockedBadge {
+  position: absolute;
+  right: 4px;
+  bottom: 4px;
+  padding: 4px 6px;
+  border-radius: 999px;
+  background: rgba(36, 39, 34, 0.9);
+  color: var(--paper);
+  font-size: 0.58rem;
+  font-weight: 750;
+  line-height: 1;
+  pointer-events: none;
+}
+
+.rotationHandle {
+  position: absolute;
+  top: var(--photo-top);
+  left: var(--photo-left);
+  display: grid;
+  width: 32px;
+  height: 32px;
+  margin: 0;
+  padding: 0;
+  place-items: center;
+  border: 2px solid var(--paper);
+  border-radius: 50%;
+  background: var(--moss);
+  color: white;
+  cursor: grab;
+  font-size: 1rem;
+  font-weight: 750;
+  line-height: 1;
+  box-shadow: 0 3px 9px rgba(36, 39, 34, 0.3);
+  transform: translate(-50%, calc(-100% - 72px));
+  touch-action: none;
+}
+
+.rotationHandle:active {
+  cursor: grabbing;
+}
+
+.photoAssetFallback {
+  display: grid;
+  min-height: 72px;
+  padding: 10px;
+  place-items: center;
+  border: 2px dashed rgba(36, 39, 34, 0.48);
+  border-radius: 8px;
+  background: rgba(251, 250, 246, 0.9);
+  color: var(--ink);
+  font-size: 0.68rem;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .photoObject,
+  .photoObjectSelected {
+    transition: none;
+  }
+}
+
 .canvasTopbar {
   position: absolute;
   z-index: 2;
