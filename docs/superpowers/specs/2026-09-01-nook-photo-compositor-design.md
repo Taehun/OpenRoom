@@ -2,7 +2,7 @@
 
 **Date:** 2026-09-01
 
-**Status:** Approved in chat; pending written-spec review
+**Status:** Approved
 
 **Scope:** Replace the interactive 3D room with a photo-based DOM compositor and make the existing Core 6 tools available to both native WebMCP agents and local Claude MCP clients.
 
