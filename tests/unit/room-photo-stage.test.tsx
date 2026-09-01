@@ -106,6 +106,96 @@ describe("RoomPhotoStage", () => {
     expect(stage).toContainElement(table);
   });
 
+  test("does not commit a move that ends at the gesture's starting transform", () => {
+    const store = createSceneStore();
+    const commit = vi.spyOn(store.getState(), "commitTransform");
+    const originalPosition = [...objectFromStore(store, "table_01").position];
+    renderStage(store);
+    const table = screen.getByRole("button", { name: "Coffee table" });
+
+    fireEvent.pointerDown(table, {
+      pointerId: 17,
+      clientX: 500,
+      clientY: 433,
+    });
+    fireEvent.pointerMove(table, {
+      pointerId: 17,
+      clientX: 500,
+      clientY: 433,
+    });
+    fireEvent.pointerUp(table, {
+      pointerId: 17,
+      clientX: 500,
+      clientY: 433,
+    });
+
+    expect(commit).not.toHaveBeenCalled();
+    expect(objectFromStore(store, "table_01").position).toEqual(originalPosition);
+    expect(store.getState().scene.revision).toBe(1);
+    expect(store.getState().history).toHaveLength(0);
+    expect(store.getState().isTransforming).toBe(false);
+  });
+
+  test("keeps the first pointer as the sole gesture owner", () => {
+    const store = createSceneStore();
+    const commit = vi.spyOn(store.getState(), "commitTransform");
+    const originalPosition = [...objectFromStore(store, "table_01").position];
+    renderStage(store);
+    const table = screen.getByRole("button", { name: "Coffee table" });
+
+    fireEvent.pointerDown(table, {
+      pointerId: 21,
+      clientX: 500,
+      clientY: 433,
+    });
+    fireEvent.pointerMove(table, {
+      pointerId: 21,
+      clientX: 560,
+      clientY: 340,
+    });
+
+    fireEvent.pointerDown(table, {
+      pointerId: 22,
+      clientX: 500,
+      clientY: 433,
+    });
+    fireEvent.pointerMove(table, {
+      pointerId: 22,
+      clientX: 760,
+      clientY: 500,
+    });
+    fireEvent.pointerUp(table, {
+      pointerId: 22,
+      clientX: 760,
+      clientY: 500,
+    });
+
+    expect(commit).not.toHaveBeenCalled();
+    expect(store.getState().isTransforming).toBe(true);
+    expect(objectFromStore(store, "table_01").position).toEqual(originalPosition);
+
+    fireEvent.pointerUp(table, {
+      pointerId: 21,
+      clientX: 560,
+      clientY: 340,
+    });
+
+    expect(commit).toHaveBeenCalledTimes(1);
+    expect(commit).toHaveBeenCalledWith(
+      "table_01",
+      [expect.closeTo(0.8653846154), 0.21, -2.4],
+      0,
+    );
+    expect(objectFromStore(store, "table_01").position).toEqual([
+      expect.closeTo(0.8653846154),
+      0.21,
+      expect.closeTo(-2),
+    ]);
+    expect(store.getState().scene.revision).toBe(2);
+    expect(store.getState().history).toHaveLength(1);
+    expect(store.getState().isTransforming).toBe(false);
+  });
+
   test("discards a changed drag preview when the pointer is cancelled", () => {
     const store = createSceneStore();
     const commit = vi.spyOn(store.getState(), "commitTransform");
@@ -282,6 +372,36 @@ describe("RoomPhotoStage", () => {
     expect(commit).toHaveBeenCalledTimes(1);
     expect(store.getState().scene.revision).toBe(2);
     expect(store.getState().history).toHaveLength(1);
+    expect(store.getState().isTransforming).toBe(false);
+  });
+
+  test("does not commit a rotation that equals the gesture's starting transform", () => {
+    const store = createSceneStore();
+    store.getState().setToolMode("rotate");
+    const commit = vi.spyOn(store.getState(), "commitTransform");
+    renderStage(store);
+    const handle = screen.getByRole("button", { name: "Rotate Coffee table" });
+
+    fireEvent.pointerDown(handle, {
+      pointerId: 27,
+      clientX: 500,
+      clientY: 300,
+    });
+    fireEvent.pointerMove(handle, {
+      pointerId: 27,
+      clientX: 500,
+      clientY: 300,
+    });
+    fireEvent.pointerUp(handle, {
+      pointerId: 27,
+      clientX: 500,
+      clientY: 300,
+    });
+
+    expect(commit).not.toHaveBeenCalled();
+    expect(objectFromStore(store, "table_01").rotation[1]).toBe(0);
+    expect(store.getState().scene.revision).toBe(1);
+    expect(store.getState().history).toHaveLength(0);
     expect(store.getState().isTransforming).toBe(false);
   });
 });

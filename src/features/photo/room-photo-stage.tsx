@@ -40,6 +40,7 @@ const MOVE_STEP_M = 0.08;
 const MOVE_SHIFT_STEP_M = 0.24;
 const ROTATE_STEP_RADIANS = (5 * Math.PI) / 180;
 const ROTATE_SHIFT_STEP_RADIANS = (15 * Math.PI) / 180;
+const TRANSFORM_EPSILON = 1e-9;
 
 function objectLabel(object: SceneObject) {
   return object.product?.title ?? OBJECT_LABELS[object.type];
@@ -47,6 +48,22 @@ function objectLabel(object: SceneObject) {
 
 function capturePointer(element: HTMLElement, pointerId: number) {
   element.setPointerCapture?.(pointerId);
+}
+
+function positionsMatch(first: Vec3, second: Vec3) {
+  return (
+    Math.abs(first[0] - second[0]) <= TRANSFORM_EPSILON &&
+    Math.abs(first[1] - second[1]) <= TRANSFORM_EPSILON &&
+    Math.abs(first[2] - second[2]) <= TRANSFORM_EPSILON
+  );
+}
+
+function rotationsMatch(first: number, second: number) {
+  const difference = first - second;
+  return (
+    Math.abs(Math.atan2(Math.sin(difference), Math.cos(difference))) <=
+    TRANSFORM_EPSILON
+  );
 }
 
 export function RoomPhotoStage() {
@@ -62,6 +79,8 @@ export function RoomPhotoStage() {
     object: SceneObject,
     event: PointerEvent<HTMLElement>,
   ) {
+    if (transformPreview) return;
+
     selectObject(object.id);
     if (object.locked) return;
 
@@ -103,11 +122,18 @@ export function RoomPhotoStage() {
     const point = stagePoint(event);
     if (!point) return;
     const position = unprojectStagePoint(point, scene.room);
+    const previewPosition: Vec3 = [
+      position.x,
+      object.position[1],
+      position.z,
+    ];
 
     setTransformPreview({
       ...transformPreview,
-      position: [position.x, object.position[1], position.z],
-      changed: true,
+      position: previewPosition,
+      changed:
+        !positionsMatch(previewPosition, object.position) ||
+        !rotationsMatch(transformPreview.rotationY, object.rotation[1]),
     });
   }
 
@@ -127,11 +153,17 @@ export function RoomPhotoStage() {
       { x: object.position[0], z: object.position[2] },
       scene.room,
     );
+    const rotationY = Math.atan2(
+      point.x - anchor.left,
+      anchor.top - point.y,
+    );
 
     setTransformPreview({
       ...transformPreview,
-      rotationY: Math.atan2(point.x - anchor.left, anchor.top - point.y),
-      changed: true,
+      rotationY,
+      changed:
+        !positionsMatch(transformPreview.position, object.position) ||
+        !rotationsMatch(rotationY, object.rotation[1]),
     });
   }
 
