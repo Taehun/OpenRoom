@@ -40,6 +40,9 @@ test("connects the Core 6 journey to the shared Scene and approval UI", async ()
   const { unmount } = render(<DemoWorkspace />);
 
   await waitFor(() => expect(registrations).toHaveLength(6));
+  expect(
+    screen.getByRole("status", { name: "Native WebMCP status" }),
+  ).toHaveTextContent("Available");
   const tool = (name: ModelContextTool["name"]) => {
     const descriptor = registrations.find(
       (registration) => registration.tool.name === name,
@@ -102,7 +105,7 @@ test("moves from object inspection to product preview", async () => {
   await user.click(screen.getByRole("button", { name: "Find alternatives" }));
 
   const products = screen.getByRole("region", {
-    name: "Tables for your room",
+    name: "Coffee tables for your room",
   });
   expect(within(products).getAllByRole("article")).toHaveLength(3);
 
@@ -117,14 +120,43 @@ test("moves from object inspection to product preview", async () => {
   ).toHaveTextContent("Revision 2 · table_01 · oak-frame-table");
 });
 
-test("exposes the interactive 3D room and its accessible object controls", () => {
+test("exposes the editable room photo with exactly six object controls", () => {
   render(<DemoWorkspace />);
 
   expect(
-    screen.getByRole("region", { name: "Interactive 3D room" }),
+    screen.getByRole("region", { name: "Editable room photo" }),
   ).toBeVisible();
-  expect(screen.getByRole("region", { name: "Objects in room" })).toBeVisible();
-  expect(screen.getByRole("button", { name: "Coffee table" })).toBeVisible();
+  expect(
+    screen.getAllByRole("button", {
+      name: /sofa|coffee table|rug|floor lamp|chair|plant/i,
+    }),
+  ).toHaveLength(6);
+  expect(
+    screen.queryByRole("button", { name: /run agent move/i }),
+  ).not.toBeInTheDocument();
+  expect(
+    screen.getByRole("button", { name: "Copy redesign prompt" }),
+  ).toBeVisible();
+  expect(
+    screen.getByRole("status", { name: "Native WebMCP status" }),
+  ).toHaveTextContent("Unavailable");
+});
+
+test("shows three alternatives for the selected chair category", async () => {
+  const user = userEvent.setup();
+  render(<DemoWorkspace />);
+
+  await user.click(screen.getByRole("button", { name: "Chair" }));
+  await user.click(screen.getByRole("button", { name: "Find alternatives" }));
+
+  const products = screen.getByRole("region", {
+    name: "Chairs for your room",
+  });
+  expect(within(products).getAllByRole("article")).toHaveLength(3);
+  expect(within(products).getByText("Ash Lounge Chair")).toBeVisible();
+  expect(within(products).getByText("Boucle Barrel Chair")).toBeVisible();
+  expect(within(products).getByText("Cognac Sling Chair")).toBeVisible();
+  expect(within(products).queryByText("Oak Frame Table")).not.toBeInTheDocument();
 });
 
 test("uses Scene selection without incrementing revision", async () => {
@@ -250,28 +282,47 @@ test("activates move and rotate tools for Scene transforms", async () => {
   expect(move).toHaveAttribute("aria-pressed", "false");
 });
 
-test("runs the Agent move and supports keyboard undo", async () => {
+test("copies prompt guidance without changing Scene revision or state version", async () => {
+  const registrations: CapturedRegistration[] = [];
+  Object.defineProperty(document, "modelContext", {
+    configurable: true,
+    value: {
+      async registerTool(
+        tool: ModelContextTool,
+        options?: { signal?: AbortSignal },
+      ) {
+        if (!options?.signal) throw new Error("Expected a registration signal");
+        registrations.push({ signal: options.signal, tool });
+      },
+    },
+  });
   const user = userEvent.setup();
+  const writeText = vi
+    .spyOn(navigator.clipboard, "writeText")
+    .mockResolvedValue(undefined);
   render(<DemoWorkspace />);
+  await waitFor(() => expect(registrations).toHaveLength(6));
+  const getScene = registrations.find(
+    ({ tool }) => tool.name === "get_scene",
+  )?.tool;
+  if (!getScene) throw new Error("Missing get_scene");
+  const signal = new AbortController().signal;
+  const before = await getScene.execute({}, { signal });
 
-  await user.click(screen.getByRole("button", { name: "Run Agent move" }));
-  expect(
-    screen.getByRole("heading", { name: "Agent activity" }),
-  ).toBeVisible();
-  expect(screen.getByText("get_scene")).toBeVisible();
-  expect(screen.getByText("move_object")).toBeVisible();
-  expect(screen.getByText("Lamp moved to match your layout")).toBeVisible();
-  expect(screen.getByText("Revision 2")).toBeVisible();
+  await user.click(
+    screen.getByRole("button", { name: "Copy redesign prompt" }),
+  );
 
-  await user.click(screen.getByRole("button", { name: "Floor lamp" }));
-  expect(screen.getByText("X 2.31 · Y 0.80 · Z −2.13")).toBeVisible();
-
-  await user.keyboard("{Control>}z{/Control}");
-  expect(
-    screen.getByRole("heading", { name: "Object inspector" }),
-  ).toBeVisible();
-  expect(screen.getByText("Revision 1")).toBeVisible();
-  expect(screen.getByText("X 2.73 · Y 0.80 · Z −2.13")).toBeVisible();
+  expect(writeText).toHaveBeenCalledWith(
+    "Redesign this room as a warm minimal Japandi interior. Replace every outdated unlocked item with a coherent catalog result, keep the sofa on the left, and leave a clear path to the windows. Read the latest scene after each change.",
+  );
+  const after = await getScene.execute({}, { signal });
+  expect(after.structuredContent.sceneRevision).toBe(
+    before.structuredContent.sceneRevision,
+  );
+  expect(after.structuredContent.stateVersion).toBe(
+    before.structuredContent.stateVersion,
+  );
 });
 
 test("Reset Demo restores the canonical inspector state", async () => {

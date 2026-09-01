@@ -48,13 +48,11 @@ describe("demoReducer", () => {
     expect(preview).not.toHaveProperty("history");
   });
 
-  test("records Agent disclosure and reset restores the canonical UI state", () => {
-    const moved = demoReducer(createInitialDemoState(), {
-      type: "run-agent-move",
+  test("reset restores the canonical UI state", () => {
+    const products = demoReducer(createInitialDemoState(), {
+      type: "show-products",
     });
-    expect(moved.mode).toBe("activity");
-    expect(moved.toast?.message).toBe("Lamp moved to match your layout");
-    expect(demoReducer(moved, { type: "reset" })).toEqual(
+    expect(demoReducer(products, { type: "reset" })).toEqual(
       createInitialDemoState(),
     );
   });

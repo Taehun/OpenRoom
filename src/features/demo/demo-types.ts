@@ -31,7 +31,6 @@ export type DemoAction =
   | { type: "show-activity" }
   | { type: "select-object"; objectId: string | null }
   | { type: "preview-product"; productId: string }
-  | { type: "run-agent-move" }
   | { type: "open-cart"; draft?: CartApprovalDraft }
   | { type: "close-cart" }
   | { type: "confirm-demo-cart" }

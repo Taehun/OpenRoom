@@ -14,14 +14,14 @@ const packageJson = JSON.parse(
 test("keeps the required MVP packages and reproducible test toolchain available", () => {
   expect(packageJson.dependencies).toEqual(
     expect.objectContaining({
-      "@react-three/drei": expect.any(String),
-      "@react-three/fiber": expect.any(String),
       immer: expect.any(String),
-      three: expect.any(String),
       zod: expect.any(String),
       zustand: expect.any(String),
     }),
   );
+  expect(packageJson.dependencies).not.toHaveProperty("three");
+  expect(packageJson.dependencies).not.toHaveProperty("@react-three/fiber");
+  expect(packageJson.dependencies).not.toHaveProperty("@react-three/drei");
 
   expect(packageJson.devDependencies).toEqual(
     expect.objectContaining({

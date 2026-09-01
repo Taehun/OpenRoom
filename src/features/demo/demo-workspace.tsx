@@ -131,23 +131,6 @@ function DemoWorkspaceContent() {
         return;
       }
 
-      if (action.type === "run-agent-move") {
-        const lamp = store.scene.objects.find(({ id }) => id === "lamp_01");
-        if (!lamp) return;
-
-        const result = store.applyCommand({
-          expectedRevision: store.scene.revision,
-          actor: "agent",
-          command: {
-            type: "move",
-            objectId: lamp.id,
-            position: { x: lamp.position[0] - 0.42, z: lamp.position[2] },
-          },
-        });
-        if (result.ok) dispatch(action);
-        return;
-      }
-
       if (action.type === "undo") {
         if (store.undo()) dispatch(action);
         return;

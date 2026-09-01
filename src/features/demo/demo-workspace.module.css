@@ -127,9 +127,7 @@
 .commerceButton,
 .cancelButton,
 .toolButton,
-.toolButtonActive,
-.objectButton,
-.objectButtonSelected {
+.toolButtonActive {
   border: 0;
   cursor: pointer;
 }
@@ -146,11 +144,8 @@
 .cancelButton:focus-visible,
 .toolButton:focus-visible,
 .toolButtonActive:focus-visible,
-.objectButton:focus-visible,
-.objectButtonSelected:focus-visible,
 .undoToast button:focus-visible,
-.brand:focus-visible,
-.composer input:focus-visible {
+.brand:focus-visible {
   outline: 3px solid var(--moss);
   outline-offset: 3px;
 }
@@ -269,49 +264,9 @@
   box-shadow: inset 2px 0 var(--moss);
 }
 
-.objectSection {
-  width: 100%;
-  min-height: 0;
-  margin-top: 9px;
-}
-
-.objectList {
-  display: grid;
-  justify-items: center;
-  gap: 5px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.objectButton,
-.objectButtonSelected {
-  width: 36px;
-  height: 36px;
-  border: 1px solid transparent;
-  border-radius: 50%;
-  background: #ece8df;
-  color: var(--muted-text);
-  font-size: 0.58rem;
-  font-weight: 750;
-  letter-spacing: 0.03em;
-}
-
-.objectButton:hover {
-  border-color: var(--warm-divider);
-  color: var(--ink);
-}
-
-.objectButtonSelected {
-  border-color: var(--moss);
-  background: var(--moss);
-  color: white;
-  box-shadow: 0 0 0 2px var(--paper), 0 0 0 3px var(--moss);
-}
-
 .canvas {
   display: grid;
-  grid-template-rows: minmax(0, 1fr) 72px;
+  grid-template-rows: minmax(0, 1fr) auto;
   min-width: 0;
   min-height: 0;
   background: #dad5ca;
@@ -344,20 +299,10 @@
   inset: 0;
 }
 
-.sceneViewport > div,
-.sceneViewport canvas {
+.sceneViewport > section {
   width: 100% !important;
   height: 100% !important;
-}
-
-.sceneLoading {
-  display: grid;
-  height: 100%;
-  place-items: center;
-  background: #d8d2c7;
-  color: var(--muted-text);
-  font-size: 0.76rem;
-  letter-spacing: 0.02em;
+  aspect-ratio: auto;
 }
 
 .photoStage {
@@ -590,10 +535,10 @@
   z-index: 3;
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
-  align-items: center;
+  align-items: start;
   gap: 10px;
-  height: 72px;
-  padding: 12px 14px 12px 18px;
+  min-height: 128px;
+  padding: 13px 14px 13px 18px;
   border-top: 1px solid var(--warm-divider);
   background: var(--paper);
 }
@@ -608,21 +553,46 @@
   color: var(--moss);
 }
 
-.composer input {
-  width: 100%;
-  height: 44px;
-  border: 0;
-  background: transparent;
-  color: var(--ink);
-  outline: 0;
+.promptGuidance {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
 }
 
-.composer input::selection {
-  background: #d9dece;
+.promptGuidance p {
+  margin: 0;
+  font-size: 0.71rem;
+  line-height: 1.4;
+}
+
+.promptGuidance small,
+.webMcpStatus {
+  color: var(--muted-text);
+  font-size: 0.61rem;
+  line-height: 1.35;
+}
+
+.promptSuggestions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.promptSuggestions span {
+  padding: 3px 6px;
+  border: 1px solid var(--warm-divider);
+  border-radius: 999px;
+  color: var(--moss);
+  font-size: 0.59rem;
+}
+
+.webMcpStatus {
+  font-weight: 700;
 }
 
 .agentButton {
   min-height: 44px;
+  margin-top: 1px;
   padding: 0 16px;
   border-radius: 7px;
   background: var(--moss);
@@ -910,52 +880,6 @@
   font-family: var(--font-editorial), Georgia, serif;
   font-size: 1rem;
   line-height: 1.4;
-}
-
-.activityList {
-  display: grid;
-  gap: 0;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.activityList li {
-  display: grid;
-  grid-template-columns: 32px minmax(0, 1fr) auto;
-  gap: 10px;
-  align-items: start;
-  padding: 15px 0;
-  border-bottom: 1px solid #e6e1d8;
-}
-
-.activityIcon {
-  display: grid;
-  width: 30px;
-  height: 30px;
-  place-items: center;
-  border-radius: 50%;
-  background: #e5e9df;
-  color: var(--moss);
-  font-size: 0.58rem;
-  font-weight: 750;
-}
-
-.activityList strong {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 0.68rem;
-}
-
-.activityList p {
-  margin: 4px 0 0;
-  color: var(--muted-text);
-  font-size: 0.64rem;
-}
-
-.completeState {
-  color: var(--moss);
-  font-size: 0.58rem;
-  font-weight: 750;
 }
 
 .revisionCard {

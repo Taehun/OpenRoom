@@ -10,7 +10,14 @@ test("completes the deterministic spatial commerce UI journey", async ({
   await page.setViewportSize({ width: 1280, height: 720 });
   await page.goto("/demo");
 
-  await expect(page.locator('canvas[data-testid="scene-canvas"]')).toBeVisible();
+  await expect(
+    page.getByRole("region", { name: "Editable room photo" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", {
+      name: /sofa|coffee table|rug|floor lamp|chair|plant/i,
+    }),
+  ).toHaveCount(6);
   await expect(
     page.getByRole("heading", { name: "Object inspector" }),
   ).toBeVisible();
@@ -25,11 +32,12 @@ test("completes the deterministic spatial commerce UI journey", async ({
   await page.getByRole("button", { name: "Find alternatives" }).click();
   await page.getByRole("button", { name: "Preview Oak Frame Table" }).click();
   await expect(page.getByText("Previewing Oak Frame Table")).toBeVisible();
-  await page.getByRole("button", { name: "Run Agent move" }).click();
   await expect(
-    page.getByRole("heading", { name: "Agent activity" }),
+    page.getByRole("button", { name: "Run Agent move" }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: "Copy redesign prompt" }),
   ).toBeVisible();
-  await page.keyboard.press("Control+z");
   await expect(
     page.getByRole("status", { name: "Scene diagnostics" }),
   ).toContainText("Revision 2");
