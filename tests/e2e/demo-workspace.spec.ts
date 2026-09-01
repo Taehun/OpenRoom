@@ -7,13 +7,24 @@ test("completes the deterministic spatial commerce UI journey", async ({
   page.on("console", (message) => {
     if (message.type() === "error") consoleErrors.push(message.text());
   });
-  await page.setViewportSize({ width: 1280, height: 720 });
+  await page.setViewportSize({ width: 1280, height: 800 });
   await page.goto("/demo");
+
+  const appIcon = page.locator('link[rel="icon"]');
+  await expect(appIcon).toHaveAttribute("href", /\/icon\.svg/);
+  const appIconHref = await appIcon.getAttribute("href");
+  if (!appIconHref) throw new Error("Missing app icon href");
+  expect((await page.request.get(appIconHref)).ok()).toBe(true);
 
   const stage = page.getByRole("region", { name: "Editable room photo" });
   const objectRail = page.getByRole("region", { name: "Objects in room" });
   await expect(stage).toBeVisible();
   await expect(objectRail).toBeVisible();
+  const stageBounds = await stage.boundingBox();
+  if (!stageBounds) throw new Error("Missing editable photo bounds");
+  expect(stageBounds.width / stageBounds.height).toBeCloseTo(16 / 9, 2);
+  await expect(stage.locator("img")).toHaveCount(6);
+  await expect(page.locator("canvas")).toHaveCount(0);
   await expect(
     stage.getByRole("button", {
       name: /sofa|coffee table|rug|floor lamp|chair|plant/i,

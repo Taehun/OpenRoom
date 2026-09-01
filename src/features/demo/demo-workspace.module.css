@@ -341,12 +341,16 @@
 .sceneViewport {
   position: absolute;
   inset: 0;
+  display: grid;
+  align-items: center;
+  justify-items: center;
 }
 
 .sceneViewport > section {
   width: 100% !important;
-  height: 100% !important;
-  aspect-ratio: auto;
+  height: auto !important;
+  max-height: 100%;
+  aspect-ratio: 16 / 9;
 }
 
 .photoStage {

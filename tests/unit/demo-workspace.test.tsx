@@ -16,6 +16,15 @@ interface CapturedRegistration {
   tool: ModelContextTool;
 }
 
+const CORE_6 = [
+  "add_scene_to_cart",
+  "get_scene",
+  "get_selection",
+  "move_object",
+  "replace_object",
+  "search_products",
+] as const;
+
 afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
@@ -40,6 +49,9 @@ test("connects the Core 6 journey to the shared Scene and approval UI", async ()
   const { unmount } = render(<DemoWorkspace />);
 
   await waitFor(() => expect(registrations).toHaveLength(6));
+  expect(registrations.map(({ tool }) => tool.name).sort()).toEqual([
+    ...CORE_6,
+  ]);
   expect(
     screen.getByRole("status", { name: "Native WebMCP status" }),
   ).toHaveTextContent("Available");
