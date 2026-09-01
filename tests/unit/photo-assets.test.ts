@@ -38,4 +38,20 @@ describe("photo assets", () => {
     expect(existsSync(join(process.cwd(), "public", NOOK_ROOM_BACKGROUND)))
       .toBe(true);
   });
+
+  it("anchors floor-contact tables and rugs to meaningful alpha", () => {
+    const expectedAnchorY = {
+      "oak-frame-table": 0.8418,
+      "travertine-plinth-table": 0.8369,
+      "walnut-nesting-table": 0.8711,
+      "woven-jute-rug": 0.9131,
+      "wool-pebble-rug": 0.8574,
+      "geometric-flatweave-rug": 0.9482,
+    } as const;
+
+    for (const [id, anchorY] of Object.entries(expectedAnchorY)) {
+      expect(PHOTO_ASSETS[id]?.anchorY).toBeCloseTo(anchorY, 4);
+      expect(PHOTO_ASSETS[id]?.anchorY).toBeLessThan(1);
+    }
+  });
 });

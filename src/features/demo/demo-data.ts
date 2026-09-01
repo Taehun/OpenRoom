@@ -69,7 +69,7 @@ export const DEMO_PRODUCTS: readonly DemoProduct[] = [
     category: "coffee_table",
     price: { amountMinor: 24900, currency: "USD" },
     dimensionsCm: { width: 110, height: 38, depth: 60 },
-    styleTags: ["warm-minimal", "stone"],
+    styleTags: ["modern-organic", "warm-minimal", "stone"],
     color: "ivory",
     material: "travertine",
     description: "A quiet stone-led alternative for the centre of the room.",

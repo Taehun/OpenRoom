@@ -69,6 +69,20 @@ function errorCode(result: Awaited<ReturnType<ModelContextTool["execute"]>>) {
 }
 
 describe("WebMCP Core 6 handlers", () => {
+  test("finds the modern-organic coffee table by style query", async () => {
+    const store = createSceneStore();
+    const { context } = createContext(store);
+    const result = await execute(createCoreTools(context), "search_products", {
+      category: "coffee_table",
+      query: "modern",
+    });
+
+    expect(result.structuredContent.ok).toBe(true);
+    if (!result.structuredContent.ok) return;
+    expect((result.structuredContent.data as { results: CatalogProduct[] })
+      .results.map(({ id }) => id)).toEqual(["travertine-plinth-table"]);
+  });
+
   test("searches, replaces the selected table, and rejects a stale move", async () => {
     const store = createSceneStore();
     const { context } = createContext(store);
