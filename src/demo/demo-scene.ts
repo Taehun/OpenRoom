@@ -31,6 +31,9 @@ export function createDemoScene(): Scene {
   for (const object of scene.objects) {
     const assetId = SEED_ASSETS[object.id];
     if (assetId) object.assetId = assetId;
+    if (object.id === "lamp_01") {
+      object.position = [0.5, object.position[1], object.position[2]];
+    }
   }
 
   return SceneSchema.parse({

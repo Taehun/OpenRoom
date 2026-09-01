@@ -35,6 +35,12 @@ interface BrowserScene {
   revision: number;
 }
 
+interface CartRequestObservation {
+  method: string;
+  resourceType: string;
+  url: string;
+}
+
 declare global {
   interface Window {
     __photoActiveToolNames: Set<string>;
@@ -122,9 +128,46 @@ async function visualPlacement(layer: Locator) {
   });
 }
 
+async function largestExposedHorizontalEdgeRatio(
+  layer: Locator,
+  occluder: Locator,
+) {
+  const [layerBounds, occluderBounds] = await Promise.all([
+    layer.boundingBox(),
+    occluder.boundingBox(),
+  ]);
+  if (!layerBounds || !occluderBounds) {
+    throw new Error("Missing photo layer bounds");
+  }
+
+  const layerRight = layerBounds.x + layerBounds.width;
+  const occluderRight = occluderBounds.x + occluderBounds.width;
+  const exposedLeft = Math.max(
+    0,
+    Math.min(layerRight, occluderBounds.x) - layerBounds.x,
+  );
+  const exposedRight = Math.max(
+    0,
+    layerRight - Math.max(layerBounds.x, occluderRight),
+  );
+
+  return Math.max(exposedLeft, exposedRight) / layerBounds.width;
+}
+
+async function expectLampVisibleBeyondChair(stage: Locator) {
+  const lamp = stage.locator('[data-object-id="lamp_01"]');
+  const chair = stage.locator('[data-object-id="chair_01"]');
+  await expect(lamp).toBeVisible();
+  await expect(chair).toBeVisible();
+  expect(await largestExposedHorizontalEdgeRatio(lamp, chair)).toBeGreaterThan(
+    0.2,
+  );
+}
+
 test("redesigns the whole photo room through Core 6 and preserves human transforms", async ({
   page,
 }) => {
+  const cartRequests: CartRequestObservation[] = [];
   const consoleErrors: string[] = [];
   const externalRequestsDuringCart: string[] = [];
   let appOrigin = "";
@@ -134,9 +177,17 @@ test("redesigns the whole photo room through Core 6 and preserves human transfor
     if (message.type() === "error") consoleErrors.push(message.text());
   });
   await page.route("**/*", async (route) => {
-    const requestOrigin = new URL(route.request().url()).origin;
-    if (trackCartRequests && appOrigin !== "" && requestOrigin !== appOrigin) {
-      externalRequestsDuringCart.push(route.request().url());
+    const request = route.request();
+    const requestOrigin = new URL(request.url()).origin;
+    if (trackCartRequests) {
+      cartRequests.push({
+        method: request.method(),
+        resourceType: request.resourceType(),
+        url: request.url(),
+      });
+      if (appOrigin !== "" && requestOrigin !== appOrigin) {
+        externalRequestsDuringCart.push(request.url());
+      }
     }
     await route.continue();
   });
@@ -166,6 +217,9 @@ test("redesigns the whole photo room through Core 6 and preserves human transfor
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto("/demo");
   appOrigin = new URL(page.url()).origin;
+
+  const stage = page.getByRole("region", { name: "Editable room photo" });
+  await expectLampVisibleBeyondChair(stage);
 
   await expect
     .poll(() =>
@@ -234,7 +288,6 @@ test("redesigns the whole photo room through Core 6 and preserves human transfor
     })),
   );
 
-  const stage = page.getByRole("region", { name: "Editable room photo" });
   const objectRail = page.getByRole("region", { name: "Objects in room" });
   const stageBounds = await stage.boundingBox();
   if (!stageBounds) throw new Error("Missing editable photo bounds");
@@ -246,6 +299,7 @@ test("redesigns the whole photo room through Core 6 and preserves human transfor
       stage.locator(`[data-object-id="${objectId}"] img`),
     ).toHaveAttribute("src", `/demo/photo/products/${productId}.webp`);
   }
+  await expectLampVisibleBeyondChair(stage);
 
   const table = stage.locator('[data-object-id="table_01"]');
   const beforeDrag = await callTool(page, "get_scene", {});
@@ -329,6 +383,18 @@ test("redesigns the whole photo room through Core 6 and preserves human transfor
   await expect(dialog).toBeHidden();
   expect(await page.evaluate(() => window.__photoFetchCount)).toBe(0);
   trackCartRequests = false;
+  expect(
+    cartRequests.filter(
+      ({ method }) => !["GET", "HEAD", "OPTIONS"].includes(method),
+    ),
+  ).toEqual([]);
+  expect(
+    cartRequests.filter(({ url }) =>
+      /(?:^|\/)(?:api\/)?(?:cart|checkout)(?:\/|$)/i.test(
+        new URL(url).pathname,
+      ),
+    ),
+  ).toEqual([]);
   expect(externalRequestsDuringCart).toEqual([]);
 
   await page.getByRole("link", { name: "Nook home" }).click();
