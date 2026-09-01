@@ -96,6 +96,8 @@ describe("WebMCP Core 6 handlers", () => {
     expect(store.getState().scene.revision).toBe(2);
     expect(store.getState().scene.objects.find(({ id }) => id === "table_01")
       ?.product?.id).toBe("travertine-plinth-table");
+    expect(store.getState().scene.objects.find(({ id }) => id === "table_01")
+      ?.assetId).toBe("travertine-plinth-table");
 
     const staleMove = await execute(tools, "move_object", {
       objectId: "lamp_01",

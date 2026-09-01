@@ -157,7 +157,9 @@ function ProductsPanel({
       </p>
 
       <div className={styles.productList}>
-        {DEMO_PRODUCTS.map((product, index) => {
+        {DEMO_PRODUCTS.filter(
+          ({ category }) => category === "coffee_table",
+        ).map((product, index) => {
           const isPreviewing = product.id === tableProductId;
 
           return (

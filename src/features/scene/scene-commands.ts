@@ -129,6 +129,7 @@ export function applySceneCommand(
       depth: request.command.product.dimensionsCm.depth / 100,
     };
     object.source = "product";
+    object.assetId = request.command.product.id;
     object.product = structuredClone(request.command.product);
     object.dimensionsM = dimensionsM;
     object.position = [

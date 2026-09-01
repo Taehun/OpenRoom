@@ -58,6 +58,7 @@ describe("applySceneCommand", () => {
       depth: 0.55,
     });
     expect(table.product?.id).toBe("oak-frame-table");
+    expect(table.assetId).toBe("oak-frame-table");
     expect(table.source).toBe("product");
     expect(table.addedBy).toBe("human");
     expect(replaced.scene.revision).toBe(2);

@@ -1,6 +1,15 @@
 import { buildScene } from "../features/room/room-engine";
 import { SceneSchema, type Scene } from "../features/scene/scene-schema";
 
+const SEED_ASSETS: Record<string, string> = {
+  sofa_01: "seed-dated-sofa",
+  table_01: "seed-glass-table",
+  rug_01: "seed-pattern-rug",
+  lamp_01: "seed-brass-lamp",
+  chair_01: "seed-vinyl-chair",
+  plant_01: "seed-faux-plant",
+};
+
 export function createDemoScene(): Scene {
   const scene = buildScene(
     {
@@ -18,6 +27,11 @@ export function createDemoScene(): Scene {
     },
     6,
   );
+
+  for (const object of scene.objects) {
+    const assetId = SEED_ASSETS[object.id];
+    if (assetId) object.assetId = assetId;
+  }
 
   return SceneSchema.parse({
     ...scene,
