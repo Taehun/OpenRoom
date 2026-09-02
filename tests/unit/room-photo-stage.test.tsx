@@ -134,6 +134,34 @@ describe("RoomPhotoStage", () => {
       "aria-hidden",
       "true",
     );
+    const sofaShadow = screen.getByTestId("photo-contact-shadow-sofa_01");
+    const sofaFrame = screen.getByTestId("photo-object-frame-sofa_01");
+    const selection = screen.getByTestId("photo-rug-selection-rug_01");
+    expect(Number.parseFloat(sofaShadow.style.left)).toBeCloseTo(27.2, 10);
+    expect(Number.parseFloat(sofaShadow.style.top)).toBeCloseTo(74, 10);
+    expect(Number.parseFloat(sofaShadow.style.width)).toBeCloseTo(17.28, 10);
+    expect(Number.parseFloat(sofaShadow.style.height)).toBeCloseTo(
+      3.0123831364044356,
+      10,
+    );
+    expect(Number.parseFloat(sofaShadow.style.filter.slice(5))).toBeCloseTo(
+      7,
+      10,
+    );
+    expect(Number.parseFloat(sofaShadow.style.opacity)).toBeCloseTo(0.198, 10);
+    expect(sofaShadow.style.transform).toBe(
+      "translate(-50%, -50%) rotate(0deg)",
+    );
+    expect(getComputedStyle(sofaShadow).pointerEvents).toBe("none");
+    expect(Number(rug.style.zIndex)).toBeLessThan(
+      Number(sofaShadow.style.zIndex),
+    );
+    expect(Number(sofaShadow.style.zIndex)).toBeLessThan(
+      Number(sofaFrame.style.zIndex),
+    );
+    expect(Number(sofaFrame.style.zIndex)).toBeLessThan(
+      Number(selection.style.zIndex),
+    );
 
     fireEvent.click(rug);
     expect(rug).toHaveAttribute("aria-pressed", "true");
@@ -144,6 +172,21 @@ describe("RoomPhotoStage", () => {
       "data-destination-quad",
       destinationQuad,
     );
+  });
+
+  test("gives a focused projected rug a fixed visible floor outline", () => {
+    renderStage();
+    const rug = screen.getByRole("button", { name: "Rug" });
+    const polygon = screen
+      .getByTestId("photo-rug-selection-rug_01")
+      .querySelector("polygon");
+    if (!polygon) throw new Error("Missing rug focus polygon");
+
+    rug.focus();
+
+    expect(rug).toHaveFocus();
+    expect(polygon).toHaveAttribute("vector-effect", "non-scaling-stroke");
+    expect(polygon).toHaveAttribute("stroke-width", "3");
   });
 
   test("keeps a failed projected rug labelled and selectable", () => {
@@ -221,6 +264,53 @@ describe("RoomPhotoStage", () => {
     expect(store.getState().history).toHaveLength(1);
     expect(store.getState().isTransforming).toBe(false);
     expect(stage).toContainElement(table);
+  });
+
+  test("previews and commits canonical rug movement through its clipped hit target", () => {
+    const store = createSceneStore();
+    const commit = vi.spyOn(store.getState(), "commitTransform");
+    const originalRug = structuredClone(objectFromStore(store, "rug_01"));
+    renderStage(store);
+    const rug = screen.getByRole("button", { name: "Rug" });
+    const originalQuad = rug.getAttribute("data-destination-quad");
+
+    fireEvent.pointerDown(rug, {
+      pointerId: 72,
+      clientX: 612,
+      clientY: 526.24,
+    });
+    fireEvent.pointerMove(rug, {
+      pointerId: 72,
+      clientX: 652,
+      clientY: 546.24,
+    });
+
+    expect(store.getState().scene.selectedObjectId).toBe("rug_01");
+    expect(store.getState().isTransforming).toBe(true);
+    expect(commit).not.toHaveBeenCalled();
+    expect(objectFromStore(store, "rug_01").position).toEqual(
+      originalRug.position,
+    );
+    expect(rug.getAttribute("data-destination-quad")).not.toBe(originalQuad);
+
+    fireEvent.pointerUp(rug, {
+      pointerId: 72,
+      clientX: 652,
+      clientY: 546.24,
+    });
+
+    expect(commit).toHaveBeenCalledOnce();
+    expect(commit).toHaveBeenCalledWith(
+      "rug_01",
+      [expect.any(Number), originalRug.position[1], expect.any(Number)],
+      originalRug.rotation[1],
+    );
+    expect(objectFromStore(store, "rug_01").position).not.toEqual(
+      originalRug.position,
+    );
+    expect(store.getState().scene.revision).toBe(2);
+    expect(store.getState().history).toHaveLength(1);
+    expect(store.getState().isTransforming).toBe(false);
   });
 
   test("moves by the pointer delta without jumping the floor anchor", () => {

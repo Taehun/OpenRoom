@@ -250,7 +250,11 @@ export function PhotoRugLayer({
         style={{ zIndex: INTERACTION_LAYER }}
         viewBox="0 0 1 1"
       >
-        <polygon points={destinationQuad} vectorEffect="non-scaling-stroke" />
+        <polygon
+          points={destinationQuad}
+          strokeWidth={3}
+          vectorEffect="non-scaling-stroke"
+        />
       </svg>
 
       {selected ? (

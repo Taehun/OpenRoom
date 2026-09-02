@@ -461,7 +461,6 @@
   opacity: 0;
   pointer-events: none;
   stroke: var(--moss);
-  stroke-width: 0.006;
 }
 
 .photoRugSelectionVisible,

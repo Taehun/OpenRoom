@@ -90,6 +90,42 @@ describe("photo projection", () => {
     expect(shadow.opacity).toBeLessThanOrEqual(0.28);
   });
 
+  it("derives a 45-degree shadow once from its projected screen axes", () => {
+    const scene = completedProductScene();
+    const sofa = structuredClone(
+      scene.objects.find(({ id }) => id === "sofa_01")!,
+    );
+    sofa.position = [0, sofa.position[1], 0];
+    sofa.dimensionsM = { ...sofa.dimensionsM, width: 2, depth: 1 };
+    sofa.rotation[1] = Math.PI / 4;
+
+    const shadow = projectContactShadow(sofa, scene.room);
+
+    expect(shadow.left).toBeCloseTo(0.5052083333333334, 12);
+    expect(shadow.top).toBeCloseTo(0.74, 12);
+    expect(shadow.width).toBeCloseTo(13.117943817534822, 12);
+    expect(shadow.height).toBeCloseTo(5.668247328564432, 12);
+    expect(shadow.rotationDegrees).toBeCloseTo(21.33685929180563, 12);
+  });
+
+  it("keeps a 90-degree shadow aligned to the projected physical axes", () => {
+    const scene = completedProductScene();
+    const sofa = structuredClone(
+      scene.objects.find(({ id }) => id === "sofa_01")!,
+    );
+    sofa.position = [0, sofa.position[1], 0];
+    sofa.dimensionsM = { ...sofa.dimensionsM, width: 2, depth: 1 };
+    sofa.rotation[1] = Math.PI / 2;
+
+    const shadow = projectContactShadow(sofa, scene.room);
+
+    expect(shadow.left).toBeCloseTo(0.5, 12);
+    expect(shadow.top).toBeCloseTo(0.74, 12);
+    expect(shadow.width).toBeCloseTo(6.75, 12);
+    expect(shadow.height).toBeCloseTo(7.46666666666667, 12);
+    expect(shadow.rotationDegrees).toBeCloseTo(90, 12);
+  });
+
   it("uses lexical object IDs to stabilize equal-depth vertical layers", () => {
     const scene = completedProductScene();
     const chair = scene.objects.find(({ id }) => id === "chair_01")!;

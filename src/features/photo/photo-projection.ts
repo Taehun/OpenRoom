@@ -207,6 +207,8 @@ const RUG_LAYER_BASE = 0;
 const SHADOW_LAYER_BASE = 2_000_000;
 const VERTICAL_LAYER_BASE = 4_000_000;
 const LAYER_DEPTH_STRIDE = 1_000;
+const PHOTO_STAGE_WIDTH_UNITS = 16;
+const PHOTO_STAGE_HEIGHT_UNITS = 9;
 
 export function objectVisualWidth(
   widthM: number,
@@ -228,16 +230,29 @@ export function projectContactShadow(
   const projectedCorners = footprintCorners(objectFootprint(object)).map(
     ({ x, z }) => projectRoomPoint({ x, z }, room),
   );
-  let minimumX = Number.POSITIVE_INFINITY;
-  let maximumX = Number.NEGATIVE_INFINITY;
-  let minimumY = Number.POSITIVE_INFINITY;
-  let maximumY = Number.NEGATIVE_INFINITY;
-  for (const corner of projectedCorners) {
-    minimumX = Math.min(minimumX, corner.x);
-    maximumX = Math.max(maximumX, corner.x);
-    minimumY = Math.min(minimumY, corner.y);
-    maximumY = Math.max(maximumY, corner.y);
-  }
+  const center = projectedCorners.reduce(
+    (current, corner) => ({
+      x: current.x + corner.x / projectedCorners.length,
+      y: current.y + corner.y / projectedCorners.length,
+    }),
+    { x: 0, y: 0 },
+  );
+  const midpoint = (
+    first: ProjectedPlacement,
+    second: ProjectedPlacement,
+  ) => ({ x: (first.x + second.x) / 2, y: (first.y + second.y) / 2 });
+  const widthStart = midpoint(projectedCorners[0], projectedCorners[3]);
+  const widthEnd = midpoint(projectedCorners[1], projectedCorners[2]);
+  const depthStart = midpoint(projectedCorners[0], projectedCorners[1]);
+  const depthEnd = midpoint(projectedCorners[3], projectedCorners[2]);
+  const widthAxis = {
+    x: (widthEnd.x - widthStart.x) * PHOTO_STAGE_WIDTH_UNITS,
+    y: (widthEnd.y - widthStart.y) * PHOTO_STAGE_HEIGHT_UNITS,
+  };
+  const depthAxis = {
+    x: (depthEnd.x - depthStart.x) * PHOTO_STAGE_WIDTH_UNITS,
+    y: (depthEnd.y - depthStart.y) * PHOTO_STAGE_HEIGHT_UNITS,
+  };
 
   const profile =
     object.type === "rug"
@@ -255,11 +270,18 @@ export function projectContactShadow(
         );
 
   return {
-    left: placement.left,
-    top: placement.top,
-    width: (maximumX - minimumX) * 100 * profile.widthFactor,
-    height: (maximumY - minimumY) * 100 * profile.depthFactor,
-    rotationDegrees: (object.rotation[1] * 180) / Math.PI,
+    left: center.x,
+    top: center.y,
+    width:
+      (Math.hypot(widthAxis.x, widthAxis.y) / PHOTO_STAGE_WIDTH_UNITS) *
+      100 *
+      profile.widthFactor,
+    height:
+      (Math.hypot(depthAxis.x, depthAxis.y) / PHOTO_STAGE_HEIGHT_UNITS) *
+      100 *
+      profile.depthFactor,
+    rotationDegrees:
+      (Math.atan2(widthAxis.y, widthAxis.x) * 180) / Math.PI,
     blurPx: lerp(4, 10, depthAmount),
     opacity: clamp(profile.opacity * placement.scale, 0, 0.28),
     zIndex: SHADOW_LAYER_BASE + placement.zIndex * LAYER_DEPTH_STRIDE,

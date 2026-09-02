@@ -15,6 +15,7 @@ export function PhotoContactShadow({
     height: `${projection.height}%`,
     left: `${projection.left * 100}%`,
     opacity: projection.opacity,
+    pointerEvents: "none",
     top: `${projection.top * 100}%`,
     transform: `translate(-50%, -50%) rotate(${projection.rotationDegrees}deg)`,
     width: `${projection.width}%`,
