@@ -58,23 +58,52 @@ export function PhotoObjectLayer({
   const asset = getPhotoAsset(object);
   const anchorX = asset?.anchorX ?? 0.5;
   const anchorY = asset?.anchorY ?? 1;
+  const left = `${placement.left * 100}%`;
+  const top = `${placement.top * 100}%`;
+  const width = `${visualWidth}%`;
+  const rotation = `${(object.rotation[1] * 180) / Math.PI}deg`;
+  const anchorXPercent = `${anchorX * 100}%`;
+  const anchorYPercent = `${anchorY * 100}%`;
   const customStyle = {
-    "--photo-left": `${placement.left * 100}%`,
-    "--photo-top": `${placement.top * 100}%`,
-    "--photo-width": `${visualWidth}%`,
-    "--photo-rotation": `${(object.rotation[1] * 180) / Math.PI}deg`,
-    "--photo-anchor-x": `${anchorX * 100}%`,
-    "--photo-anchor-y": `${anchorY * 100}%`,
+    "--photo-left": left,
+    "--photo-top": top,
+    "--photo-width": width,
+    "--photo-rotation": rotation,
+    "--photo-anchor-x": anchorXPercent,
+    "--photo-anchor-y": anchorYPercent,
     "--photo-anchor-x-offset": `${anchorX * -100}%`,
     "--photo-anchor-y-offset": `${anchorY * -100}%`,
     zIndex: layerZIndex(object, placement.zIndex),
+  } as CSSProperties;
+  const frameStyle = {
+    ...customStyle,
+    left,
+    top,
+    transform: `translate(${-anchorX * 100}%, ${-anchorY * 100}%) rotate(${rotation})`,
+    transformOrigin: `${anchorXPercent} ${anchorYPercent}`,
+    width,
+  } as CSSProperties;
+  const objectStyle = {
+    ...customStyle,
+    transform: "none",
+    width: "100%",
+  } as CSSProperties;
+  const floorAnchorStyle = {
+    left: anchorXPercent,
+    top: anchorYPercent,
+    transform: "translate(-50%, -50%)",
+  } as CSSProperties;
+  const rotationHandleStyle = {
+    left: anchorXPercent,
+    top: 0,
+    transform: "translate(-50%, -100%)",
   } as CSSProperties;
 
   return (
     <div
       className={styles.photoObjectFrame}
       data-testid={`photo-object-frame-${object.id}`}
-      style={customStyle}
+      style={frameStyle}
     >
       <button
         aria-label={label}
@@ -90,7 +119,7 @@ export function PhotoObjectLayer({
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
-        style={customStyle}
+        style={objectStyle}
         type="button"
       >
         {asset ? (
@@ -118,6 +147,7 @@ export function PhotoObjectLayer({
           aria-hidden="true"
           className={styles.floorAnchor}
           data-testid={`photo-floor-anchor-${object.id}`}
+          style={floorAnchorStyle}
         />
       ) : null}
 
@@ -129,7 +159,7 @@ export function PhotoObjectLayer({
           onPointerDown={onRotationPointerDown}
           onPointerMove={onRotationPointerMove}
           onPointerUp={onRotationPointerUp}
-          style={customStyle}
+          style={rotationHandleStyle}
           type="button"
         >
           <span aria-hidden="true">↻</span>

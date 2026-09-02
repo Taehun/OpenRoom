@@ -478,10 +478,24 @@ describe("RoomPhotoStage", () => {
     const frame = screen.getByTestId("photo-object-frame-table_01");
     expect(frame.style.getPropertyValue("--photo-anchor-x")).toBe("50.07%");
     expect(frame.style.getPropertyValue("--photo-anchor-y")).toBe("86.13%");
-    expect(frame.style.transform).not.toContain("scale(");
+    expect(frame.style.left).toBe("50%");
+    expect(frame.style.top).toBe("74%");
+    expect(frame.style.transform).toBe(
+      "translate(-50.07%, -86.13%) rotate(0deg)",
+    );
+    expect(frame.style.transformOrigin).toBe("50.07% 86.13%");
     const floorAnchor = screen.getByTestId("photo-floor-anchor-table_01");
+    const object = screen.getByRole("button", { name: "Coffee table" });
     const handle = screen.getByRole("button", { name: "Rotate Coffee table" });
     expect(frame).toContainElement(floorAnchor);
     expect(frame).toContainElement(handle);
+    expect(floorAnchor.style.left).toBe("50.07%");
+    expect(floorAnchor.style.top).toBe("86.13%");
+    expect(floorAnchor.style.transform).toBe("translate(-50%, -50%)");
+    expect(object.style.width).toBe("100%");
+    expect(object.style.transform).toBe("none");
+    expect(handle.style.left).toBe("50.07%");
+    expect(handle.style.top).toBe("0px");
+    expect(handle.style.transform).toBe("translate(-50%, -100%)");
   });
 });

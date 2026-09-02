@@ -365,15 +365,6 @@
 
 .photoObjectFrame {
   position: absolute;
-  top: var(--photo-top);
-  left: var(--photo-left);
-  width: var(--photo-width);
-  transform: translate(
-      var(--photo-anchor-x-offset),
-      var(--photo-anchor-y-offset)
-    )
-    rotate(var(--photo-rotation));
-  transform-origin: var(--photo-anchor-x) var(--photo-anchor-y);
 }
 
 .photoObject,
@@ -423,8 +414,6 @@
 
 .floorAnchor {
   position: absolute;
-  top: var(--photo-anchor-y);
-  left: var(--photo-anchor-x);
   width: 10px;
   height: 10px;
   border: 2px solid var(--paper);
@@ -451,8 +440,6 @@
 
 .rotationHandle {
   position: absolute;
-  top: 0;
-  left: var(--photo-anchor-x);
   display: grid;
   width: 32px;
   height: 32px;
@@ -468,7 +455,6 @@
   font-weight: 750;
   line-height: 1;
   box-shadow: 0 3px 9px rgba(36, 39, 34, 0.3);
-  transform: translate(-50%, -100%);
   touch-action: none;
 }
 
