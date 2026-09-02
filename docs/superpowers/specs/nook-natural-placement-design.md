@@ -2,9 +2,8 @@
 
 **Date:** 2026-09-02
 
-**Status:** Draft for written-spec review. The architectural design was approved
-in chat on 2026-09-02. Implementation remains blocked until this written spec is
-reviewed and explicitly approved.
+**Status:** Approved on 2026-09-02 after in-chat architectural review and
+written-spec review.
 
 **Depends on:** The repaired static photo compositor on
 `feat/photo-compositor`. Its focused tests, complete verification matrix,
