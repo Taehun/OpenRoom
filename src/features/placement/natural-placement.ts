@@ -48,6 +48,28 @@ interface CandidateSet {
   truncated: boolean;
 }
 
+/**
+ * Candidate lanes an accessory's perimeter is split into. Ordered clockwise from the
+ * back-left corner; the search draws from them round-robin, so the candidate cap is
+ * shared out over the whole perimeter rather than one arc of it.
+ */
+const PERIMETER_SIDES = [
+  "back-left",
+  "back",
+  "back-right",
+  "right",
+  "front-right",
+  "front",
+  "front-left",
+  "left",
+] as const;
+
+type PerimeterSide = (typeof PERIMETER_SIDES)[number];
+
+interface PerimeterPoint extends PointXZ {
+  side: PerimeterSide;
+}
+
 const CATEGORY_ORDER: readonly SceneObjectType[] = [
   "sofa",
   "rug",
@@ -793,31 +815,107 @@ function chairCandidates(
   return result;
 }
 
-function accessoryCandidates(scene: Scene, object: SceneObject): readonly ProposedPlacement[] {
-  const result: ProposedPlacement[] = [placementFor(object)];
-  const rotationY = object.rotation[1];
+/**
+ * The inset perimeter an accessory can stand on, tagged by the wall or corner it
+ * belongs to so the candidate cap can be shared out evenly between them.
+ */
+function perimeterRing(
+  scene: Scene,
+  object: SceneObject,
+  rotationY: number,
+): readonly PerimeterPoint[] {
   const range = usableCenterRange(scene, object, rotationY);
   const [minimumX, maximumX] = inwardGridRange(range.minimumX, range.maximumX, PLACEMENT_LIMITS.gridM);
   const [minimumZ, maximumZ] = inwardGridRange(range.minimumZ, range.maximumZ, PLACEMENT_LIMITS.gridM);
-  const perimeter: { x: number; z: number }[] = [];
-
+  const xValues: number[] = [];
   for (let x = minimumX; x <= maximumX + 1e-9; x += PLACEMENT_LIMITS.gridM) {
-    perimeter.push({ x: quantize(x, PLACEMENT_LIMITS.gridM), z: minimumZ });
-    perimeter.push({ x: quantize(x, PLACEMENT_LIMITS.gridM), z: maximumZ });
+    xValues.push(quantize(x, PLACEMENT_LIMITS.gridM));
+  }
+  const ring: PerimeterPoint[] = [];
+  for (let index = 0; index < xValues.length; index += 1) {
+    const x = xValues[index]!;
+    const corner = index === 0 ? "left" : index === xValues.length - 1 ? "right" : null;
+    ring.push({ x, z: minimumZ, side: corner ? `back-${corner}` : "back" });
+    ring.push({ x, z: maximumZ, side: corner ? `front-${corner}` : "front" });
   }
   for (let z = minimumZ + PLACEMENT_LIMITS.gridM; z < maximumZ - 1e-9; z += PLACEMENT_LIMITS.gridM) {
-    perimeter.push({ x: minimumX, z: quantize(z, PLACEMENT_LIMITS.gridM) });
-    perimeter.push({ x: maximumX, z: quantize(z, PLACEMENT_LIMITS.gridM) });
+    const quantizedZ = quantize(z, PLACEMENT_LIMITS.gridM);
+    ring.push({ x: minimumX, z: quantizedZ, side: "left" });
+    ring.push({ x: maximumX, z: quantizedZ, side: "right" });
   }
-  perimeter.sort(
-    (first, second) =>
-      Math.hypot(first.x - object.position[0], first.z - object.position[2]) -
-        Math.hypot(second.x - object.position[0], second.z - object.position[2]) ||
-      first.z - second.z ||
-      first.x - second.x,
+  return ring;
+}
+
+/**
+ * Reorders a coordinate-sorted wall so that every prefix still spans it: both ends
+ * first, then the midpoint, then the quarter points. Taking the first n entries
+ * therefore samples the whole wall instead of the run nearest one corner.
+ */
+function spreadOrder(
+  points: readonly ProposedPlacement[],
+): readonly ProposedPlacement[] {
+  if (points.length <= 2) return points;
+  const last = points.length - 1;
+  const ordered: ProposedPlacement[] = [points[0]!, points[last]!];
+  const taken = new Uint8Array(points.length);
+  taken[0] = 1;
+  taken[last] = 1;
+  const segments: [number, number][] = [[0, last]];
+  for (let head = 0; head < segments.length; head += 1) {
+    const [low, high] = segments[head]!;
+    if (high - low < 2) continue;
+    const middle = low + Math.floor((high - low) / 2);
+    if (!taken[middle]) {
+      taken[middle] = 1;
+      ordered.push(points[middle]!);
+    }
+    segments.push([low, middle], [middle, high]);
+  }
+  return ordered;
+}
+
+/**
+ * Perimeter candidates for an accessory, aware of the partial layout it is joining.
+ * Positions the settled obstacles already cover are dropped before the candidate cap
+ * applies, and the survivors are drawn round-robin from every wall and corner, so the
+ * cap can never be spent on the single arc nearest the object's current position.
+ */
+function accessoryCandidates(
+  scene: Scene,
+  object: SceneObject,
+  obstacles: readonly SceneObject[],
+): readonly ProposedPlacement[] {
+  const rotationY = object.rotation[1];
+  const blockers = obstacles
+    .filter(({ id, type }) => id !== object.id && type !== "rug")
+    .map(objectFootprint);
+  const clearances = openingClearanceZones(scene);
+  const isFree = (placement: ProposedPlacement): boolean => {
+    const footprint = objectFootprint(withPlacement(object, placement));
+    return (
+      footprintInsideRoom(footprint, scene.room, PLACEMENT_LIMITS.roomInsetM) &&
+      !clearances.some((zone) => footprintsOverlap(footprint, zone)) &&
+      !blockers.some((blocker) => footprintsOverlap(footprint, blocker))
+    );
+  };
+
+  const lanes = new Map<PerimeterSide, ProposedPlacement[]>(
+    PERIMETER_SIDES.map((side) => [side, []]),
   );
-  for (const point of perimeter) {
-    result.push(candidate(object, point.x, point.z, rotationY));
+  for (const point of perimeterRing(scene, object, rotationY)) {
+    const placement = candidate(object, point.x, point.z, rotationY);
+    if (isFree(placement)) lanes.get(point.side)!.push(placement);
+  }
+
+  const incumbent = placementFor(object);
+  const result: ProposedPlacement[] = isFree(incumbent) ? [incumbent] : [];
+  const spread = PERIMETER_SIDES.map((side) => spreadOrder(lanes.get(side)!));
+  const deepest = spread.reduce((longest, lane) => Math.max(longest, lane.length), 0);
+  for (let depth = 0; depth < deepest; depth += 1) {
+    for (const lane of spread) {
+      const placement = lane[depth];
+      if (placement) result.push(placement);
+    }
   }
   return result;
 }
@@ -847,6 +945,7 @@ function candidatesFor(
   scene: Scene,
   object: SceneObject,
   placements: readonly ProposedPlacement[],
+  placedIds: ReadonlySet<string>,
   limit: number,
 ): CandidateSet {
   const objects = layoutObjects(scene, placements);
@@ -866,7 +965,14 @@ function candidatesFor(
       break;
     case "floor_lamp":
     case "plant":
-      candidates = accessoryCandidates(scene, object);
+      candidates = accessoryCandidates(
+        scene,
+        object,
+        objects.filter(
+          (other) =>
+            other.locked || other.type === "unknown" || placedIds.has(other.id),
+        ),
+      );
       break;
     case "unknown":
       candidates = [];
@@ -945,9 +1051,27 @@ function partialBlocksCirculation(
   );
 }
 
+/**
+ * The current layout is itself a complete candidate. When the bounded search keeps no
+ * valid layout of its own, a room that already satisfies the hard constraints still has
+ * one answer to report, so exhaustion is never raised for a Scene that is already safe.
+ */
+function settledSearch(
+  best: EvaluatedLayout | null,
+  evaluatedLayouts: number,
+  exhausted: boolean,
+  incumbent: EvaluatedLayout,
+): LayoutSearch {
+  if (best !== null || !incumbent.valid) {
+    return { best, evaluatedLayouts, exhausted };
+  }
+  return { best: incumbent, evaluatedLayouts: evaluatedLayouts + 1, exhausted: false };
+}
+
 function searchLayouts(
   scene: Scene,
   limits: typeof PLACEMENT_LIMITS,
+  incumbent: EvaluatedLayout,
 ): LayoutSearch {
   const movable = scene.objects
     .filter(({ locked, type }) => !locked && type !== "unknown")
@@ -964,21 +1088,24 @@ function searchLayouts(
     const object = movable[objectIndex]!;
     const expanded: SearchState[] = [];
     for (const state of beam) {
+      const placedIds = new Set(state.objectIds);
       const candidateSet = candidatesFor(
         scene,
         object,
         state.placements,
+        placedIds,
         limits.candidatesPerObject,
       );
       if (candidateSet.truncated) truncatedCandidates = true;
+      const objectIds = [...state.objectIds, object.id];
+      const nextIds = new Set(objectIds);
       for (
         let candidateIndex = 0;
         candidateIndex < candidateSet.candidates.length;
         candidateIndex += 1
       ) {
         const placements = [...state.placements, candidateSet.candidates[candidateIndex]!];
-        const objectIds = [...state.objectIds, object.id];
-        if (!respectsPartialConstraints(scene, placements, new Set(objectIds))) continue;
+        if (!respectsPartialConstraints(scene, placements, nextIds)) continue;
         const objects = layoutObjects(scene, placements);
         expanded.push({
           placements,
@@ -1008,11 +1135,12 @@ function searchLayouts(
     if (ranked < expanded.length) prunedByBeam = true;
     beam = kept;
     if (beam.length === 0) {
-      return {
-        best: null,
+      return settledSearch(
+        null,
         evaluatedLayouts,
-        exhausted: prunedByBeam || truncatedCandidates,
-      };
+        prunedByBeam || truncatedCandidates,
+        incumbent,
+      );
     }
   }
 
@@ -1032,11 +1160,12 @@ function searchLayouts(
     }
   }
 
-  return {
+  return settledSearch(
     best,
     evaluatedLayouts,
-    exhausted: best === null && (prunedByBeam || truncatedCandidates),
-  };
+    best === null && (prunedByBeam || truncatedCandidates),
+    incumbent,
+  );
 }
 
 function diagnostics(
@@ -1052,7 +1181,7 @@ function diagnostics(
 
 function proposeSinglePass(scene: Scene): NaturalPlacementResult {
   const current = evaluateCompleteLayout(scene, currentPlacements(scene));
-  const search = searchLayouts(scene, PLACEMENT_LIMITS);
+  const search = searchLayouts(scene, PLACEMENT_LIMITS, current);
   if (search.exhausted) return { kind: "failed", reason: "search-limit-exhausted" };
   if (!search.best) return { kind: "failed", reason: "no-valid-layout" };
   if (

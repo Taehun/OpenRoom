@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { createDemoScene } from "../../src/demo/demo-scene";
 import { hasCirculationPath } from "../../src/features/placement/circulation";
 import {
   footprintInsideRoom,
@@ -11,8 +12,10 @@ import { proposeNaturalPlacement } from "../../src/features/placement/natural-pl
 import { validateAndApplyPlacement } from "../../src/features/scene/natural-placement-command";
 import { PLACEMENT_LIMITS } from "../../src/features/placement/placement-profile";
 import type { ProposedPlacement } from "../../src/features/placement/placement-types";
+import { applySceneCommand } from "../../src/features/scene/scene-commands";
 import type {
   Scene,
+  SceneCommand,
   SceneObject,
 } from "../../src/features/scene/scene-schema";
 import { DEMO_PRODUCTS } from "../../src/features/demo/demo-data";
@@ -77,9 +80,9 @@ function thresholdScene(rugX: number): Scene {
 }
 
 // Mirrors the browser journey in tests/e2e/photo-compositor.spec.ts: the six-product
-// redesign followed by six `move_object` calls to a deliberately poor layout. Product IDs
-// and target coordinates are the ones that journey uses; the x/z clamp reproduces
-// `clampPositionToRoom` in scene-commands so the fixture matches the committed Scene.
+// redesign, then six `move_object` calls to a deliberately poor layout. Both Scenes are
+// built through the same command layer the store commits, so the room the solver sees
+// matches the committed browser Scene, `clampPositionToRoom` included.
 const REDESIGN_PRODUCT_IDS: Readonly<Record<string, string>> = {
   sofa_01: "boucle-curve-sofa",
   table_01: "travertine-plinth-table",
@@ -98,49 +101,104 @@ const POOR_JOURNEY_TARGETS: Readonly<Record<string, { x: number; z: number }>> =
   plant_01: { x: -2.3, z: -1.5 },
 };
 
-const ROOM_INSET_M = 0.1;
-
-function clamp(value: number, minimum: number, maximum: number) {
-  return Math.min(Math.max(value, minimum), maximum);
+function catalogProduct(productId: string) {
+  const product = DEMO_PRODUCTS.find(({ id }) => id === productId);
+  if (!product) throw new Error(`Missing catalog product ${productId}`);
+  return {
+    id: product.id,
+    variantId: product.variantId,
+    title: product.title,
+    category: product.category,
+    price: structuredClone(product.price),
+    dimensionsCm: structuredClone(product.dimensionsCm),
+    styleTags: [...product.styleTags],
+    color: product.color,
+    material: product.material,
+  };
 }
 
-function poorRedesignedJourneyScene(): Scene {
-  const scene = completedProductScene();
+function commit(scene: Scene, command: SceneCommand): Scene {
+  const result = applySceneCommand(scene, {
+    expectedRevision: scene.revision,
+    actor: "agent",
+    command,
+  });
+  if (!result.ok) throw new Error(`${command.type} command rejected`);
+  return result.scene;
+}
 
-  for (const object of scene.objects) {
-    const productId = REDESIGN_PRODUCT_IDS[object.id];
-    const product = DEMO_PRODUCTS.find(({ id }) => id === productId);
-    if (!product) throw new Error(`Missing redesign product for ${object.id}`);
-    object.assetId = product.id;
-    object.product = {
-      id: product.id,
-      variantId: product.variantId,
-      title: product.title,
-      category: product.category,
-      price: structuredClone(product.price),
-      dimensionsCm: structuredClone(product.dimensionsCm),
-      styleTags: [...product.styleTags],
-      color: product.color,
-      material: product.material,
-    };
-    object.dimensionsM = {
-      width: product.dimensionsCm.width / 100,
-      height: product.dimensionsCm.height / 100,
-      depth: product.dimensionsCm.depth / 100,
-    };
-
-    const target = POOR_JOURNEY_TARGETS[object.id]!;
-    const limitX =
-      scene.room.width / 2 - ROOM_INSET_M - object.dimensionsM.width / 2;
-    const limitZ =
-      scene.room.depth / 2 - ROOM_INSET_M - object.dimensionsM.depth / 2;
-    object.position = [
-      clamp(target.x, -limitX, limitX),
-      object.type === "rug" ? 0.01 : object.dimensionsM.height / 2,
-      clamp(target.z, -limitZ, limitZ),
-    ];
+/** The Scene the sixth `replace_object` commits, before any arrangement runs. */
+function redesignedProductScene(): Scene {
+  let scene = createDemoScene();
+  for (const [objectId, productId] of Object.entries(REDESIGN_PRODUCT_IDS)) {
+    scene = commit(scene, {
+      type: "replace",
+      objectId,
+      product: catalogProduct(productId),
+    });
   }
+  return scene;
+}
 
+/** The redesigned room dragged to the plan's verbatim poor targets. */
+function poorRedesignedJourneyScene(): Scene {
+  let scene = redesignedProductScene();
+  for (const [objectId, position] of Object.entries(POOR_JOURNEY_TARGETS)) {
+    scene = commit(scene, { type: "move", objectId, position });
+  }
+  return scene;
+}
+
+function objectAt(object: SceneObject, point: { x: number; z: number }): SceneObject {
+  return { ...object, position: [point.x, object.position[1], point.z] };
+}
+
+/** The inset perimeter positions the solver samples for an accessory. */
+function insetPerimeterRing(
+  scene: Scene,
+  object: SceneObject,
+): readonly { x: number; z: number }[] {
+  const grid = PLACEMENT_LIMITS.gridM;
+  const round = (value: number) => Number(value.toFixed(6));
+  const bound = (half: number, span: number) => ({
+    minimum: round(
+      Math.ceil((-span / 2 + PLACEMENT_LIMITS.roomInsetM + half - 1e-9) / grid) * grid,
+    ),
+    maximum: round(
+      Math.floor((span / 2 - PLACEMENT_LIMITS.roomInsetM - half + 1e-9) / grid) * grid,
+    ),
+  });
+  const x = bound(object.dimensionsM.width / 2, scene.room.width);
+  const z = bound(object.dimensionsM.depth / 2, scene.room.depth);
+  const ring: { x: number; z: number }[] = [];
+  for (let value = x.minimum; value <= x.maximum + 1e-9; value += grid) {
+    ring.push({ x: round(value), z: z.minimum });
+    ring.push({ x: round(value), z: z.maximum });
+  }
+  for (let value = z.minimum + grid; value < z.maximum - 1e-9; value += grid) {
+    ring.push({ x: x.minimum, z: round(value) });
+    ring.push({ x: x.maximum, z: round(value) });
+  }
+  return ring;
+}
+
+/**
+ * A 6.0 x 1.2 room whose locked sofa covers the left two thirds of the inset perimeter.
+ * Every ring position within reach of the lamp's corner is blocked while the right half
+ * of the ring is free, so a candidate list sorted by distance from the lamp and cut at
+ * 48 entries never reaches a usable position.
+ */
+function blockedAccessoryArcScene(): Scene {
+  const scene = keepObjects(completedProductScene(), "sofa_01", "lamp_01");
+  scene.id = "blocked-accessory-arc";
+  scene.source = "upload";
+  scene.room = { width: 6, height: 2.5, depth: 1.2 };
+  scene.openings = [];
+  const sofa = scene.objects.find(({ id }) => id === "sofa_01")!;
+  const lamp = scene.objects.find(({ id }) => id === "lamp_01")!;
+  sofa.position = [-1.6, sofa.position[1], 0];
+  sofa.locked = true;
+  lamp.position = [-2.7, lamp.position[1], -0.3];
   return scene;
 }
 
@@ -338,7 +396,7 @@ describe("natural placement", () => {
     ).toBe(false);
   });
 
-  it("reports an inconclusive truncated candidate search as exhausted", () => {
+  it("reaches a free wall when opening clearance blocks the nearest arc", () => {
     const scene = keepObjects(completedProductScene(), "lamp_01");
     scene.id = "bounded-perimeter-search";
     scene.source = "upload";
@@ -374,6 +432,32 @@ describe("natural placement", () => {
       ),
     ).toBe(false);
     expect(hasCirculationPath(witness, [witnessFootprint], [])).toBe(true);
+
+    const result = proposeNaturalPlacement(scene);
+    expect(result.kind).toBe("changed");
+    if (result.kind !== "changed") return;
+    const arranged = applyPlacements(scene, result.placements);
+    const arrangedFootprint = objectFootprint(arranged.objects[0]!);
+    expect(footprintInsideRoom(arrangedFootprint, arranged.room, 0.1)).toBe(true);
+    expect(
+      openingClearanceZones(arranged).some((zone) =>
+        footprintsOverlap(arrangedFootprint, zone),
+      ),
+    ).toBe(false);
+  });
+
+  it("reports an inconclusive truncated candidate search as exhausted", () => {
+    const scene = keepObjects(completedProductScene(), "sofa_01", "table_01");
+    scene.id = "unreachable-table-gap";
+    scene.source = "upload";
+    scene.room = { width: 9, height: 2.5, depth: 6 };
+    scene.openings = [];
+    const table = scene.objects.find(({ id }) => id === "table_01")!;
+    table.position = [0, table.position[1], 0];
+    table.locked = true;
+
+    // Every sofa candidate hugs a wall, so no layout can hold the 350-550mm
+    // sofa-to-table gap, and the current layout does not hold it either.
     expect(proposeNaturalPlacement(scene)).toEqual({
       kind: "failed",
       reason: "search-limit-exhausted",
@@ -441,8 +525,12 @@ describe("natural placement", () => {
     ).toBe(PLACEMENT_LIMITS.improvementThreshold);
   });
 
-  it("improves the poor whole-room journey layout and settles on a second pass", () => {
-    const scene = poorRedesignedJourneyScene();
+  it.each([
+    ["the seed placeholder room", createDemoScene],
+    ["the six-product redesign before arrangement", redesignedProductScene],
+    ["the redesign dragged to the poor journey layout", poorRedesignedJourneyScene],
+  ])("arranges %s and settles on a second pass", (_journey, buildScene) => {
+    const scene = buildScene();
     const current = scene.objects.map(({ id, position }) => [
       id,
       position[0],
@@ -463,5 +551,68 @@ describe("natural placement", () => {
       arranged.objects.map(({ id, position }) => [id, position[0], position[2]]),
     ).not.toEqual(current);
     expect(proposeNaturalPlacement(arranged).kind).toBe("unchanged");
+  });
+
+  it("samples the free perimeter when the accessory's nearest arc is blocked", () => {
+    const scene = blockedAccessoryArcScene();
+    const sofa = scene.objects.find(({ id }) => id === "sofa_01")!;
+    const lamp = scene.objects.find(({ id }) => id === "lamp_01")!;
+    const blocked = (point: { x: number; z: number }) =>
+      footprintsOverlap(
+        objectFootprint(objectAt(lamp, point)),
+        objectFootprint(sofa),
+      );
+    const ring = insetPerimeterRing(scene, lamp);
+    const nearestArc = [...ring]
+      .sort(
+        (first, second) =>
+          Math.hypot(first.x - lamp.position[0], first.z - lamp.position[2]) -
+          Math.hypot(second.x - lamp.position[0], second.z - lamp.position[2]),
+      )
+      .slice(0, PLACEMENT_LIMITS.candidatesPerObject);
+
+    // The whole distance-ordered candidate budget lands on blocked positions...
+    expect(nearestArc).toHaveLength(PLACEMENT_LIMITS.candidatesPerObject);
+    expect(nearestArc.every(blocked)).toBe(true);
+    // ...while most of the perimeter is free.
+    expect(ring.filter((point) => !blocked(point)).length).toBeGreaterThan(
+      PLACEMENT_LIMITS.candidatesPerObject,
+    );
+
+    const result = proposeNaturalPlacement(scene);
+    expect(result.kind).toBe("changed");
+    if (result.kind !== "changed") return;
+
+    const applied = validateAndApplyPlacement(scene, result);
+    expect(applied.ok).toBe(true);
+    if (!applied.ok || !applied.changed) return;
+    const arrangedLamp = applied.scene.objects.find(({ id }) => id === "lamp_01")!;
+    expect(
+      blocked({ x: arrangedLamp.position[0], z: arrangedLamp.position[2] }),
+    ).toBe(false);
+    expect(
+      footprintInsideRoom(
+        objectFootprint(arrangedLamp),
+        applied.scene.room,
+        PLACEMENT_LIMITS.roomInsetM,
+      ),
+    ).toBe(true);
+  });
+
+  it("keeps a valid current layout out of the failed outcomes", () => {
+    const settled = [
+      createDemoScene,
+      redesignedProductScene,
+      poorRedesignedJourneyScene,
+    ].map((buildScene) => {
+      const scene = buildScene();
+      const proposal = proposeNaturalPlacement(scene);
+      if (proposal.kind !== "changed") throw new Error("expected an arrangement");
+      return applyPlacements(scene, proposal.placements);
+    });
+
+    for (const scene of [...settled, thresholdScene(-0.3)]) {
+      expect(proposeNaturalPlacement(scene).kind).not.toBe("failed");
+    }
   });
 });
