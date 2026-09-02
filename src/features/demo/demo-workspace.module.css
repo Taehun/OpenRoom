@@ -639,6 +639,8 @@
 }
 
 .agentButton {
+  grid-column: 3;
+  grid-row: 1;
   min-height: 44px;
   margin-top: 1px;
   padding: 0 16px;
@@ -655,9 +657,9 @@
 
 .copyStatusSuccess,
 .copyStatusError {
-  grid-column: 3;
-  grid-row: 1;
-  align-self: end;
+  position: absolute;
+  right: 14px;
+  bottom: 13px;
   max-width: 168px;
   padding: 5px 7px;
   border-radius: 5px;

@@ -1,5 +1,76 @@
 import { expect, test } from "@playwright/test";
 
+declare global {
+  interface Window {
+    __demoClipboardShouldReject: boolean;
+  }
+}
+
+function expectStableBounds(
+  before: { x: number; y: number; width: number; height: number },
+  after: { x: number; y: number; width: number; height: number },
+) {
+  expect(Math.abs(after.x - before.x)).toBeLessThanOrEqual(1);
+  expect(Math.abs(after.y - before.y)).toBeLessThanOrEqual(1);
+  expect(Math.abs(after.width - before.width)).toBeLessThanOrEqual(1);
+  expect(Math.abs(after.height - before.height)).toBeLessThanOrEqual(1);
+}
+
+test("keeps prompt feedback from reflowing the copy button or photo stage", async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    window.__demoClipboardShouldReject = false;
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: {
+        async writeText() {
+          if (window.__demoClipboardShouldReject) {
+            throw new DOMException("Denied", "NotAllowedError");
+          }
+        },
+      },
+    });
+  });
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.goto("/demo");
+
+  const copyButton = page.getByRole("button", {
+    name: "Copy redesign prompt",
+  });
+  const stage = page.getByRole("region", { name: "Editable room photo" });
+  const beforeButton = await copyButton.boundingBox();
+  const beforeStage = await stage.boundingBox();
+  if (!beforeButton || !beforeStage) throw new Error("Missing initial bounds");
+
+  await copyButton.click();
+  await expect(
+    page.getByRole("status", { name: "Prompt copy status" }),
+  ).toHaveText("Prompt copied");
+  const afterSuccessButton = await copyButton.boundingBox();
+  const afterSuccessStage = await stage.boundingBox();
+  if (!afterSuccessButton || !afterSuccessStage) {
+    throw new Error("Missing success bounds");
+  }
+  expectStableBounds(beforeButton, afterSuccessButton);
+  expectStableBounds(beforeStage, afterSuccessStage);
+
+  await page.evaluate(() => {
+    window.__demoClipboardShouldReject = true;
+  });
+  await copyButton.click();
+  await expect(
+    page.getByRole("status", { name: "Prompt copy status" }),
+  ).toHaveText("Could not copy. Select and copy the prompt manually.");
+  const afterFailureButton = await copyButton.boundingBox();
+  const afterFailureStage = await stage.boundingBox();
+  if (!afterFailureButton || !afterFailureStage) {
+    throw new Error("Missing failure bounds");
+  }
+  expectStableBounds(beforeButton, afterFailureButton);
+  expectStableBounds(beforeStage, afterFailureStage);
+});
+
 test("completes the deterministic spatial commerce UI journey", async ({
   page,
 }) => {
