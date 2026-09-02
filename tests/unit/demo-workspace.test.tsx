@@ -181,6 +181,35 @@ test("arranges through Human UI and one Undo restores the Scene", async () => {
     .toBe(before);
 });
 
+// A later commit owns the top of the history stack, so `Undo placement` would pop that
+// command rather than the arrangement (spec §4.2/§5.3). The affordance must disappear
+// with the notice it belongs to.
+test("drops the Undo placement affordance after a later keyboard move", async () => {
+  const user = userEvent.setup();
+  const store = createSceneStore();
+  render(<DemoWorkspace store={store} />);
+  const stage = screen.getByRole("region", { name: "Editable room photo" });
+
+  await user.click(screen.getByRole("button", { name: "Arrange naturally" }));
+  expect(screen.getByRole("button", { name: "Undo placement" })).toBeVisible();
+
+  act(() => {
+    store.getState().selectObject("table_01");
+    store.getState().setToolMode("move");
+  });
+  const table = within(stage).getByRole("button", { name: "Coffee table" });
+  const revision = store.getState().scene.revision;
+  fireEvent.keyDown(table, { key: "ArrowRight" });
+
+  expect(store.getState().scene.revision).toBe(revision + 1);
+  expect(
+    screen.queryByRole("button", { name: "Undo placement" }),
+  ).not.toBeInTheDocument();
+  expect(
+    screen.queryByRole("status", { name: "Placement status" }),
+  ).not.toBeInTheDocument();
+});
+
 test("disables natural arrangement while a pointer transform is active", () => {
   render(<DemoWorkspace />);
   const stage = screen.getByRole("region", { name: "Editable room photo" });

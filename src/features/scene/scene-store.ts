@@ -161,7 +161,10 @@ export function createSceneStore(
           -HISTORY_LIMIT,
         ),
         stateVersion: state.stateVersion + 1,
-        ...(placementNotice === undefined ? {} : { placementNotice }),
+        // A commit describes the latest placement outcome or none at all: a later
+        // command must not inherit the previous notice, whose `Undo placement` button
+        // would pop this commit instead of the arrangement it names (spec §4.2, §5.3).
+        placementNotice: placementNotice ?? null,
       }));
       if (cause !== null) {
         notifyCommit(options.onCommit, {

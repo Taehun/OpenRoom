@@ -276,6 +276,55 @@ describe("createSceneStore", () => {
     expect(events).toHaveLength(1);
   });
 
+  // §4.2: the arrangement "is fully restored by one Undo" and §5.3 makes the notice the
+  // truthful description of the *last* placement outcome. A later commit pushes its own
+  // history entry, so the `Undo placement` affordance the notice carries would pop that
+  // command instead of the arrangement; the notice must not survive it.
+  test.each([
+    {
+      name: "a human keyboard or pointer move",
+      commit: (store: SceneStore) => {
+        const table = store
+          .getState()
+          .scene.objects.find(({ id }) => id === "table_01")!;
+        return store
+          .getState()
+          .commitTransform(
+            "table_01",
+            [table.position[0] + 0.08, table.position[1], table.position[2]],
+            table.rotation[1],
+          );
+      },
+    },
+    {
+      name: "an agent preserve command",
+      commit: (store: SceneStore) =>
+        store.getState().applyCommand({
+          expectedRevision: store.getState().scene.revision,
+          actor: "agent",
+          command: { type: "preserve", objectId: "table_01", preserved: true },
+        }),
+    },
+  ])("clears the placement notice when $name commits afterwards", ({ commit }) => {
+    const store = createSceneStore(completedProductScene());
+
+    expect(store.getState().arrangeNaturally()).toMatchObject({
+      ok: true,
+      changed: true,
+    });
+    expect(store.getState().placementNotice).toMatchObject({
+      kind: "manual-arranged",
+      message: "Placement improved",
+    });
+    const historyLength = store.getState().history.length;
+
+    const result = commit(store);
+
+    expect(result.ok).toBe(true);
+    expect(store.getState().history).toHaveLength(historyLength + 1);
+    expect(store.getState().placementNotice).toBeNull();
+  });
+
   test.each([
     {
       name: "an unchanged proposal",
