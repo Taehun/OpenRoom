@@ -48,6 +48,20 @@ function destinationClipPath(projection: RugProjection) {
     .join(", ")})`;
 }
 
+/**
+ * The centre of the projected floor quad. The rug's chrome is drawn in a layer that spans
+ * the whole stage but is clipped to this quad, so anything anchored to the layer's own
+ * corners falls outside the rug and is never painted; the centroid of a convex quad is
+ * always inside it.
+ */
+function destinationCentroid(projection: RugProjection) {
+  const corners = projection.destinationNormalized;
+  return {
+    x: corners.reduce((sum, { x }) => sum + x, 0) / corners.length,
+    y: corners.reduce((sum, { y }) => sum + y, 0) / corners.length,
+  };
+}
+
 export function PhotoRugLayer({
   label,
   object,
@@ -175,6 +189,7 @@ export function PhotoRugLayer({
 
   const destinationQuad = destinationQuadValue(projection);
   const clipPath = destinationClipPath(projection);
+  const lockedBadgeCenter = destinationCentroid(projection);
   const topEdgeCenter = {
     x:
       (projection.destinationNormalized[0].x +
@@ -230,7 +245,14 @@ export function PhotoRugLayer({
             style={imageStyle}
           />
           {object.locked ? (
-            <span aria-hidden="true" className={styles.photoLockedBadge}>
+            <span
+              aria-hidden="true"
+              className={`${styles.photoLockedBadge} ${styles.photoRugLockedBadge}`}
+              style={{
+                left: `${lockedBadgeCenter.x * 100}%`,
+                top: `${lockedBadgeCenter.y * 100}%`,
+              }}
+            >
               Locked
             </span>
           ) : null}

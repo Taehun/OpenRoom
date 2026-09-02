@@ -517,6 +517,17 @@
   pointer-events: none;
 }
 
+/*
+ * A floor-projected rug is clipped to its quad while the layer holding the badge spans
+ * the whole stage, so the shared corner offsets park the badge outside the rug where it
+ * is never drawn. Its inline left/top carry the quad's centre instead.
+ */
+.photoRugLockedBadge {
+  right: auto;
+  bottom: auto;
+  transform: translate(-50%, -50%);
+}
+
 .rotationHandle {
   position: absolute;
   display: grid;

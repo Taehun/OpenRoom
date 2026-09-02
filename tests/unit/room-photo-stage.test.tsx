@@ -83,6 +83,49 @@ function renderStage(
   return { ...result, stage, store };
 }
 
+interface QuadPoint {
+  x: number;
+  y: number;
+}
+
+/** The floor quad an element is tagged with, in stage-normalized coordinates. */
+function parseDestinationQuad(element: Element): readonly QuadPoint[] {
+  const attribute = element.getAttribute("data-destination-quad");
+  if (!attribute) throw new Error("Missing data-destination-quad");
+  return attribute.split(" ").map((pair) => {
+    const [x, y] = pair.split(",").map(Number);
+    if (!Number.isFinite(x) || !Number.isFinite(y)) {
+      throw new Error(`Malformed destination quad point "${pair}"`);
+    }
+    return { x: x!, y: y! };
+  });
+}
+
+function percentageFraction(value: string, label: string): number {
+  const match = /^(-?\d+(?:\.\d+)?)%$/.exec(value.trim());
+  if (!match) {
+    throw new Error(`Expected ${label} as a percentage, received "${value}"`);
+  }
+  return Number(match[1]) / 100;
+}
+
+/** Winding test against a convex quad, so the anchor is checked against the clip polygon
+ * rather than the box around it. */
+function pointInsideQuad(point: QuadPoint, quad: readonly QuadPoint[]): boolean {
+  let positive = 0;
+  let negative = 0;
+  for (let index = 0; index < quad.length; index += 1) {
+    const start = quad[index]!;
+    const end = quad[(index + 1) % quad.length]!;
+    const side =
+      (end.x - start.x) * (point.y - start.y) -
+      (end.y - start.y) * (point.x - start.x);
+    if (side > 0) positive += 1;
+    if (side < 0) negative += 1;
+  }
+  return positive === 0 || negative === 0;
+}
+
 function objectFromStore(store: ReturnType<typeof createSceneStore>, id: string) {
   const object = store.getState().scene.objects.find((item) => item.id === id);
   if (!object) throw new Error(`Missing scene object ${id}`);
@@ -474,6 +517,42 @@ describe("RoomPhotoStage", () => {
     expect(
       screen.queryByRole("button", { name: "Rotate Coffee table" }),
     ).not.toBeInTheDocument();
+  });
+
+  test("anchors a locked projected rug's badge to its floor quad", () => {
+    const scene = createDemoScene();
+    scene.selectedObjectId = null;
+    const rug = scene.objects.find(({ id }) => id === "rug_01")!;
+    rug.locked = true;
+    renderStage(createSceneStore(scene));
+
+    const rugButton = screen.getByRole("button", { name: "Rug" });
+    const quad = parseDestinationQuad(rugButton);
+    expect(quad).toHaveLength(4);
+
+    const badge = within(
+      screen.getByTestId("photo-rug-visual-rug_01"),
+    ).getByText("Locked");
+    expect(badge).toHaveAttribute("aria-hidden", "true");
+
+    const anchorPoint = {
+      x: percentageFraction(badge.style.left, "the locked badge left"),
+      y: percentageFraction(badge.style.top, "the locked badge top"),
+    };
+    const bounds = {
+      minimumX: Math.min(...quad.map(({ x }) => x)),
+      maximumX: Math.max(...quad.map(({ x }) => x)),
+      minimumY: Math.min(...quad.map(({ y }) => y)),
+      maximumY: Math.max(...quad.map(({ y }) => y)),
+    };
+
+    expect(anchorPoint.x).toBeGreaterThanOrEqual(bounds.minimumX);
+    expect(anchorPoint.x).toBeLessThanOrEqual(bounds.maximumX);
+    expect(anchorPoint.y).toBeGreaterThanOrEqual(bounds.minimumY);
+    expect(anchorPoint.y).toBeLessThanOrEqual(bounds.maximumY);
+    // The rug button is clipped to the quad, so only a point inside the polygon itself
+    // is ever painted.
+    expect(pointInsideQuad(anchorPoint, quad)).toBe(true);
   });
 
   test("clears selection when the stage itself is clicked", () => {
