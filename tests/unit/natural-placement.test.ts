@@ -98,6 +98,19 @@ describe("natural placement", () => {
     expect(scene.objects.find(({ id }) => id === locked.id)).toEqual(before);
   });
 
+  it("preserves the exact Y rotation of every non-rug cutout", () => {
+    const scene = completedProductScene();
+    const result = proposeNaturalPlacement(scene);
+    expect(result.kind).toBe("changed");
+    if (result.kind !== "changed") return;
+
+    for (const placement of result.placements) {
+      const object = scene.objects.find(({ id }) => id === placement.objectId)!;
+      if (object.type === "rug") continue;
+      expect(placement.rotationY).toBe(object.rotation[1]);
+    }
+  });
+
   it("fails closed for an unlocked unknown object", () => {
     const scene = completedProductScene();
     scene.objects[0]!.type = "unknown";
@@ -199,9 +212,9 @@ describe("natural placement", () => {
     const localForwardGap =
       Math.abs(arrangedTable.position[0] - sofa.position[0]) -
       sofa.dimensionsM.depth / 2 -
-      arrangedTable.dimensionsM.depth / 2;
+      arrangedTable.dimensionsM.width / 2;
 
-    expect(arrangedTable.rotation[1]).toBeCloseTo(Math.PI / 2, 8);
+    expect(arrangedTable.rotation[1]).toBe(table.rotation[1]);
     expect(localForwardGap).toBeGreaterThanOrEqual(0.35);
     expect(localForwardGap).toBeLessThanOrEqual(0.55);
     expect(Math.sign(arrangedTable.position[0] - sofa.position[0])).toBe(

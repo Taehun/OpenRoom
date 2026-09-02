@@ -184,6 +184,15 @@ function edgeGapAlongAxis(
   return -Math.min(firstMaximum, secondMaximum) + Math.max(firstMinimum, secondMinimum);
 }
 
+function footprintRadiusAlongAxis(object: SceneObject, axis: PointXZ): number {
+  const centerProjection = axisProjection(objectFootprint(object).center, axis);
+  return Math.max(
+    ...footprintCorners(objectFootprint(object)).map((point) =>
+      Math.abs(axisProjection(point, axis) - centerProjection),
+    ),
+  );
+}
+
 function tableEdgeGap(sofa: SceneObject, table: SceneObject): number {
   return edgeGapAlongAxis(sofa, table, localAxes(sofa.rotation[1]).forward);
 }
@@ -582,20 +591,28 @@ function inwardGridRange(
 function sofaCandidates(scene: Scene, object: SceneObject): readonly ProposedPlacement[] {
   const result: ProposedPlacement[] = [placementFor(object)];
   const sign = Math.sign(object.position[0]) || -1;
-  for (const rotationY of [0, Math.PI] as const) {
-    const range = usableCenterRange(scene, object, rotationY);
-    const [minimumX, maximumX] = inwardGridRange(range.minimumX, range.maximumX, PLACEMENT_LIMITS.gridM);
-    const [minimumZ, maximumZ] = inwardGridRange(range.minimumZ, range.maximumZ, PLACEMENT_LIMITS.gridM);
-    const z = rotationY === 0 ? minimumZ : maximumZ;
-    const xValues: number[] = [];
-    for (let x = minimumX; x <= maximumX + 1e-9; x += PLACEMENT_LIMITS.gridM) {
-      const quantizedX = quantize(x, PLACEMENT_LIMITS.gridM);
-      if (Math.sign(quantizedX) === sign) xValues.push(quantizedX);
-    }
-    xValues.sort((first, second) =>
-      Math.abs(first - object.position[0]) - Math.abs(second - object.position[0]) ||
-      first - second,
-    );
+  const rotationY = object.rotation[1];
+  const range = usableCenterRange(scene, object, rotationY);
+  const [minimumX, maximumX] = inwardGridRange(
+    range.minimumX,
+    range.maximumX,
+    PLACEMENT_LIMITS.gridM,
+  );
+  const [minimumZ, maximumZ] = inwardGridRange(
+    range.minimumZ,
+    range.maximumZ,
+    PLACEMENT_LIMITS.gridM,
+  );
+  const xValues: number[] = [];
+  for (let x = minimumX; x <= maximumX + 1e-9; x += PLACEMENT_LIMITS.gridM) {
+    const quantizedX = quantize(x, PLACEMENT_LIMITS.gridM);
+    if (Math.sign(quantizedX) === sign) xValues.push(quantizedX);
+  }
+  xValues.sort((first, second) =>
+    Math.abs(first - object.position[0]) - Math.abs(second - object.position[0]) ||
+    first - second,
+  );
+  for (const z of [minimumZ, maximumZ]) {
     for (const x of xValues) result.push(candidate(object, x, z, rotationY));
   }
   return result;
@@ -614,10 +631,12 @@ function idealTablePosition(
     forward,
   );
   const forwardSign = towardRoomCenter >= 0 ? 1 : -1;
-  const rotationY = sofa.rotation[1];
+  const rotationY = table.rotation[1];
   const range = usableCenterRange(scene, table, rotationY);
   const distance =
-    sofa.dimensionsM.depth / 2 + table.dimensionsM.depth / 2 + 0.45;
+    footprintRadiusAlongAxis(sofa, forward) +
+    footprintRadiusAlongAxis(table, forward) +
+    0.45;
   return {
     x: quantize(
       clamp(
@@ -679,7 +698,10 @@ function tableCandidates(
   const { forward, lateral } = localAxes(sofa.rotation[1]);
   const range = usableCenterRange(scene, object, ideal.rotationY);
   for (const gap of [0.45, 0.4, 0.5, 0.35, 0.55]) {
-    const distance = sofa.dimensionsM.depth / 2 + object.dimensionsM.depth / 2 + gap;
+    const distance =
+      footprintRadiusAlongAxis(sofa, forward) +
+      footprintRadiusAlongAxis(object, forward) +
+      gap;
     for (const deltaX of [0, -0.1, 0.1, -0.2, 0.2, -0.3, 0.3]) {
       const x = quantize(
         clamp(
@@ -730,11 +752,14 @@ function chairCandidates(
       forward,
     ),
   ) || 1;
-  const range = usableCenterRange(scene, object, sofa.rotation[1] + Math.PI);
+  const rotationY = object.rotation[1];
+  const range = usableCenterRange(scene, object, rotationY);
   for (const gap of [0.4, 0.5, 0.6, 0.7]) {
     for (const deltaX of [0, -0.1, 0.1, -0.2, 0.2]) {
       const distance =
-        table.dimensionsM.depth / 2 + object.dimensionsM.depth / 2 + gap;
+        footprintRadiusAlongAxis(table, forward) +
+        footprintRadiusAlongAxis(object, forward) +
+        gap;
       const x = quantize(
         clamp(
           table.position[0] + forward.x * direction * distance + lateral.x * deltaX,
@@ -756,7 +781,7 @@ function chairCandidates(
           object,
           x,
           z,
-          sofa.rotation[1] + Math.PI,
+          rotationY,
         ),
       );
     }
@@ -766,7 +791,8 @@ function chairCandidates(
 
 function accessoryCandidates(scene: Scene, object: SceneObject): readonly ProposedPlacement[] {
   const result: ProposedPlacement[] = [placementFor(object)];
-  const range = usableCenterRange(scene, object, 0);
+  const rotationY = object.rotation[1];
+  const range = usableCenterRange(scene, object, rotationY);
   const [minimumX, maximumX] = inwardGridRange(range.minimumX, range.maximumX, PLACEMENT_LIMITS.gridM);
   const [minimumZ, maximumZ] = inwardGridRange(range.minimumZ, range.maximumZ, PLACEMENT_LIMITS.gridM);
   const perimeter: { x: number; z: number }[] = [];
@@ -786,7 +812,9 @@ function accessoryCandidates(scene: Scene, object: SceneObject): readonly Propos
       first.z - second.z ||
       first.x - second.x,
   );
-  for (const point of perimeter) result.push(candidate(object, point.x, point.z, 0));
+  for (const point of perimeter) {
+    result.push(candidate(object, point.x, point.z, rotationY));
+  }
   return result;
 }
 
