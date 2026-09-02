@@ -1,4 +1,4 @@
-import { type Dispatch, useState, useSyncExternalStore } from "react";
+import { type Dispatch, useRef, useState, useSyncExternalStore } from "react";
 import { getDocumentModelContext } from "../../webmcp/register-tools";
 import { RoomPhotoStage } from "../photo/room-photo-stage";
 import { useSceneStore } from "../scene/scene-context";
@@ -64,19 +64,27 @@ export function RoomCanvas({ dispatch, scene, state }: RoomCanvasProps) {
     getServerNativeWebMcpSnapshot,
   );
   const [copyStatus, setCopyStatus] = useState<CopyStatus>(null);
+  const copyRequestId = useRef(0);
   const selectedObject = scene.objects.find(
     ({ id }) => id === scene.selectedObjectId,
   );
 
   async function copyPrompt() {
+    const requestId = copyRequestId.current + 1;
+    copyRequestId.current = requestId;
+
     try {
       await navigator.clipboard.writeText(PRIMARY_PROMPT);
-      setCopyStatus({ kind: "success", message: "Prompt copied" });
+      if (copyRequestId.current === requestId) {
+        setCopyStatus({ kind: "success", message: "Prompt copied" });
+      }
     } catch {
-      setCopyStatus({
-        kind: "error",
-        message: "Could not copy. Select and copy the prompt manually.",
-      });
+      if (copyRequestId.current === requestId) {
+        setCopyStatus({
+          kind: "error",
+          message: "Could not copy. Select and copy the prompt manually.",
+        });
+      }
     }
   }
 

@@ -393,6 +393,44 @@ test("reports rejected prompt copies without changing Scene revision or state ve
   );
 });
 
+test("keeps the latest copy result visible when attempts settle in reverse order", async () => {
+  let rejectFirstCopy!: (reason?: unknown) => void;
+  let resolveSecondCopy!: () => void;
+  const firstCopy = new Promise<void>((_, reject) => {
+    rejectFirstCopy = reject;
+  });
+  const secondCopy = new Promise<void>((resolve) => {
+    resolveSecondCopy = resolve;
+  });
+  const user = userEvent.setup();
+  const writeText = vi
+    .spyOn(navigator.clipboard, "writeText")
+    .mockReturnValueOnce(firstCopy)
+    .mockReturnValueOnce(secondCopy);
+  render(<DemoWorkspace />);
+
+  const copyPrompt = screen.getByRole("button", {
+    name: "Copy redesign prompt",
+  });
+  await user.click(copyPrompt);
+  await user.click(copyPrompt);
+  expect(writeText).toHaveBeenCalledTimes(2);
+
+  await act(async () => {
+    resolveSecondCopy();
+    await Promise.resolve();
+  });
+  expect(screen.getByRole("status", { name: "Prompt copy status" }))
+    .toHaveTextContent("Prompt copied");
+
+  await act(async () => {
+    rejectFirstCopy(new DOMException("Denied", "NotAllowedError"));
+    await Promise.resolve();
+  });
+  expect(screen.getByRole("status", { name: "Prompt copy status" }))
+    .toHaveTextContent("Prompt copied");
+});
+
 test("Reset Demo restores the canonical inspector state", async () => {
   const user = userEvent.setup();
   render(<DemoWorkspace />);
