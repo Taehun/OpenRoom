@@ -345,6 +345,70 @@ describe("createSceneStore", () => {
     expect(events).toEqual([]);
   });
 
+  test.each([
+    {
+      name: "unchanged",
+      outcome: {
+        kind: "unchanged" as const,
+        reason: "already-safe" as const,
+        diagnostics: { currentScore: 1, proposedScore: 1, evaluatedLayouts: 1 },
+      },
+      expected: { ok: true, changed: false },
+    },
+    {
+      name: "failed",
+      outcome: { kind: "failed" as const, reason: "no-valid-layout" as const },
+      expected: { ok: false, changed: false, reason: "no-valid-layout" },
+    },
+  ])("isolates canonical state when a manual proposer mutates then returns $name", ({
+    outcome,
+    expected,
+  }) => {
+    const events: SceneCommitEvent[] = [];
+    const store = createSceneStore(completedProductScene(), {
+      proposePlacement: (scene) => {
+        scene.objects[0]!.position[0] = 999;
+        return outcome;
+      },
+      onCommit: (event) => events.push(event),
+    });
+    const beforeState = store.getState();
+    const beforeScene = structuredClone(beforeState.scene);
+
+    expect(store.getState().arrangeNaturally()).toMatchObject(expected);
+
+    expect(store.getState().scene).toBe(beforeState.scene);
+    expect(store.getState().scene).toEqual(beforeScene);
+    expect(store.getState().history).toBe(beforeState.history);
+    expect(store.getState().stateVersion).toBe(beforeState.stateVersion);
+    expect(events).toEqual([]);
+  });
+
+  test("isolates canonical state when a manual proposer mutates then throws", () => {
+    const events: SceneCommitEvent[] = [];
+    const store = createSceneStore(completedProductScene(), {
+      proposePlacement: (scene) => {
+        scene.objects[0]!.position[0] = 999;
+        throw new Error("solver fault");
+      },
+      onCommit: (event) => events.push(event),
+    });
+    const beforeState = store.getState();
+    const beforeScene = structuredClone(beforeState.scene);
+
+    expect(store.getState().arrangeNaturally()).toEqual({
+      ok: false,
+      changed: false,
+      scene: beforeState.scene,
+      reason: "unexpected",
+    });
+    expect(store.getState().scene).toBe(beforeState.scene);
+    expect(store.getState().scene).toEqual(beforeScene);
+    expect(store.getState().history).toBe(beforeState.history);
+    expect(store.getState().stateVersion).toBe(beforeState.stateVersion);
+    expect(events).toEqual([]);
+  });
+
   test("rejects an incomplete manual proposal without partially moving objects", () => {
     const scene = completedProductScene();
     const proposal = completePlacementProposal();
@@ -487,6 +551,93 @@ describe("createSceneStore", () => {
     expect(events.at(-1)).toMatchObject({
       cause: "replace",
       revision: before.revision + 1,
+    });
+  });
+
+  test.each([
+    {
+      name: "unchanged",
+      outcome: {
+        kind: "unchanged" as const,
+        reason: "already-safe" as const,
+        diagnostics: { currentScore: 1, proposedScore: 1, evaluatedLayouts: 1 },
+      },
+    },
+    {
+      name: "failed",
+      outcome: { kind: "failed" as const, reason: "no-valid-layout" as const },
+    },
+  ])("retains an untouched replacement when an automatic proposer mutates then returns $name", ({
+    outcome,
+  }) => {
+    const events: SceneCommitEvent[] = [];
+    const store = createSceneStore(undefined, {
+      proposePlacement: (scene) => {
+        scene.objects[0]!.position[0] = 999;
+        return outcome;
+      },
+      onCommit: (event) => events.push(event),
+    });
+    const lastObjectId = completeFirstFive(store);
+    const before = structuredClone(store.getState().scene);
+    const priorEvents = events.length;
+
+    const result = replaceDemoObject(store, lastObjectId);
+
+    expect(result).toMatchObject({
+      ok: true,
+      placementOutcome: { kind: "auto-retained" },
+      scene: { revision: before.revision + 1 },
+    });
+    expect(store.getState().scene).toBe(result.scene);
+    expect(placementById(store.getState().scene)).toEqual(placementById(before));
+    expect(store.getState().scene.objects[0]!.position[0]).not.toBe(999);
+    expect(store.getState().scene.objects.find(({ id }) => id === lastObjectId)?.source)
+      .toBe("product");
+    expect(store.getState().history).toHaveLength(6);
+    expect(store.getState().history.at(-1)).toEqual(before);
+    expect(store.getState().stateVersion).toBe(7);
+    expect(events).toHaveLength(priorEvents + 1);
+    expect(events.at(-1)).toEqual({
+      cause: "replace",
+      revision: before.revision + 1,
+      scene: store.getState().scene,
+    });
+  });
+
+  test("retains an untouched replacement when an automatic proposer mutates then throws", () => {
+    const events: SceneCommitEvent[] = [];
+    const store = createSceneStore(undefined, {
+      proposePlacement: (scene) => {
+        scene.objects[0]!.position[0] = 999;
+        throw new Error("solver fault");
+      },
+      onCommit: (event) => events.push(event),
+    });
+    const lastObjectId = completeFirstFive(store);
+    const before = structuredClone(store.getState().scene);
+    const priorEvents = events.length;
+
+    const result = replaceDemoObject(store, lastObjectId);
+
+    expect(result).toMatchObject({
+      ok: true,
+      placementOutcome: { kind: "auto-retained" },
+      scene: { revision: before.revision + 1 },
+    });
+    expect(store.getState().scene).toBe(result.scene);
+    expect(placementById(store.getState().scene)).toEqual(placementById(before));
+    expect(store.getState().scene.objects[0]!.position[0]).not.toBe(999);
+    expect(store.getState().scene.objects.find(({ id }) => id === lastObjectId)?.source)
+      .toBe("product");
+    expect(store.getState().history).toHaveLength(6);
+    expect(store.getState().history.at(-1)).toEqual(before);
+    expect(store.getState().stateVersion).toBe(7);
+    expect(events).toHaveLength(priorEvents + 1);
+    expect(events.at(-1)).toEqual({
+      cause: "replace",
+      revision: before.revision + 1,
+      scene: store.getState().scene,
     });
   });
 

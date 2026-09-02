@@ -195,7 +195,7 @@ export function createSceneStore(
           try {
             const placement = validateAndApplyPlacement(
               applied.scene,
-              proposePlacement(applied.scene),
+              proposePlacement(cloneScene(applied.scene)),
             );
             if (placement.ok && placement.changed) {
               result = {
@@ -257,7 +257,7 @@ export function createSceneStore(
         const current = get().scene;
         let proposal;
         try {
-          proposal = proposePlacement(current);
+          proposal = proposePlacement(cloneScene(current));
         } catch {
           const placementNotice = notice(
             "manual-failed",
