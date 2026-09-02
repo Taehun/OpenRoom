@@ -7,7 +7,7 @@ import {
   within,
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, describe, expect, test, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
 import { createDemoScene } from "../../src/demo/demo-scene";
 import { DEMO_PRODUCTS } from "../../src/features/demo/demo-data";
@@ -17,30 +17,69 @@ import type { CommandResult } from "../../src/features/scene/scene-schema";
 import { createSceneStore } from "../../src/features/scene/scene-store";
 
 const STAGE_RECT = {
-  bottom: 550,
-  height: 450,
+  bottom: 676,
+  height: 576,
   left: 100,
-  right: 900,
+  right: 1124,
   top: 100,
-  width: 800,
+  width: 1024,
   x: 100,
   y: 100,
   toJSON: () => ({}),
 };
 
+const ZERO_STAGE_RECT = {
+  ...STAGE_RECT,
+  bottom: 100,
+  height: 0,
+  right: 100,
+  width: 0,
+};
+
+const resizeObservers: Array<{
+  callback: ResizeObserverCallback;
+  disconnect: ReturnType<typeof vi.fn>;
+  observe: ReturnType<typeof vi.fn>;
+}> = [];
+
+class ResizeObserverStub {
+  readonly disconnect = vi.fn();
+  readonly observe = vi.fn();
+  readonly unobserve = vi.fn();
+
+  constructor(readonly callback: ResizeObserverCallback) {
+    resizeObservers.push({
+      callback,
+      disconnect: this.disconnect,
+      observe: this.observe,
+    });
+  }
+}
+
+beforeEach(() => {
+  resizeObservers.length = 0;
+  vi.stubGlobal("ResizeObserver", ResizeObserverStub);
+});
+
 afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
+  vi.unstubAllGlobals();
 });
 
-function renderStage(store = createSceneStore()) {
+function renderStage(
+  store = createSceneStore(),
+  stageRect: typeof STAGE_RECT = STAGE_RECT,
+) {
+  vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockReturnValue(
+    stageRect,
+  );
   const result = render(
     <SceneStoreProvider store={store}>
       <RoomPhotoStage />
     </SceneStoreProvider>,
   );
   const stage = screen.getByRole("region", { name: "Editable room photo" });
-  vi.spyOn(stage, "getBoundingClientRect").mockReturnValue(STAGE_RECT);
   return { ...result, stage, store };
 }
 
@@ -51,15 +90,24 @@ function objectFromStore(store: ReturnType<typeof createSceneStore>, id: string)
 }
 
 describe("RoomPhotoStage", () => {
+  test("measures and observes the 16:9 stage for projective composition", () => {
+    const { stage, unmount } = renderStage();
+
+    expect(resizeObservers).toHaveLength(1);
+    expect(resizeObservers[0]!.observe).toHaveBeenCalledWith(stage);
+    unmount();
+    expect(resizeObservers[0]!.disconnect).toHaveBeenCalledOnce();
+  });
+
   test("renders the six initial room objects as labelled button controls", () => {
     const { stage } = renderStage();
 
     const buttons = within(stage).getAllByRole("button");
     expect(buttons).toHaveLength(6);
     expect(buttons.map((button) => button.getAttribute("aria-label"))).toEqual([
+      "Rug",
       "Sofa",
       "Coffee table",
-      "Rug",
       "Floor lamp",
       "Chair",
       "Plant",
@@ -67,6 +115,72 @@ describe("RoomPhotoStage", () => {
     expect(
       screen.getByRole("button", { name: "Coffee table" }),
     ).toHaveAttribute("aria-pressed", "true");
+  });
+
+  test("projects the rug, five physical shadows, and aligned floor chrome", () => {
+    renderStage();
+
+    const rugVisual = screen.getByTestId("photo-rug-visual-rug_01");
+    const rug = screen.getByRole("button", { name: "Rug" });
+    const destinationQuad = rug.getAttribute("data-destination-quad");
+    expect(rugVisual).toHaveAttribute("data-floor-projected", "true");
+    expect(rug.style.clipPath).toContain("polygon(");
+    expect(destinationQuad).toBeTruthy();
+    expect(rugVisual.querySelector("img")?.style.transform).toContain(
+      "matrix3d(",
+    );
+    expect(screen.getAllByTestId(/photo-contact-shadow-/)).toHaveLength(5);
+    expect(screen.getByTestId("photo-contact-shadow-sofa_01")).toHaveAttribute(
+      "aria-hidden",
+      "true",
+    );
+
+    fireEvent.click(rug);
+    expect(rug).toHaveAttribute("aria-pressed", "true");
+    expect(
+      screen.getByTestId("photo-rug-selection-rug_01"),
+    ).toHaveAttribute("data-destination-quad", destinationQuad);
+    expect(screen.getByTestId("photo-floor-anchor-rug_01")).toHaveAttribute(
+      "data-destination-quad",
+      destinationQuad,
+    );
+  });
+
+  test("keeps a failed projected rug labelled and selectable", () => {
+    const scene = createDemoScene();
+    scene.selectedObjectId = null;
+    const store = createSceneStore(scene);
+    renderStage(store);
+    const rug = screen.getByRole("button", { name: "Rug" });
+    const image = rug.querySelector("img");
+    if (!image) throw new Error("Missing registered rug image");
+
+    fireEvent.error(image);
+    expect(
+      within(rug).getByRole("img", { name: "Rug preview unavailable" }),
+    ).toBeVisible();
+    expect(rug).not.toBeDisabled();
+    fireEvent.click(rug);
+    expect(store.getState().scene.selectedObjectId).toBe("rug_01");
+  });
+
+  test("uses the registered anchor layout for a zero-size stage rug", () => {
+    const scene = createDemoScene();
+    scene.selectedObjectId = null;
+    const store = createSceneStore(scene);
+    renderStage(store, ZERO_STAGE_RECT);
+    const rug = screen.getByRole("button", { name: "Rug" });
+    const rugVisual = screen.getByTestId("photo-rug-visual-rug_01");
+
+    expect(rugVisual).toHaveAttribute("data-floor-projected", "false");
+    expect(rug.querySelector("img")).toHaveAttribute(
+      "src",
+      "/demo/photo/seed/seed-pattern-rug.webp",
+    );
+    expect(rug.style.getPropertyValue("--photo-left")).not.toBe("");
+    expect(rug).toHaveAccessibleName("Rug");
+    fireEvent.click(rug);
+    expect(store.getState().scene.selectedObjectId).toBe("rug_01");
   });
 
   test("commits one move when an unlocked cutout drag ends", () => {
@@ -213,13 +327,13 @@ describe("RoomPhotoStage", () => {
     expect(commit).toHaveBeenCalledTimes(1);
     expect(commit).toHaveBeenCalledWith(
       "table_01",
-      [expect.closeTo(0.8653846154), 0.21, -2.4],
+      [expect.closeTo(0.6294293174), 0.21, expect.closeTo(-1.9375)],
       0,
     );
     expect(objectFromStore(store, "table_01").position).toEqual([
-      expect.closeTo(0.8653846154),
+      expect.closeTo(0.6294293174),
       0.21,
-      expect.closeTo(-2),
+      expect.closeTo(-1.9375),
     ]);
     expect(store.getState().scene.revision).toBe(2);
     expect(store.getState().history).toHaveLength(1);
@@ -400,7 +514,7 @@ describe("RoomPhotoStage", () => {
     );
   });
 
-  test("rotates a focused non-rug by one keyboard command and omits rug rotation", () => {
+  test("rotates focused vertical objects and rugs by keyboard", () => {
     const store = createSceneStore();
     store.getState().setToolMode("rotate");
     const commit = vi.spyOn(store.getState(), "commitTransform");
@@ -426,11 +540,48 @@ describe("RoomPhotoStage", () => {
     );
 
     const rug = screen.getByRole("button", { name: "Rug" });
-    expect(fireEvent.keyDown(rug, { key: "ArrowRight" })).toBe(true);
-    expect(commit).toHaveBeenCalledTimes(2);
-    expect(
-      screen.queryByRole("button", { name: "Rotate Rug" }),
-    ).not.toBeInTheDocument();
+    const initialRugRotation = objectFromStore(store, "rug_01").rotation[1];
+    fireEvent.click(rug);
+    expect(screen.getByRole("button", { name: "Rotate Rug" })).toBeVisible();
+    expect(fireEvent.keyDown(rug, { key: "ArrowRight" })).toBe(false);
+    expect(commit).toHaveBeenCalledTimes(3);
+    expect(objectFromStore(store, "rug_01").rotation[1]).toBeCloseTo(
+      initialRugRotation + (5 * Math.PI) / 180,
+    );
+  });
+
+  test("previews and commits rug rotation from its aligned floor handle", () => {
+    const store = createSceneStore();
+    store.getState().selectObject("rug_01");
+    store.getState().setToolMode("rotate");
+    const commit = vi.spyOn(store.getState(), "commitTransform");
+    renderStage(store);
+    const rug = screen.getByRole("button", { name: "Rug" });
+    const handle = screen.getByRole("button", { name: "Rotate Rug" });
+    const initialQuad = rug.getAttribute("data-destination-quad");
+
+    expect(handle).toHaveAttribute("data-destination-quad", initialQuad);
+    fireEvent.pointerDown(handle, {
+      pointerId: 71,
+      clientX: 612,
+      clientY: 470,
+    });
+    fireEvent.pointerMove(handle, {
+      pointerId: 71,
+      clientX: 700,
+      clientY: 520,
+    });
+    expect(rug.getAttribute("data-destination-quad")).not.toBe(initialQuad);
+    expect(commit).not.toHaveBeenCalled();
+    fireEvent.pointerUp(handle, {
+      pointerId: 71,
+      clientX: 700,
+      clientY: 520,
+    });
+
+    expect(commit).toHaveBeenCalledOnce();
+    expect(store.getState().history).toHaveLength(1);
+    expect(store.getState().isTransforming).toBe(false);
   });
 
   test("selects a focused object with Enter or Space in any tool mode", () => {

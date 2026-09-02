@@ -3,15 +3,12 @@ import type {
   KeyboardEventHandler,
   PointerEventHandler,
 } from "react";
-import { useState } from "react";
 
 import styles from "../demo/demo-workspace.module.css";
 import type { SceneObject } from "../scene/scene-schema";
-import { getPhotoAsset, type PhotoAsset } from "./photo-assets";
-import {
-  layerOrder,
-  type ProjectedPlacement,
-} from "./photo-projection";
+import { getPhotoAsset } from "./photo-assets";
+import { PhotoAssetFallback, PhotoAssetImage } from "./photo-asset-image";
+import type { ProjectedPlacement } from "./photo-projection";
 
 interface PhotoObjectLayerProps {
   label: string;
@@ -30,47 +27,6 @@ interface PhotoObjectLayerProps {
   selected: boolean;
   showRotationHandle: boolean;
   visualWidth: number;
-}
-
-function layerZIndex(object: SceneObject, zIndex: number) {
-  return object.type === "unknown"
-    ? zIndex
-    : layerOrder(object.type, zIndex);
-}
-
-function PhotoAssetFallback({ label }: { label: string }) {
-  return (
-    <span
-      className={styles.photoAssetFallback}
-      role="img"
-      aria-label={`${label} preview unavailable`}
-    >
-      {label}
-    </span>
-  );
-}
-
-function PhotoAssetImage({
-  asset,
-  label,
-}: {
-  asset: PhotoAsset;
-  label: string;
-}) {
-  const [failed, setFailed] = useState(false);
-
-  return failed ? (
-    <PhotoAssetFallback label={label} />
-  ) : (
-    // Transformable transparent cutouts need the native image box with no layout wrapper.
-    // eslint-disable-next-line @next/next/no-img-element
-    <img
-      alt=""
-      draggable={false}
-      onError={() => setFailed(true)}
-      src={asset.src}
-    />
-  );
 }
 
 export function PhotoObjectLayer({
@@ -109,7 +65,7 @@ export function PhotoObjectLayer({
     "--photo-anchor-y": anchorYPercent,
     "--photo-anchor-x-offset": `${anchorX * -100}%`,
     "--photo-anchor-y-offset": `${anchorY * -100}%`,
-    zIndex: layerZIndex(object, placement.zIndex),
+    zIndex: placement.zIndex,
   } as CSSProperties;
   const frameStyle = {
     ...customStyle,

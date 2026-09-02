@@ -4,17 +4,27 @@ import {
   type KeyboardEvent,
   type MouseEvent,
   type PointerEvent,
+  useCallback,
+  useLayoutEffect,
+  useMemo,
+  useRef,
   useState,
+  useSyncExternalStore,
 } from "react";
 
 import styles from "../demo/demo-workspace.module.css";
-import { useSceneStore } from "../scene/scene-context";
+import { useSceneStore, useSceneStoreApi } from "../scene/scene-context";
 import type { SceneObject, Vec3 } from "../scene/scene-schema";
-import { NOOK_ROOM_BACKGROUND } from "./photo-assets";
+import { getPhotoAsset, NOOK_ROOM_BACKGROUND } from "./photo-assets";
+import { PhotoContactShadow } from "./photo-contact-shadow";
 import { PhotoObjectLayer } from "./photo-object-layer";
+import { PhotoRugLayer } from "./photo-rug-layer";
 import {
   objectVisualWidth,
+  projectContactShadow,
   projectRoomPoint,
+  projectRugPlacement,
+  stableLayerOrder,
   unprojectStagePoint,
 } from "./photo-projection";
 import type { NormalizedPoint } from "./photo-calibration";
@@ -84,20 +94,61 @@ function pointerAngle(point: NormalizedPoint, anchor: NormalizedPoint) {
 export function RoomPhotoStage() {
   const scene = useSceneStore((state) => state.scene);
   const toolMode = useSceneStore((state) => state.toolMode);
-  const selectObject = useSceneStore((state) => state.selectObject);
-  const setTransforming = useSceneStore((state) => state.setTransforming);
-  const commitTransform = useSceneStore((state) => state.commitTransform);
-  const [transformPreview, setTransformPreview] =
-    useState<TransformPreview | null>(null);
+  const sceneStore = useSceneStoreApi();
+  const stageRef = useRef<HTMLElement>(null);
+  const transformPreviewRef = useRef<TransformPreview | null>(null);
+  const previewListenersRef = useRef(new Set<() => void>());
+  const subscribeToTransformPreview = useCallback((listener: () => void) => {
+    previewListenersRef.current.add(listener);
+    return () => previewListenersRef.current.delete(listener);
+  }, []);
+  const getTransformPreview = useCallback(
+    () => transformPreviewRef.current,
+    [],
+  );
+  const transformPreview = useSyncExternalStore(
+    subscribeToTransformPreview,
+    getTransformPreview,
+    getTransformPreview,
+  );
+  const [stageSize, setStageSize] = useState({ width: 0, height: 0 });
+
+  function renderTransformPreview() {
+    for (const listener of previewListenersRef.current) listener();
+  }
+
+  useLayoutEffect(() => {
+    const stage = stageRef.current;
+    if (!stage) return;
+
+    const measureStage = () => {
+      const bounds = stage.getBoundingClientRect();
+      const width = Number.isFinite(bounds.width) ? Math.max(0, bounds.width) : 0;
+      const height = Number.isFinite(bounds.height)
+        ? Math.max(0, bounds.height)
+        : 0;
+      setStageSize((current) =>
+        current.width === width && current.height === height
+          ? current
+          : { width, height },
+      );
+    };
+
+    measureStage();
+    if (typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(measureStage);
+    observer.observe(stage);
+    return () => observer.disconnect();
+  }, []);
 
   function startTransform(
     object: SceneObject,
     event: PointerEvent<HTMLElement>,
     kind: TransformPreview["kind"],
   ) {
-    if (transformPreview) return;
+    if (transformPreviewRef.current) return;
 
-    selectObject(object.id);
+    sceneStore.getState().selectObject(object.id);
     if (object.locked) return;
 
     const startPointer = stagePoint(event);
@@ -108,7 +159,7 @@ export function RoomPhotoStage() {
     );
 
     capturePointer(event.currentTarget, event.pointerId);
-    setTransformPreview({
+    transformPreviewRef.current = {
       kind,
       pointerId: event.pointerId,
       objectId: object.id,
@@ -120,8 +171,9 @@ export function RoomPhotoStage() {
       position: [...object.position],
       rotationY: object.rotation[1],
       changed: false,
-    });
-    setTransforming(true);
+    };
+    renderTransformPreview();
+    sceneStore.getState().setTransforming(true);
   }
 
   function stagePoint(event: PointerEvent<HTMLElement>) {
@@ -144,34 +196,33 @@ export function RoomPhotoStage() {
   ) {
     const point = stagePoint(event);
     if (!point) return;
-    setTransformPreview((current) => {
-      if (
-        current?.kind !== "move" ||
-        current.pointerId !== event.pointerId ||
-        current.objectId !== object.id
-      ) {
-        return current;
-      }
+    const current = transformPreviewRef.current;
+    if (
+      current?.kind !== "move" ||
+      current.pointerId !== event.pointerId ||
+      current.objectId !== object.id
+    ) {
+      return;
+    }
 
-      const targetAnchor = {
-        x: current.startAnchor.x + point.x - current.startPointer.x,
-        y: current.startAnchor.y + point.y - current.startPointer.y,
-      };
-      const position = unprojectStagePoint(targetAnchor, scene.room);
-      const previewPosition: Vec3 = [
-        position.x,
-        current.startPosition[1],
-        position.z,
-      ];
-
-      return {
-        ...current,
-        position: previewPosition,
-        changed:
-          !positionsMatch(previewPosition, current.startPosition) ||
-          !rotationsMatch(current.rotationY, current.startRotationY),
-      };
-    });
+    const targetAnchor = {
+      x: current.startAnchor.x + point.x - current.startPointer.x,
+      y: current.startAnchor.y + point.y - current.startPointer.y,
+    };
+    const position = unprojectStagePoint(targetAnchor, scene.room);
+    const previewPosition: Vec3 = [
+      position.x,
+      current.startPosition[1],
+      position.z,
+    ];
+    transformPreviewRef.current = {
+      ...current,
+      position: previewPosition,
+      changed:
+        !positionsMatch(previewPosition, current.startPosition) ||
+        !rotationsMatch(current.rotationY, current.startRotationY),
+    };
+    renderTransformPreview();
   }
 
   function previewRotation(
@@ -180,34 +231,34 @@ export function RoomPhotoStage() {
   ) {
     const point = stagePoint(event);
     if (!point) return;
-    setTransformPreview((current) => {
-      if (
-        current?.kind !== "rotate" ||
-        current.pointerId !== event.pointerId ||
-        current.objectId !== object.id
-      ) {
-        return current;
-      }
+    const current = transformPreviewRef.current;
+    if (
+      current?.kind !== "rotate" ||
+      current.pointerId !== event.pointerId ||
+      current.objectId !== object.id
+    ) {
+      return;
+    }
 
-      const currentPointerAngle = pointerAngle(point, current.startAnchor);
-      const rotationY =
-        current.startRotationY +
-        normalizeAngleDelta(currentPointerAngle - current.startPointerAngle);
-
-      return {
-        ...current,
-        rotationY,
-        changed:
-          !positionsMatch(current.position, current.startPosition) ||
-          !rotationsMatch(rotationY, current.startRotationY),
-      };
-    });
+    const currentPointerAngle = pointerAngle(point, current.startAnchor);
+    const rotationY =
+      current.startRotationY +
+      normalizeAngleDelta(currentPointerAngle - current.startPointerAngle);
+    transformPreviewRef.current = {
+      ...current,
+      rotationY,
+      changed:
+        !positionsMatch(current.position, current.startPosition) ||
+        !rotationsMatch(rotationY, current.startRotationY),
+    };
+    renderTransformPreview();
   }
 
   function finishTransform(
     object: SceneObject,
     event: PointerEvent<HTMLElement>,
   ) {
+    const transformPreview = transformPreviewRef.current;
     if (
       transformPreview?.pointerId !== event.pointerId ||
       transformPreview.objectId !== object.id
@@ -216,20 +267,22 @@ export function RoomPhotoStage() {
     }
 
     if (transformPreview.changed) {
-      commitTransform(
+      sceneStore.getState().commitTransform(
         object.id,
         transformPreview.position,
         transformPreview.rotationY,
       );
     }
-    setTransformPreview(null);
-    setTransforming(false);
+    transformPreviewRef.current = null;
+    renderTransformPreview();
+    sceneStore.getState().setTransforming(false);
   }
 
   function cancelTransform(
     object: SceneObject,
     event: PointerEvent<HTMLElement>,
   ) {
+    const transformPreview = transformPreviewRef.current;
     if (
       transformPreview?.pointerId !== event.pointerId ||
       transformPreview.objectId !== object.id
@@ -237,8 +290,9 @@ export function RoomPhotoStage() {
       return;
     }
 
-    setTransformPreview(null);
-    setTransforming(false);
+    transformPreviewRef.current = null;
+    renderTransformPreview();
+    sceneStore.getState().setTransforming(false);
   }
 
   function handleObjectKeyDown(
@@ -247,7 +301,7 @@ export function RoomPhotoStage() {
   ) {
     if (event.key === "Enter" || event.key === " ") {
       event.preventDefault();
-      selectObject(object.id);
+      sceneStore.getState().selectObject(object.id);
       return;
     }
 
@@ -264,13 +318,14 @@ export function RoomPhotoStage() {
       else return;
 
       event.preventDefault();
-      commitTransform(object.id, position, object.rotation[1]);
+      sceneStore
+        .getState()
+        .commitTransform(object.id, position, object.rotation[1]);
       return;
     }
 
     if (
       toolMode === "rotate" &&
-      object.type !== "rug" &&
       (event.key === "ArrowLeft" || event.key === "ArrowRight")
     ) {
       const step = event.shiftKey
@@ -279,7 +334,7 @@ export function RoomPhotoStage() {
       const direction = event.key === "ArrowLeft" ? -1 : 1;
 
       event.preventDefault();
-      commitTransform(
+      sceneStore.getState().commitTransform(
         object.id,
         object.position,
         object.rotation[1] + direction * step,
@@ -288,43 +343,145 @@ export function RoomPhotoStage() {
   }
 
   function clearSelection(event: MouseEvent<HTMLElement>) {
-    if (event.target === event.currentTarget) selectObject(null);
+    if (event.target === event.currentTarget) {
+      sceneStore.getState().selectObject(null);
+    }
   }
+
+  const renderModel = useMemo(() => {
+    const lexicalIndexById = new Map(
+      scene.objects
+        .map(({ id }) => id)
+        .toSorted()
+        .map((id, index) => [id, index] as const),
+    );
+    const visualObjects = scene.objects.map((object) =>
+      transformPreview?.objectId === object.id
+        ? {
+            ...object,
+            position: transformPreview.position,
+            rotation: [
+              object.rotation[0],
+              transformPreview.rotationY,
+              object.rotation[2],
+            ] as Vec3,
+          }
+        : object,
+    );
+    const placements = new Map<string, ReturnType<typeof projectRoomPoint>>();
+    const rugProjections = new Map<
+      string,
+      ReturnType<typeof projectRugPlacement>
+    >();
+    const rugObjects: SceneObject[] = [];
+    const verticalObjects: SceneObject[] = [];
+
+    for (const object of visualObjects) {
+      const projectedPlacement = projectRoomPoint(
+        { x: object.position[0], z: object.position[2] },
+        scene.room,
+      );
+      const placement = {
+        ...projectedPlacement,
+        zIndex: stableLayerOrder(
+          object,
+          projectedPlacement,
+          lexicalIndexById.get(object.id) ?? 0,
+        ),
+      };
+      placements.set(object.id, placement);
+
+      if (object.type === "rug") {
+        rugObjects.push(object);
+        const asset = getPhotoAsset(object);
+        rugProjections.set(
+          object.id,
+          asset
+            ? projectRugPlacement(object, asset, scene.room, stageSize)
+            : null,
+        );
+      } else {
+        verticalObjects.push(object);
+      }
+    }
+
+    return {
+      previewObjectId: transformPreview?.objectId ?? null,
+      rugObjects,
+      rugProjections,
+      placements,
+      verticalObjects,
+    };
+  }, [scene, stageSize, transformPreview]);
 
   return (
     <section
       aria-label="Editable room photo"
       className={styles.photoStage}
       onClick={clearSelection}
+      ref={stageRef}
       role="region"
       style={{ backgroundImage: `url(${NOOK_ROOM_BACKGROUND})` }}
     >
-      {scene.objects.map((object) => {
-        const preview =
-          transformPreview?.objectId === object.id ? transformPreview : null;
-        const visualObject = preview
-          ? {
-              ...object,
-              position: preview.position,
-              rotation: [
-                object.rotation[0],
-                preview.rotationY,
-                object.rotation[2],
-              ] as Vec3,
+      {renderModel.rugObjects.map((object) => {
+        const placement = renderModel.placements.get(object.id)!;
+        const selected = scene.selectedObjectId === object.id;
+
+        return (
+          <PhotoRugLayer
+            key={object.id}
+            label={objectLabel(object)}
+            object={object}
+            onClick={() => sceneStore.getState().selectObject(object.id)}
+            onKeyDown={(event) => handleObjectKeyDown(object, event)}
+            onPointerCancel={(event) => cancelTransform(object, event)}
+            onPointerDown={(event) => startTransform(object, event, "move")}
+            onPointerMove={(event) => previewMove(object, event)}
+            onPointerUp={(event) => finishTransform(object, event)}
+            onRotationPointerCancel={(event) =>
+              cancelTransform(object, event)
             }
-          : object;
-        const placement = projectRoomPoint(
-          { x: visualObject.position[0], z: visualObject.position[2] },
-          scene.room,
+            onRotationPointerDown={(event) =>
+              startTransform(object, event, "rotate")
+            }
+            onRotationPointerMove={(event) => previewRotation(object, event)}
+            onRotationPointerUp={(event) => finishTransform(object, event)}
+            placement={placement}
+            projection={renderModel.rugProjections.get(object.id) ?? null}
+            selected={selected}
+            showRotationHandle={
+              selected &&
+              toolMode === "rotate" &&
+              !object.locked
+            }
+            transforming={renderModel.previewObjectId === object.id}
+            visualWidth={objectVisualWidth(
+              object.dimensionsM.width,
+              placement.scale,
+              object.type,
+            )}
+          />
         );
+      })}
+
+      {renderModel.verticalObjects.map((object) => (
+        <PhotoContactShadow
+          key={`shadow-${object.id}`}
+          objectId={object.id}
+          projection={projectContactShadow(object, scene.room)}
+        />
+      ))}
+
+      {renderModel.verticalObjects.map((object) => {
+        const placement = renderModel.placements.get(object.id)!;
         const selected = scene.selectedObjectId === object.id;
 
         return (
           <PhotoObjectLayer
             key={object.id}
             label={objectLabel(object)}
-            object={visualObject}
-            onClick={() => selectObject(object.id)}
+            object={object}
+            onClick={() => sceneStore.getState().selectObject(object.id)}
             onKeyDown={(event) => handleObjectKeyDown(object, event)}
             onPointerCancel={(event) => cancelTransform(object, event)}
             onPointerDown={(event) => startTransform(object, event, "move")}
@@ -341,10 +498,7 @@ export function RoomPhotoStage() {
             placement={placement}
             selected={selected}
             showRotationHandle={
-              selected &&
-              toolMode === "rotate" &&
-              !object.locked &&
-              object.type !== "rug"
+              selected && toolMode === "rotate" && !object.locked
             }
             visualWidth={objectVisualWidth(
               object.dimensionsM.width,

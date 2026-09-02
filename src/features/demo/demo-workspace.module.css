@@ -357,6 +357,7 @@
 
 .photoStage {
   position: relative;
+  isolation: isolate;
   width: 100%;
   aspect-ratio: 16 / 9;
   overflow: hidden;
@@ -379,7 +380,7 @@
   border: 0;
   background: transparent;
   cursor: grab;
-  transition: filter 140ms ease, outline-color 140ms ease;
+  transition: outline-color 140ms ease;
   touch-action: none;
 }
 
@@ -397,14 +398,91 @@
   user-select: none;
 }
 
-.photoObject:hover,
-.photoObjectSelected {
-  filter: drop-shadow(0 5px 7px rgba(36, 39, 34, 0.24));
-}
-
 .photoObjectSelected {
   outline: 3px solid var(--moss);
   outline-offset: 4px;
+}
+
+.photoRugLayer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.photoRugButton {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: grab;
+  pointer-events: auto;
+  touch-action: none;
+}
+
+.photoRugButton:active {
+  cursor: grabbing;
+}
+
+.photoRugVisual {
+  position: absolute;
+  inset: 0;
+  display: block;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.photoRugVisual img {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: block;
+  max-width: none;
+  pointer-events: none;
+  user-select: none;
+}
+
+.photoRugFallback {
+  position: absolute;
+  min-height: 48px;
+}
+
+.photoRugSelection {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  fill: rgba(91, 104, 75, 0.08);
+  opacity: 0;
+  pointer-events: none;
+  stroke: var(--moss);
+  stroke-width: 0.006;
+}
+
+.photoRugSelectionVisible,
+.photoRugButton:focus-visible ~ .photoRugSelection {
+  opacity: 1;
+}
+
+.photoRugButton:focus-visible {
+  outline: none;
+}
+
+.photoRugRotationHandle {
+  pointer-events: auto;
+}
+
+.photoContactShadow {
+  position: absolute;
+  display: block;
+  border-radius: 50%;
+  background: #242722;
+  pointer-events: none;
 }
 
 .photoObject:focus-visible,

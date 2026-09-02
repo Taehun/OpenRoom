@@ -45,6 +45,17 @@ export interface RugProjection {
   cssTransform: string;
 }
 
+export interface ContactShadowProjection {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+  rotationDegrees: number;
+  blurPx: number;
+  opacity: number;
+  zIndex: number;
+}
+
 const clamp = (value: number, min: number, max: number) =>
   Math.min(Math.max(value, min), max);
 
@@ -174,14 +185,28 @@ export function projectRugPlacement(
 }
 
 const VISUAL_WIDTH_BOUNDS = {
-  sofa: [24, 52],
-  coffee_table: [10, 36],
-  rug: [20, 56],
-  floor_lamp: [6, 20],
-  chair: [10, 32],
-  plant: [8, 26],
-  unknown: [8, 56],
+  sofa: [14, 60],
+  coffee_table: [7, 40],
+  rug: [12, 70],
+  floor_lamp: [4, 24],
+  chair: [6, 38],
+  plant: [6, 34],
+  unknown: [6, 60],
 } as const;
+
+const CONTACT_SHADOW_PROFILES = {
+  sofa: { widthFactor: 0.72, depthFactor: 0.35, opacity: 0.22 },
+  coffee_table: { widthFactor: 0.75, depthFactor: 0.55, opacity: 0.2 },
+  floor_lamp: { widthFactor: 0.45, depthFactor: 0.45, opacity: 0.18 },
+  chair: { widthFactor: 0.65, depthFactor: 0.5, opacity: 0.2 },
+  plant: { widthFactor: 0.55, depthFactor: 0.5, opacity: 0.19 },
+  unknown: { widthFactor: 0.6, depthFactor: 0.45, opacity: 0.18 },
+} as const;
+
+const RUG_LAYER_BASE = 0;
+const SHADOW_LAYER_BASE = 2_000_000;
+const VERTICAL_LAYER_BASE = 4_000_000;
+const LAYER_DEPTH_STRIDE = 1_000;
 
 export function objectVisualWidth(
   widthM: number,
@@ -190,6 +215,69 @@ export function objectVisualWidth(
 ): number {
   const [minimum, maximum] = VISUAL_WIDTH_BOUNDS[type];
   return clamp(widthM * 18 * depthScale, minimum, maximum);
+}
+
+export function projectContactShadow(
+  object: SceneObject,
+  room: SceneRoom,
+): ContactShadowProjection {
+  const placement = projectRoomPoint(
+    { x: object.position[0], z: object.position[2] },
+    room,
+  );
+  const projectedCorners = footprintCorners(objectFootprint(object)).map(
+    ({ x, z }) => projectRoomPoint({ x, z }, room),
+  );
+  let minimumX = Number.POSITIVE_INFINITY;
+  let maximumX = Number.NEGATIVE_INFINITY;
+  let minimumY = Number.POSITIVE_INFINITY;
+  let maximumY = Number.NEGATIVE_INFINITY;
+  for (const corner of projectedCorners) {
+    minimumX = Math.min(minimumX, corner.x);
+    maximumX = Math.max(maximumX, corner.x);
+    minimumY = Math.min(minimumY, corner.y);
+    maximumY = Math.max(maximumY, corner.y);
+  }
+
+  const profile =
+    object.type === "rug"
+      ? CONTACT_SHADOW_PROFILES.unknown
+      : CONTACT_SHADOW_PROFILES[object.type];
+  const scaleRange =
+    NOOK_PHOTO_CALIBRATION.maxScale - NOOK_PHOTO_CALIBRATION.minScale;
+  const depthAmount =
+    scaleRange === 0
+      ? 0
+      : clamp(
+          (placement.scale - NOOK_PHOTO_CALIBRATION.minScale) / scaleRange,
+          0,
+          1,
+        );
+
+  return {
+    left: placement.left,
+    top: placement.top,
+    width: (maximumX - minimumX) * 100 * profile.widthFactor,
+    height: (maximumY - minimumY) * 100 * profile.depthFactor,
+    rotationDegrees: (object.rotation[1] * 180) / Math.PI,
+    blurPx: lerp(4, 10, depthAmount),
+    opacity: clamp(profile.opacity * placement.scale, 0, 0.28),
+    zIndex: SHADOW_LAYER_BASE + placement.zIndex * LAYER_DEPTH_STRIDE,
+  };
+}
+
+export function stableLayerOrder(
+  object: SceneObject,
+  placement: ProjectedPlacement,
+  lexicalIndex: number,
+): number {
+  const layerBase =
+    object.type === "rug" ? RUG_LAYER_BASE : VERTICAL_LAYER_BASE;
+  return (
+    layerBase +
+    placement.zIndex * LAYER_DEPTH_STRIDE +
+    Math.max(0, Math.trunc(lexicalIndex))
+  );
 }
 
 export function layerOrder(type: ProductCategory, zIndex: number): number {

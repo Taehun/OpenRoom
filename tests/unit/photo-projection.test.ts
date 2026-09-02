@@ -5,8 +5,10 @@ import { NOOK_PHOTO_CALIBRATION } from "../../src/features/photo/photo-calibrati
 import {
   layerOrder,
   objectVisualWidth,
+  projectContactShadow,
   projectRoomPoint,
   projectRugPlacement,
+  stableLayerOrder,
   unprojectStagePoint,
 } from "../../src/features/photo/photo-projection";
 import {
@@ -57,6 +59,71 @@ describe("photo projection", () => {
       objectVisualWidth(1.8, 0.8, "sofa"),
     );
     expect(objectVisualWidth(0.45, 1, "floor_lamp")).toBeCloseTo(8.1);
+  });
+
+  it("preserves catalog physical-width ordering with one depth scale", () => {
+    const depth = 0.8;
+    expect(objectVisualWidth(2.4, depth, "rug")).toBeGreaterThan(
+      objectVisualWidth(2.24, depth, "sofa"),
+    );
+    expect(objectVisualWidth(2.24, depth, "sofa")).toBeGreaterThan(
+      objectVisualWidth(1.1, depth, "coffee_table"),
+    );
+    expect(objectVisualWidth(1.1, depth, "coffee_table")).toBeGreaterThan(
+      objectVisualWidth(0.58, depth, "floor_lamp"),
+    );
+  });
+
+  it("anchors a bounded contact shadow to the physical footprint", () => {
+    const scene = completedProductScene();
+    const sofa = scene.objects.find(({ id }) => id === "sofa_01")!;
+    const shadow = projectContactShadow(sofa, scene.room);
+    const anchor = projectRoomPoint(
+      { x: sofa.position[0], z: sofa.position[2] },
+      scene.room,
+    );
+
+    expect(shadow.left).toBeCloseTo(anchor.left, 6);
+    expect(shadow.top).toBeCloseTo(anchor.top, 6);
+    expect(shadow.width).toBeGreaterThan(shadow.height);
+    expect(shadow.opacity).toBeGreaterThan(0);
+    expect(shadow.opacity).toBeLessThanOrEqual(0.28);
+  });
+
+  it("uses lexical object IDs to stabilize equal-depth vertical layers", () => {
+    const scene = completedProductScene();
+    const chair = scene.objects.find(({ id }) => id === "chair_01")!;
+    const table = scene.objects.find(({ id }) => id === "table_01")!;
+    table.position[2] = chair.position[2];
+    const placement = projectRoomPoint(
+      { x: chair.position[0], z: chair.position[2] },
+      scene.room,
+    );
+    const lexicalIds = [chair.id, table.id].toSorted();
+
+    expect(
+      stableLayerOrder(chair, placement, lexicalIds.indexOf(chair.id)),
+    ).toBeLessThan(
+      stableLayerOrder(table, placement, lexicalIds.indexOf(table.id)),
+    );
+  });
+
+  it("keeps every rug underlay below every vertical object", () => {
+    const scene = completedProductScene();
+    const rug = scene.objects.find(({ id }) => id === "rug_01")!;
+    const lamp = scene.objects.find(({ id }) => id === "lamp_01")!;
+    const rugPlacement = projectRoomPoint(
+      { x: rug.position[0], z: scene.room.depth / 2 },
+      scene.room,
+    );
+    const lampPlacement = projectRoomPoint(
+      { x: lamp.position[0], z: -scene.room.depth / 2 },
+      scene.room,
+    );
+
+    expect(stableLayerOrder(rug, rugPlacement, 5)).toBeLessThan(
+      stableLayerOrder(lamp, lampPlacement, 0),
+    );
   });
 
   it("maps every registered rug corner to its projected physical footprint", () => {
