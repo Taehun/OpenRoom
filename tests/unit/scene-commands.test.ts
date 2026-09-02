@@ -1,11 +1,21 @@
 import { describe, expect, test } from "vitest";
 
 import { createDemoScene } from "../../src/demo/demo-scene";
+import { hasCirculationPath } from "../../src/features/placement/circulation";
+import { objectFootprint } from "../../src/features/placement/footprint-geometry";
+import { proposeNaturalPlacement } from "../../src/features/placement/natural-placement";
+import type {
+  NaturalPlacementResult,
+  ProposedPlacement,
+} from "../../src/features/placement/placement-types";
+import { validateAndApplyPlacement } from "../../src/features/scene/natural-placement-command";
 import { applySceneCommand } from "../../src/features/scene/scene-commands";
 import {
   SceneSchema,
+  type Scene,
   type SceneProduct,
 } from "../../src/features/scene/scene-schema";
+import { completedProductScene } from "../helpers/natural-placement-fixtures";
 
 const LIGHT_OAK_TABLE: SceneProduct = {
   id: "oak-frame-table",
@@ -26,6 +36,38 @@ const CHAIR_PRODUCT: SceneProduct = {
   title: "Oak Chair",
   category: "chair",
 };
+
+function changedProposal(scene: Scene) {
+  const result = proposeNaturalPlacement(scene);
+  if (result.kind !== "changed") {
+    throw new Error(`Expected a changed proposal, received ${result.kind}`);
+  }
+  return result;
+}
+
+const VALID_PLACEMENT_SCENE = completedProductScene();
+const VALID_PLACEMENT_PROPOSAL = changedProposal(VALID_PLACEMENT_SCENE);
+
+function validPlacementFixture() {
+  return {
+    scene: structuredClone(VALID_PLACEMENT_SCENE),
+    proposal: structuredClone(VALID_PLACEMENT_PROPOSAL),
+  };
+}
+
+function withPlacements(
+  proposal: Extract<NaturalPlacementResult, { kind: "changed" }>,
+  update: (placements: ProposedPlacement[]) => void,
+) {
+  const next = {
+    ...structuredClone(proposal),
+    placements: proposal.placements.map((placement) =>
+      structuredClone(placement),
+    ),
+  };
+  update(next.placements);
+  return next;
+}
 
 describe("applySceneCommand", () => {
   test("replaces a compatible object while preserving its horizontal transform", () => {
@@ -181,5 +223,195 @@ describe("applySceneCommand", () => {
       unpreserved.scene.objects.find(({ id }) => id === "sofa_01")?.locked,
     ).toBe(false);
     expect(unpreserved.scene.revision).toBe(4);
+  });
+});
+
+describe("validateAndApplyPlacement", () => {
+  test("applies one complete proposal without mutating the input or its revision", () => {
+    const { scene, proposal } = validPlacementFixture();
+    const before = structuredClone(scene);
+
+    const result = validateAndApplyPlacement(scene, proposal);
+
+    expect(result).toMatchObject({ ok: true, changed: true });
+    expect(result.scene.revision).toBe(scene.revision);
+    expect(result.scene).not.toBe(scene);
+    expect(scene).toEqual(before);
+    if (!result.ok || !result.changed) return;
+    for (const placement of proposal.placements) {
+      const object = result.scene.objects.find(({ id }) => id === placement.objectId)!;
+      expect(object.position).toEqual(placement.position);
+      expect(object.rotation[1]).toBe(placement.rotationY);
+    }
+  });
+
+  test("passes unchanged and failed solver outcomes through without changing the Scene", () => {
+    const scene = completedProductScene();
+    const unchanged = validateAndApplyPlacement(scene, {
+      kind: "unchanged",
+      reason: "already-safe",
+      diagnostics: { currentScore: 10, proposedScore: 10, evaluatedLayouts: 1 },
+    });
+    const failed = validateAndApplyPlacement(scene, {
+      kind: "failed",
+      reason: "search-limit-exhausted",
+    });
+
+    expect(unchanged).toEqual({ ok: true, changed: false, scene });
+    expect(failed).toEqual({
+      ok: false,
+      scene,
+      reason: "search-limit-exhausted",
+    });
+  });
+
+  test.each([
+    [
+      "a missing unlocked object",
+      (proposal: ReturnType<typeof changedProposal>) =>
+        withPlacements(proposal, (placements) => placements.pop()),
+    ],
+    [
+      "a duplicate object id",
+      (proposal: ReturnType<typeof changedProposal>) =>
+        withPlacements(proposal, (placements) => {
+          placements[1]!.objectId = placements[0]!.objectId;
+        }),
+    ],
+    [
+      "an unknown object id",
+      (proposal: ReturnType<typeof changedProposal>) =>
+        withPlacements(proposal, (placements) => {
+          placements[0]!.objectId = "missing_01";
+        }),
+    ],
+    [
+      "a non-finite coordinate",
+      (proposal: ReturnType<typeof changedProposal>) =>
+        withPlacements(proposal, (placements) => {
+          placements[0]!.position[0] = Number.NaN;
+        }),
+    ],
+    [
+      "a changed vertical coordinate",
+      (proposal: ReturnType<typeof changedProposal>) =>
+        withPlacements(proposal, (placements) => {
+          placements[0]!.position[1] += 0.01;
+        }),
+    ],
+    [
+      "a changed vertical-cutout rotation",
+      (proposal: ReturnType<typeof changedProposal>) =>
+        withPlacements(proposal, (placements) => {
+          const sofa = placements.find(({ objectId }) => objectId === "sofa_01")!;
+          sofa.rotationY += 0.1;
+        }),
+    ],
+    [
+      "an out-of-room footprint",
+      (proposal: ReturnType<typeof changedProposal>) =>
+        withPlacements(proposal, (placements) => {
+          placements[0]!.position[0] = 99;
+        }),
+    ],
+    [
+      "overlapping non-rug footprints",
+      (proposal: ReturnType<typeof changedProposal>) =>
+        withPlacements(proposal, (placements) => {
+          const sofa = placements.find(({ objectId }) => objectId === "sofa_01")!;
+          const table = placements.find(({ objectId }) => objectId === "table_01")!;
+          table.position[0] = sofa.position[0];
+          table.position[2] = sofa.position[2];
+        }),
+    ],
+    [
+      "an opening obstruction",
+      (proposal: ReturnType<typeof changedProposal>) =>
+        withPlacements(proposal, (placements) => {
+          const lamp = placements.find(({ objectId }) => objectId === "lamp_01")!;
+          lamp.position[0] = 0.72;
+          lamp.position[2] = -2.7;
+        }),
+    ],
+  ])("rejects %s atomically", (_name, mutate) => {
+    const { scene, proposal } = validPlacementFixture();
+    const before = structuredClone(scene);
+    const result = validateAndApplyPlacement(scene, mutate(proposal));
+
+    expect(result).toEqual({ ok: false, scene, reason: "invalid-input" });
+    expect(scene).toEqual(before);
+  });
+
+  test("rejects placements for locked and unlocked unknown objects", () => {
+    const { scene: lockedScene, proposal } = validPlacementFixture();
+    lockedScene.objects.find(({ id }) => id === proposal.placements[0]!.objectId)!.locked = true;
+    expect(validateAndApplyPlacement(lockedScene, proposal)).toEqual({
+      ok: false,
+      scene: lockedScene,
+      reason: "invalid-input",
+    });
+
+    const { scene: unknownScene } = validPlacementFixture();
+    unknownScene.objects[0]!.type = "unknown";
+    const unknownProposal = structuredClone(proposal);
+    expect(validateAndApplyPlacement(unknownScene, unknownProposal)).toEqual({
+      ok: false,
+      scene: unknownScene,
+      reason: "invalid-input",
+    });
+  });
+
+  test("rejects a collision-free proposal that severs room circulation", () => {
+    const scene = completedProductScene();
+    scene.id = "blocked-circulation";
+    scene.source = "upload";
+    scene.room = { width: 6, height: 2.5, depth: 6 };
+    scene.openings = [
+      {
+        id: "front-door",
+        kind: "door",
+        wall: "front",
+        offset: 0.5,
+        widthM: 1,
+        heightM: 2,
+      },
+      {
+        id: "back-window",
+        kind: "window",
+        wall: "back",
+        offset: 0.5,
+        widthM: 1,
+        heightM: 1.2,
+      },
+    ];
+    scene.objects = [scene.objects.find(({ id }) => id === "sofa_01")!];
+    scene.selectedObjectId = null;
+    scene.objects[0]!.dimensionsM = { width: 5.2, height: 0.72, depth: 0.8 };
+    scene.objects[0]!.position = [0, scene.objects[0]!.position[1], 0.1];
+    const parsed = SceneSchema.parse(scene);
+    const proposal: NaturalPlacementResult = {
+      kind: "changed",
+      placements: [{
+        objectId: "sofa_01",
+        position: [0, parsed.objects[0]!.position[1], 0],
+        rotationY: parsed.objects[0]!.rotation[1],
+      }],
+      diagnostics: { currentScore: null, proposedScore: 1, evaluatedLayouts: 1 },
+    };
+    const proposedScene = structuredClone(parsed);
+    proposedScene.objects[0]!.position = [...proposal.placements[0]!.position];
+    expect(
+      hasCirculationPath(
+        proposedScene,
+        proposedScene.objects.map(objectFootprint),
+        [],
+      ),
+    ).toBe(false);
+
+    expect(validateAndApplyPlacement(parsed, proposal)).toEqual({
+      ok: false,
+      scene: parsed,
+      reason: "invalid-input",
+    });
   });
 });
