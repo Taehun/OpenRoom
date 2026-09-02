@@ -339,13 +339,16 @@ test("redesigns the whole photo room through Core 6 and preserves human transfor
   expect(afterUndoTable?.position).toEqual(beforeDragPosition);
   expect(await visualPlacement(table)).toEqual(beforeDragPlacement);
 
+  const staleTarget = { x: 1.25, z: -0.75 };
+  expect(afterUndoTable?.position[0]).not.toBe(staleTarget.x);
+  expect(afterUndoTable?.position[2]).not.toBe(staleTarget.z);
   const placementBeforeStaleMove = await visualPlacement(table);
   const sceneBeforeStaleMove = sceneFrom(afterUndo);
   const staleMove = await callTool(page, "move_object", {
     objectId: "table_01",
     expectedRevision: afterUndo.structuredContent.sceneRevision - 1,
     expectedStateVersion: afterUndo.structuredContent.stateVersion,
-    position: { x: 0, z: 0 },
+    position: staleTarget,
   });
   expect(staleMove.structuredContent).toMatchObject({
     ok: false,

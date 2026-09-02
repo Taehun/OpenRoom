@@ -59,6 +59,11 @@ checkout.
 - Descriptors use `(input, { signal })`, validate and clone catalog data, mark
   possible catalog output untrusted, and abort all six registrations when the
   demo unmounts. Unsupported browsers retain the complete human editor.
+- Native `document.modelContext` is expected to be injected for the document
+  lifetime before React mounts. The current platform exposes no post-mount
+  availability event, so this package intentionally does not poll,
+  monkey-patch, or dynamically re-register; unsupported documents keep the
+  human editor.
 - Sequential whole-room replacement reads the latest revision/state version
   after every command and produces exactly six revision increments plus six
   product-backed, visible cutouts.
@@ -77,8 +82,7 @@ checkout.
 Whole-room browser journey:
 
 ```bash
-pnpm run test:e2e -- tests/e2e/photo-compositor.spec.ts \
-  tests/e2e/webmcp-core.spec.ts tests/e2e/demo-workspace.spec.ts
+pnpm exec playwright test tests/e2e/photo-compositor.spec.ts tests/e2e/webmcp-core.spec.ts tests/e2e/demo-workspace.spec.ts tests/e2e/photo-assets.spec.ts --config=playwright.config.ts
 ```
 
 - RED: exit `1`; the new test first exposed a byte-level CSS serialization

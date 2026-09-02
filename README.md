@@ -36,7 +36,11 @@ Descriptors use `(input, { signal })`, validate catalog output, mark possible
 catalog text as untrusted, and are aborted when `/demo` unmounts. Browsers
 without native WebMCP retain the complete human editor. The prompt area only
 copies guidance for an active agent surface; it does not execute a model in the
-page.
+page. Native `document.modelContext` is expected to be injected for the
+document lifetime before React mounts. The current platform exposes no
+post-mount availability event, so this package intentionally does not poll,
+monkey-patch, or dynamically re-register; unsupported documents keep the human
+editor.
 
 Cart operations open a visible, local approval sheet. The original human
 four-item `$626 USD` fixture and product-backed WebMCP Scene drafts both emit no

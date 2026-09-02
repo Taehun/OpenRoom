@@ -339,6 +339,51 @@ test("copies prompt guidance without changing Scene revision or state version", 
   expect(writeText).toHaveBeenCalledWith(
     "Redesign this room as a warm minimal Japandi interior. Replace every outdated unlocked item with a coherent catalog result, keep the sofa on the left, and leave a clear path to the windows. Read the latest scene after each change.",
   );
+  expect(screen.getByRole("status", { name: "Prompt copy status" }))
+    .toHaveTextContent("Prompt copied");
+  expect(screen.getByText("Prompt copied")).toBeVisible();
+  const after = await getScene.execute({}, { signal });
+  expect(after.structuredContent.sceneRevision).toBe(
+    before.structuredContent.sceneRevision,
+  );
+  expect(after.structuredContent.stateVersion).toBe(
+    before.structuredContent.stateVersion,
+  );
+});
+
+test("reports rejected prompt copies without changing Scene revision or state version", async () => {
+  const registrations: CapturedRegistration[] = [];
+  Object.defineProperty(document, "modelContext", {
+    configurable: true,
+    value: {
+      async registerTool(
+        tool: ModelContextTool,
+        options?: { signal?: AbortSignal },
+      ) {
+        if (!options?.signal) throw new Error("Expected a registration signal");
+        registrations.push({ signal: options.signal, tool });
+      },
+    },
+  });
+  const user = userEvent.setup();
+  vi.spyOn(navigator.clipboard, "writeText").mockRejectedValueOnce(
+    new DOMException("Denied", "NotAllowedError"),
+  );
+  render(<DemoWorkspace />);
+  await waitFor(() => expect(registrations).toHaveLength(6));
+  const getScene = registrations.find(
+    ({ tool }) => tool.name === "get_scene",
+  )?.tool;
+  if (!getScene) throw new Error("Missing get_scene");
+  const signal = new AbortController().signal;
+  const before = await getScene.execute({}, { signal });
+
+  await user.click(
+    screen.getByRole("button", { name: "Copy redesign prompt" }),
+  );
+
+  expect(screen.getByRole("status", { name: "Prompt copy status" }))
+    .toHaveTextContent("Could not copy. Select and copy the prompt manually.");
   const after = await getScene.execute({}, { signal });
   expect(after.structuredContent.sceneRevision).toBe(
     before.structuredContent.sceneRevision,

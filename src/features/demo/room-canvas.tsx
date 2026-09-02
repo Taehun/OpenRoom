@@ -29,6 +29,14 @@ const OBJECT_LABELS = {
   unknown: "Object",
 } as const;
 
+type CopyStatus =
+  | { kind: "success"; message: "Prompt copied" }
+  | {
+      kind: "error";
+      message: "Could not copy. Select and copy the prompt manually.";
+    }
+  | null;
+
 function subscribeToNativeWebMcp() {
   return () => undefined;
 }
@@ -55,7 +63,7 @@ export function RoomCanvas({ dispatch, scene, state }: RoomCanvasProps) {
     getNativeWebMcpSnapshot,
     getServerNativeWebMcpSnapshot,
   );
-  const [copyStatus, setCopyStatus] = useState<string | null>(null);
+  const [copyStatus, setCopyStatus] = useState<CopyStatus>(null);
   const selectedObject = scene.objects.find(
     ({ id }) => id === scene.selectedObjectId,
   );
@@ -63,9 +71,12 @@ export function RoomCanvas({ dispatch, scene, state }: RoomCanvasProps) {
   async function copyPrompt() {
     try {
       await navigator.clipboard.writeText(PRIMARY_PROMPT);
-      setCopyStatus("Prompt copied");
+      setCopyStatus({ kind: "success", message: "Prompt copied" });
     } catch {
-      setCopyStatus("Copy unavailable");
+      setCopyStatus({
+        kind: "error",
+        message: "Could not copy. Select and copy the prompt manually.",
+      });
     }
   }
 
@@ -229,8 +240,16 @@ export function RoomCanvas({ dispatch, scene, state }: RoomCanvasProps) {
             Copy redesign prompt
           </button>
           {copyStatus ? (
-            <span className={styles.visuallyHidden} role="status">
-              {copyStatus}
+            <span
+              aria-label="Prompt copy status"
+              className={
+                copyStatus.kind === "success"
+                  ? styles.copyStatusSuccess
+                  : styles.copyStatusError
+              }
+              role="status"
+            >
+              {copyStatus.message}
             </span>
           ) : null}
         </section>
