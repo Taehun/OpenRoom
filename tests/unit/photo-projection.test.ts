@@ -41,8 +41,11 @@ describe("photo projection", () => {
     expect(layerOrder("rug", 700)).toBeLessThan(layerOrder("sofa", 700));
   });
 
-  it("clamps visual width derived from real dimensions", () => {
-    expect(objectVisualWidth(0.05, 1)).toBe(8);
-    expect(objectVisualWidth(8, 1.4)).toBe(58);
+  it("applies depth scale once before clamping width by object category", () => {
+    expect(objectVisualWidth(2, 0.8, "sofa")).toBeCloseTo(28.8);
+    expect(objectVisualWidth(2.2, 0.8, "sofa")).toBeGreaterThan(
+      objectVisualWidth(1.8, 0.8, "sofa"),
+    );
+    expect(objectVisualWidth(0.45, 1, "floor_lamp")).toBeCloseTo(8.1);
   });
 });

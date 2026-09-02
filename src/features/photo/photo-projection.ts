@@ -1,4 +1,8 @@
-import type { ProductCategory, Scene } from "../scene/scene-schema";
+import type {
+  ProductCategory,
+  Scene,
+  SceneObjectType,
+} from "../scene/scene-schema";
 import {
   NOOK_PHOTO_CALIBRATION,
   type NormalizedPoint,
@@ -73,8 +77,23 @@ export function unprojectStagePoint(
   };
 }
 
-export function objectVisualWidth(widthM: number, scale: number): number {
-  return clamp(widthM * scale * 100, 8, 58);
+const VISUAL_WIDTH_BOUNDS = {
+  sofa: [24, 52],
+  coffee_table: [10, 36],
+  rug: [20, 56],
+  floor_lamp: [6, 20],
+  chair: [10, 32],
+  plant: [8, 26],
+  unknown: [8, 56],
+} as const;
+
+export function objectVisualWidth(
+  widthM: number,
+  depthScale: number,
+  type: SceneObjectType,
+): number {
+  const [minimum, maximum] = VISUAL_WIDTH_BOUNDS[type];
+  return clamp(widthM * 18 * depthScale, minimum, maximum);
 }
 
 export function layerOrder(type: ProductCategory, zIndex: number): number {

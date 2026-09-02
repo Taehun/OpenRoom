@@ -363,20 +363,29 @@
   background-size: cover;
 }
 
-.photoObject,
-.photoObjectSelected {
+.photoObjectFrame {
   position: absolute;
   top: var(--photo-top);
   left: var(--photo-left);
   width: var(--photo-width);
+  transform: translate(
+      var(--photo-anchor-x-offset),
+      var(--photo-anchor-y-offset)
+    )
+    rotate(var(--photo-rotation));
+  transform-origin: var(--photo-anchor-x) var(--photo-anchor-y);
+}
+
+.photoObject,
+.photoObjectSelected {
+  position: relative;
+  display: block;
+  width: 100%;
   margin: 0;
   padding: 0;
   border: 0;
   background: transparent;
   cursor: grab;
-  transform: translate(-50%, -100%) scale(var(--photo-scale))
-    rotate(var(--photo-rotation));
-  transform-origin: 50% 100%;
   transition: filter 140ms ease, outline-color 140ms ease;
   touch-action: none;
 }
@@ -414,15 +423,16 @@
 
 .floorAnchor {
   position: absolute;
-  bottom: -6px;
-  left: 50%;
+  top: var(--photo-anchor-y);
+  left: var(--photo-anchor-x);
   width: 10px;
   height: 10px;
   border: 2px solid var(--paper);
   border-radius: 50%;
   background: var(--moss);
   box-shadow: 0 0 0 1px var(--moss);
-  transform: translateX(-50%);
+  pointer-events: none;
+  transform: translate(-50%, -50%);
 }
 
 .photoLockedBadge {
@@ -441,8 +451,8 @@
 
 .rotationHandle {
   position: absolute;
-  top: var(--photo-top);
-  left: var(--photo-left);
+  top: 0;
+  left: var(--photo-anchor-x);
   display: grid;
   width: 32px;
   height: 32px;
@@ -458,8 +468,12 @@
   font-weight: 750;
   line-height: 1;
   box-shadow: 0 3px 9px rgba(36, 39, 34, 0.3);
-  transform: translate(-50%, calc(-100% - 72px));
+  transform: translate(-50%, -100%);
   touch-action: none;
+}
+
+.rotationHandle span {
+  transform: rotate(calc(var(--photo-rotation) * -1));
 }
 
 .rotationHandle:active {

@@ -17,10 +17,17 @@ import {
   projectRoomPoint,
   unprojectStagePoint,
 } from "./photo-projection";
+import type { NormalizedPoint } from "./photo-calibration";
 
 interface TransformPreview {
+  kind: "move" | "rotate";
   pointerId: number;
   objectId: string;
+  startPointer: NormalizedPoint;
+  startAnchor: NormalizedPoint;
+  startPointerAngle: number;
+  startPosition: Vec3;
+  startRotationY: number;
   position: Vec3;
   rotationY: number;
   changed: boolean;
@@ -66,6 +73,14 @@ function rotationsMatch(first: number, second: number) {
   );
 }
 
+export function normalizeAngleDelta(angle: number) {
+  return Math.atan2(Math.sin(angle), Math.cos(angle));
+}
+
+function pointerAngle(point: NormalizedPoint, anchor: NormalizedPoint) {
+  return Math.atan2(point.x - anchor.x, anchor.y - point.y);
+}
+
 export function RoomPhotoStage() {
   const scene = useSceneStore((state) => state.scene);
   const toolMode = useSceneStore((state) => state.toolMode);
@@ -78,16 +93,30 @@ export function RoomPhotoStage() {
   function startTransform(
     object: SceneObject,
     event: PointerEvent<HTMLElement>,
+    kind: TransformPreview["kind"],
   ) {
     if (transformPreview) return;
 
     selectObject(object.id);
     if (object.locked) return;
 
+    const startPointer = stagePoint(event);
+    if (!startPointer) return;
+    const startAnchor = projectRoomPoint(
+      { x: object.position[0], z: object.position[2] },
+      scene.room,
+    );
+
     capturePointer(event.currentTarget, event.pointerId);
     setTransformPreview({
+      kind,
       pointerId: event.pointerId,
       objectId: object.id,
+      startPointer,
+      startAnchor,
+      startPointerAngle: pointerAngle(startPointer, startAnchor),
+      startPosition: [...object.position],
+      startRotationY: object.rotation[1],
       position: [...object.position],
       rotationY: object.rotation[1],
       changed: false,
@@ -113,27 +142,35 @@ export function RoomPhotoStage() {
     object: SceneObject,
     event: PointerEvent<HTMLElement>,
   ) {
-    if (
-      transformPreview?.pointerId !== event.pointerId ||
-      transformPreview.objectId !== object.id
-    ) {
-      return;
-    }
     const point = stagePoint(event);
     if (!point) return;
-    const position = unprojectStagePoint(point, scene.room);
-    const previewPosition: Vec3 = [
-      position.x,
-      object.position[1],
-      position.z,
-    ];
+    setTransformPreview((current) => {
+      if (
+        current?.kind !== "move" ||
+        current.pointerId !== event.pointerId ||
+        current.objectId !== object.id
+      ) {
+        return current;
+      }
 
-    setTransformPreview({
-      ...transformPreview,
-      position: previewPosition,
-      changed:
-        !positionsMatch(previewPosition, object.position) ||
-        !rotationsMatch(transformPreview.rotationY, object.rotation[1]),
+      const targetAnchor = {
+        x: current.startAnchor.x + point.x - current.startPointer.x,
+        y: current.startAnchor.y + point.y - current.startPointer.y,
+      };
+      const position = unprojectStagePoint(targetAnchor, scene.room);
+      const previewPosition: Vec3 = [
+        position.x,
+        current.startPosition[1],
+        position.z,
+      ];
+
+      return {
+        ...current,
+        position: previewPosition,
+        changed:
+          !positionsMatch(previewPosition, current.startPosition) ||
+          !rotationsMatch(current.rotationY, current.startRotationY),
+      };
     });
   }
 
@@ -141,29 +178,29 @@ export function RoomPhotoStage() {
     object: SceneObject,
     event: PointerEvent<HTMLElement>,
   ) {
-    if (
-      transformPreview?.pointerId !== event.pointerId ||
-      transformPreview.objectId !== object.id
-    ) {
-      return;
-    }
     const point = stagePoint(event);
     if (!point) return;
-    const anchor = projectRoomPoint(
-      { x: object.position[0], z: object.position[2] },
-      scene.room,
-    );
-    const rotationY = Math.atan2(
-      point.x - anchor.left,
-      anchor.top - point.y,
-    );
+    setTransformPreview((current) => {
+      if (
+        current?.kind !== "rotate" ||
+        current.pointerId !== event.pointerId ||
+        current.objectId !== object.id
+      ) {
+        return current;
+      }
 
-    setTransformPreview({
-      ...transformPreview,
-      rotationY,
-      changed:
-        !positionsMatch(transformPreview.position, object.position) ||
-        !rotationsMatch(rotationY, object.rotation[1]),
+      const currentPointerAngle = pointerAngle(point, current.startAnchor);
+      const rotationY =
+        current.startRotationY +
+        normalizeAngleDelta(currentPointerAngle - current.startPointerAngle);
+
+      return {
+        ...current,
+        rotationY,
+        changed:
+          !positionsMatch(current.position, current.startPosition) ||
+          !rotationsMatch(rotationY, current.startRotationY),
+      };
     });
   }
 
@@ -290,13 +327,15 @@ export function RoomPhotoStage() {
             onClick={() => selectObject(object.id)}
             onKeyDown={(event) => handleObjectKeyDown(object, event)}
             onPointerCancel={(event) => cancelTransform(object, event)}
-            onPointerDown={(event) => startTransform(object, event)}
+            onPointerDown={(event) => startTransform(object, event, "move")}
             onPointerMove={(event) => previewMove(object, event)}
             onPointerUp={(event) => finishTransform(object, event)}
             onRotationPointerCancel={(event) =>
               cancelTransform(object, event)
             }
-            onRotationPointerDown={(event) => startTransform(object, event)}
+            onRotationPointerDown={(event) =>
+              startTransform(object, event, "rotate")
+            }
             onRotationPointerMove={(event) => previewRotation(object, event)}
             onRotationPointerUp={(event) => finishTransform(object, event)}
             placement={placement}
@@ -310,6 +349,7 @@ export function RoomPhotoStage() {
             visualWidth={objectVisualWidth(
               object.dimensionsM.width,
               placement.scale,
+              object.type,
             )}
           />
         );

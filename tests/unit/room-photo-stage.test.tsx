@@ -106,34 +106,61 @@ describe("RoomPhotoStage", () => {
     expect(stage).toContainElement(table);
   });
 
-  test("does not commit a move that ends at the gesture's starting transform", () => {
+  test("moves by the pointer delta without jumping the floor anchor", () => {
     const store = createSceneStore();
-    const commit = vi.spyOn(store.getState(), "commitTransform");
-    const originalPosition = [...objectFromStore(store, "table_01").position];
+    const start = structuredClone(objectFromStore(store, "table_01"));
     renderStage(store);
     const table = screen.getByRole("button", { name: "Coffee table" });
 
     fireEvent.pointerDown(table, {
-      pointerId: 17,
-      clientX: 500,
-      clientY: 433,
+      pointerId: 31,
+      clientX: 430,
+      clientY: 360,
     });
     fireEvent.pointerMove(table, {
-      pointerId: 17,
-      clientX: 500,
-      clientY: 433,
+      pointerId: 31,
+      clientX: 430,
+      clientY: 360,
     });
     fireEvent.pointerUp(table, {
-      pointerId: 17,
-      clientX: 500,
-      clientY: 433,
+      pointerId: 31,
+      clientX: 430,
+      clientY: 360,
     });
 
-    expect(commit).not.toHaveBeenCalled();
-    expect(objectFromStore(store, "table_01").position).toEqual(originalPosition);
+    expect(objectFromStore(store, "table_01").position).toEqual(start.position);
     expect(store.getState().scene.revision).toBe(1);
-    expect(store.getState().history).toHaveLength(0);
-    expect(store.getState().isTransforming).toBe(false);
+  });
+
+  test("applies the same scene delta from any point inside a cutout", () => {
+    function movedPosition(startX: number, startY: number, pointerId: number) {
+      const store = createSceneStore();
+      const start = structuredClone(objectFromStore(store, "table_01"));
+      const { unmount } = renderStage(store);
+      const table = screen.getByRole("button", { name: "Coffee table" });
+
+      fireEvent.pointerDown(table, { pointerId, clientX: startX, clientY: startY });
+      fireEvent.pointerMove(table, {
+        pointerId,
+        clientX: startX + 60,
+        clientY: startY + 30,
+      });
+      fireEvent.pointerUp(table, {
+        pointerId,
+        clientX: startX + 60,
+        clientY: startY + 30,
+      });
+
+      const position = structuredClone(objectFromStore(store, "table_01").position);
+      unmount();
+      return position.map((coordinate, index) => coordinate - start.position[index]);
+    }
+
+    const firstDelta = movedPosition(410, 330, 41);
+    const secondDelta = movedPosition(530, 390, 42);
+    expect(secondDelta[0]).toBeCloseTo(firstDelta[0]);
+    expect(secondDelta[1]).toBeCloseTo(firstDelta[1]);
+    expect(secondDelta[2]).toBeCloseTo(firstDelta[2]);
   });
 
   test("keeps the first pointer as the sole gesture owner", () => {
@@ -375,33 +402,86 @@ describe("RoomPhotoStage", () => {
     expect(store.getState().isTransforming).toBe(false);
   });
 
-  test("does not commit a rotation that equals the gesture's starting transform", () => {
-    const store = createSceneStore();
+  test("adds rotation pointer-angle delta to the starting rotation", () => {
+    const scene = createDemoScene();
+    scene.objects.find(({ id }) => id === "table_01")!.rotation[1] =
+      Math.PI / 3;
+    const store = createSceneStore(scene);
     store.getState().setToolMode("rotate");
-    const commit = vi.spyOn(store.getState(), "commitTransform");
     renderStage(store);
     const handle = screen.getByRole("button", { name: "Rotate Coffee table" });
 
     fireEvent.pointerDown(handle, {
-      pointerId: 27,
+      pointerId: 32,
       clientX: 500,
-      clientY: 300,
+      clientY: 250,
     });
     fireEvent.pointerMove(handle, {
-      pointerId: 27,
+      pointerId: 32,
       clientX: 500,
-      clientY: 300,
+      clientY: 250,
     });
     fireEvent.pointerUp(handle, {
-      pointerId: 27,
+      pointerId: 32,
       clientX: 500,
-      clientY: 300,
+      clientY: 250,
     });
 
-    expect(commit).not.toHaveBeenCalled();
-    expect(objectFromStore(store, "table_01").rotation[1]).toBe(0);
+    expect(objectFromStore(store, "table_01").rotation[1]).toBeCloseTo(
+      Math.PI / 3,
+    );
     expect(store.getState().scene.revision).toBe(1);
-    expect(store.getState().history).toHaveLength(0);
-    expect(store.getState().isTransforming).toBe(false);
+  });
+
+  test("uses the shortest signed rotation delta across the angle boundary", () => {
+    const store = createSceneStore();
+    store.getState().setToolMode("rotate");
+    const { stage } = renderStage(store);
+    const table = screen.getByRole("button", { name: "Coffee table" });
+    const handle = screen.getByRole("button", { name: "Rotate Coffee table" });
+    const anchorX =
+      STAGE_RECT.left +
+      (Number.parseFloat(table.style.getPropertyValue("--photo-left")) / 100) *
+        STAGE_RECT.width;
+    const anchorY =
+      STAGE_RECT.top +
+      (Number.parseFloat(table.style.getPropertyValue("--photo-top")) / 100) *
+        STAGE_RECT.height;
+
+    fireEvent.pointerDown(handle, {
+      pointerId: 33,
+      clientX: anchorX - 2,
+      clientY: anchorY + 100,
+    });
+    fireEvent.pointerMove(handle, {
+      pointerId: 33,
+      clientX: anchorX + 2,
+      clientY: anchorY + 100,
+    });
+    fireEvent.pointerUp(handle, {
+      pointerId: 33,
+      clientX: anchorX + 2,
+      clientY: anchorY + 100,
+    });
+
+    expect(objectFromStore(store, "table_01").rotation[1]).toBeCloseTo(
+      -2 * Math.atan2(2 / STAGE_RECT.width, 100 / STAGE_RECT.height),
+    );
+    expect(stage).toContainElement(table);
+  });
+
+  test("anchors the object frame, floor marker, and rotation handle to the asset", () => {
+    const store = createSceneStore();
+    store.getState().setToolMode("rotate");
+    renderStage(store);
+
+    const frame = screen.getByTestId("photo-object-frame-table_01");
+    expect(frame.style.getPropertyValue("--photo-anchor-x")).toBe("50.07%");
+    expect(frame.style.getPropertyValue("--photo-anchor-y")).toBe("86.13%");
+    expect(frame.style.transform).not.toContain("scale(");
+    const floorAnchor = screen.getByTestId("photo-floor-anchor-table_01");
+    const handle = screen.getByRole("button", { name: "Rotate Coffee table" });
+    expect(frame).toContainElement(floorAnchor);
+    expect(frame).toContainElement(handle);
   });
 });

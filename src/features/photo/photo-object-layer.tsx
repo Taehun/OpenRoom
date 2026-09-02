@@ -56,17 +56,26 @@ export function PhotoObjectLayer({
   visualWidth,
 }: PhotoObjectLayerProps) {
   const asset = getPhotoAsset(object);
+  const anchorX = asset?.anchorX ?? 0.5;
+  const anchorY = asset?.anchorY ?? 1;
   const customStyle = {
     "--photo-left": `${placement.left * 100}%`,
     "--photo-top": `${placement.top * 100}%`,
-    "--photo-scale": placement.scale,
     "--photo-width": `${visualWidth}%`,
     "--photo-rotation": `${(object.rotation[1] * 180) / Math.PI}deg`,
+    "--photo-anchor-x": `${anchorX * 100}%`,
+    "--photo-anchor-y": `${anchorY * 100}%`,
+    "--photo-anchor-x-offset": `${anchorX * -100}%`,
+    "--photo-anchor-y-offset": `${anchorY * -100}%`,
     zIndex: layerZIndex(object, placement.zIndex),
   } as CSSProperties;
 
   return (
-    <>
+    <div
+      className={styles.photoObjectFrame}
+      data-testid={`photo-object-frame-${object.id}`}
+      style={customStyle}
+    >
       <button
         aria-label={label}
         aria-pressed={selected}
@@ -97,15 +106,20 @@ export function PhotoObjectLayer({
             {label}
           </span>
         )}
-        {selected ? (
-          <span aria-hidden="true" className={styles.floorAnchor} />
-        ) : null}
         {object.locked ? (
           <span aria-hidden="true" className={styles.photoLockedBadge}>
             Locked
           </span>
         ) : null}
       </button>
+
+      {selected ? (
+        <span
+          aria-hidden="true"
+          className={styles.floorAnchor}
+          data-testid={`photo-floor-anchor-${object.id}`}
+        />
+      ) : null}
 
       {showRotationHandle ? (
         <button
@@ -121,6 +135,6 @@ export function PhotoObjectLayer({
           <span aria-hidden="true">↻</span>
         </button>
       ) : null}
-    </>
+    </div>
   );
 }
