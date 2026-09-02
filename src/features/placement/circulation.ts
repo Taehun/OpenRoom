@@ -1,6 +1,10 @@
 import type { Scene, SceneObject } from "../scene/scene-schema";
 import { openingClearanceZones } from "./footprint-geometry";
-import type { Footprint2D, PointXZ } from "./placement-types";
+import type {
+  Footprint2D,
+  OpeningClearanceZone,
+  PointXZ,
+} from "./placement-types";
 
 const GRID_METRES = 0.1;
 const PATH_WIDTH_METRES = 0.75;
@@ -39,6 +43,68 @@ function cellCenter(scene: Scene, column: number, row: number): PointXZ {
   };
 }
 
+function doorStartZones(scene: Scene): readonly OpeningClearanceZone[] {
+  const doorZoneIds = new Set(
+    scene.openings
+      .filter((opening) => opening.kind === "door")
+      .map((opening) => opening.id),
+  );
+  return openingClearanceZones(scene).filter(({ objectId }) =>
+    doorZoneIds.has(objectId),
+  );
+}
+
+function isEntryPoint(
+  scene: Scene,
+  point: PointXZ,
+  startZones: readonly OpeningClearanceZone[],
+): boolean {
+  if (startZones.length > 0) {
+    return startZones.some((zone) => pointInsideFootprint(point, zone));
+  }
+  return (
+    point.z >= scene.room.depth / 2 - GRID_METRES &&
+    Math.abs(point.x) <= PATH_RADIUS_METRES
+  );
+}
+
+/**
+ * Occupancy-grid cell centers of the calibrated foreground entry zone: the door
+ * clearance zones when the room has a door, otherwise the front-wall center
+ * segment. These are the cells `hasCirculationPath` floods out from.
+ */
+export function entryZonePoints(scene: Scene): readonly PointXZ[] {
+  const columns = gridDimension(scene.room.width);
+  const rows = gridDimension(scene.room.depth);
+  const startZones = doorStartZones(scene);
+  const points: PointXZ[] = [];
+
+  for (let row = 0; row < rows; row += 1) {
+    for (let column = 0; column < columns; column += 1) {
+      const point = cellCenter(scene, column, row);
+      if (isEntryPoint(scene, point, startZones)) points.push(point);
+    }
+  }
+
+  return points;
+}
+
+/**
+ * True when every entry cell is already inside an inflated obstacle, so no
+ * 0.75m route can start. Adding obstacles can never reopen an occupied entry
+ * zone, which makes this a sound early rejection for partial layouts.
+ */
+export function occupiesEntryZone(
+  entryPoints: readonly PointXZ[],
+  obstacles: readonly Footprint2D[],
+): boolean {
+  if (entryPoints.length === 0) return true;
+  const blocking = obstacles.map(inflated);
+  return entryPoints.every((point) =>
+    blocking.some((footprint) => pointInsideFootprint(point, footprint)),
+  );
+}
+
 export function hasCirculationPath(
   scene: Scene,
   obstacles: readonly Footprint2D[],
@@ -63,23 +129,10 @@ export function hasCirculationPath(
   });
   const indexAt = (column: number, row: number) => row * columns + column;
   const openings = openingClearanceZones(scene);
-  const doorZoneIds = new Set(
-    scene.openings
-      .filter((opening) => opening.kind === "door")
-      .map((opening) => opening.id),
+  const startZones = doorStartZones(scene);
+  const starts = cells.flatMap(({ point, blocked }, index) =>
+    !blocked && isEntryPoint(scene, point, startZones) ? [index] : [],
   );
-  const startZones = openings.filter(({ objectId }) => doorZoneIds.has(objectId));
-  const starts = cells.flatMap(({ point, blocked }, index) => {
-    if (blocked) return [];
-    const startsAtDoor = startZones.some((zone) =>
-      pointInsideFootprint(point, zone),
-    );
-    const startsAtFrontCenter =
-      startZones.length === 0 &&
-      point.z >= scene.room.depth / 2 - GRID_METRES &&
-      Math.abs(point.x) <= PATH_RADIUS_METRES;
-    return startsAtDoor || startsAtFrontCenter ? [index] : [];
-  });
 
   if (starts.length === 0) return false;
 

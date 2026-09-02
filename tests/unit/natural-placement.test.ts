@@ -8,12 +8,14 @@ import {
   openingClearanceZones,
 } from "../../src/features/placement/footprint-geometry";
 import { proposeNaturalPlacement } from "../../src/features/placement/natural-placement";
+import { validateAndApplyPlacement } from "../../src/features/scene/natural-placement-command";
 import { PLACEMENT_LIMITS } from "../../src/features/placement/placement-profile";
 import type { ProposedPlacement } from "../../src/features/placement/placement-types";
 import type {
   Scene,
   SceneObject,
 } from "../../src/features/scene/scene-schema";
+import { DEMO_PRODUCTS } from "../../src/features/demo/demo-data";
 import { completedProductScene } from "../helpers/natural-placement-fixtures";
 
 function applyPlacements(
@@ -72,6 +74,74 @@ function thresholdScene(rugX: number): Scene {
     { objectId: "plant_01", position: [-2.4, 0.85, 0.3], rotationY: 0 },
   ];
   return applyPlacements(scene, placements);
+}
+
+// Mirrors the browser journey in tests/e2e/photo-compositor.spec.ts: the six-product
+// redesign followed by six `move_object` calls to a deliberately poor layout. Product IDs
+// and target coordinates are the ones that journey uses; the x/z clamp reproduces
+// `clampPositionToRoom` in scene-commands so the fixture matches the committed Scene.
+const REDESIGN_PRODUCT_IDS: Readonly<Record<string, string>> = {
+  sofa_01: "boucle-curve-sofa",
+  table_01: "travertine-plinth-table",
+  rug_01: "wool-pebble-rug",
+  lamp_01: "linen-dome-lamp",
+  chair_01: "boucle-barrel-chair",
+  plant_01: "stone-planter-ficus",
+};
+
+const POOR_JOURNEY_TARGETS: Readonly<Record<string, { x: number; z: number }>> = {
+  sofa_01: { x: -1.8, z: 0.2 },
+  table_01: { x: 1.2, z: 0.8 },
+  rug_01: { x: 0.9, z: 0.9 },
+  lamp_01: { x: 0.2, z: 1.8 },
+  chair_01: { x: 2.2, z: -0.7 },
+  plant_01: { x: -2.3, z: -1.5 },
+};
+
+const ROOM_INSET_M = 0.1;
+
+function clamp(value: number, minimum: number, maximum: number) {
+  return Math.min(Math.max(value, minimum), maximum);
+}
+
+function poorRedesignedJourneyScene(): Scene {
+  const scene = completedProductScene();
+
+  for (const object of scene.objects) {
+    const productId = REDESIGN_PRODUCT_IDS[object.id];
+    const product = DEMO_PRODUCTS.find(({ id }) => id === productId);
+    if (!product) throw new Error(`Missing redesign product for ${object.id}`);
+    object.assetId = product.id;
+    object.product = {
+      id: product.id,
+      variantId: product.variantId,
+      title: product.title,
+      category: product.category,
+      price: structuredClone(product.price),
+      dimensionsCm: structuredClone(product.dimensionsCm),
+      styleTags: [...product.styleTags],
+      color: product.color,
+      material: product.material,
+    };
+    object.dimensionsM = {
+      width: product.dimensionsCm.width / 100,
+      height: product.dimensionsCm.height / 100,
+      depth: product.dimensionsCm.depth / 100,
+    };
+
+    const target = POOR_JOURNEY_TARGETS[object.id]!;
+    const limitX =
+      scene.room.width / 2 - ROOM_INSET_M - object.dimensionsM.width / 2;
+    const limitZ =
+      scene.room.depth / 2 - ROOM_INSET_M - object.dimensionsM.depth / 2;
+    object.position = [
+      clamp(target.x, -limitX, limitX),
+      object.type === "rug" ? 0.01 : object.dimensionsM.height / 2,
+      clamp(target.z, -limitZ, limitZ),
+    ];
+  }
+
+  return scene;
 }
 
 describe("natural placement", () => {
@@ -369,5 +439,29 @@ describe("natural placement", () => {
     expect(
       exact.diagnostics.proposedScore! - exact.diagnostics.currentScore!,
     ).toBe(PLACEMENT_LIMITS.improvementThreshold);
+  });
+
+  it("improves the poor whole-room journey layout and settles on a second pass", () => {
+    const scene = poorRedesignedJourneyScene();
+    const current = scene.objects.map(({ id, position }) => [
+      id,
+      position[0],
+      position[2],
+    ]);
+
+    const proposal = proposeNaturalPlacement(scene);
+
+    expect(proposal.kind).toBe("changed");
+    if (proposal.kind !== "changed") return;
+
+    const applied = validateAndApplyPlacement(scene, proposal);
+    expect(applied.ok).toBe(true);
+    if (!applied.ok || !applied.changed) return;
+
+    const arranged = applied.scene;
+    expect(
+      arranged.objects.map(({ id, position }) => [id, position[0], position[2]]),
+    ).not.toEqual(current);
+    expect(proposeNaturalPlacement(arranged).kind).toBe("unchanged");
   });
 });

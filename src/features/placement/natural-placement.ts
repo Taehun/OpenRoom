@@ -1,4 +1,8 @@
-import { hasCirculationPath } from "./circulation";
+import {
+  entryZonePoints,
+  hasCirculationPath,
+  occupiesEntryZone,
+} from "./circulation";
 import {
   footprintCorners,
   footprintInsideRoom,
@@ -901,6 +905,46 @@ function respectsPartialConstraints(
   return true;
 }
 
+function settledObstacles(
+  scene: Scene,
+  placements: readonly ProposedPlacement[],
+  placedIds: ReadonlySet<string>,
+): readonly SceneObject[] {
+  return layoutObjects(scene, placements).filter(
+    (object) =>
+      object.locked || object.type === "unknown" || placedIds.has(object.id),
+  );
+}
+
+/**
+ * Hard-constraint rejections that are already decidable for a partial layout.
+ * Both are monotone: the objects still to be placed can only add obstacles, so a
+ * partial that fails here can never complete into a valid layout, and dropping
+ * it frees a beam slot for a branch that still can.
+ */
+function partialBlocksEntryZone(
+  entryPoints: readonly PointXZ[],
+  obstacles: readonly SceneObject[],
+): boolean {
+  return occupiesEntryZone(
+    entryPoints,
+    obstacles
+      .filter(({ type }) => type !== "rug")
+      .map(objectFootprint),
+  );
+}
+
+function partialBlocksCirculation(
+  scene: Scene,
+  obstacles: readonly SceneObject[],
+): boolean {
+  return !hasCirculationPath(
+    scene,
+    obstacles.map(objectFootprint),
+    obstacles.filter(({ type }) => type === "rug"),
+  );
+}
+
 function searchLayouts(
   scene: Scene,
   limits: typeof PLACEMENT_LIMITS,
@@ -914,6 +958,7 @@ function searchLayouts(
   let prunedByBeam = false;
   let truncatedCandidates = false;
   let evaluatedLayouts = 0;
+  const entryPoints = entryZonePoints(scene);
 
   for (let objectIndex = 0; objectIndex < movable.length; objectIndex += 1) {
     const object = movable[objectIndex]!;
@@ -945,8 +990,23 @@ function searchLayouts(
     }
 
     expanded.sort(compareSearchStates);
-    if (expanded.length > limits.beamWidth) prunedByBeam = true;
-    beam = expanded.slice(0, limits.beamWidth);
+    const kept: SearchState[] = [];
+    let ranked = 0;
+    for (; ranked < expanded.length && kept.length < limits.beamWidth; ranked += 1) {
+      const state = expanded[ranked]!;
+      const obstacles = settledObstacles(
+        scene,
+        state.placements,
+        new Set(state.objectIds),
+      );
+      if (partialBlocksEntryZone(entryPoints, obstacles)) continue;
+      if (objectIndex === 0 && partialBlocksCirculation(scene, obstacles)) {
+        continue;
+      }
+      kept.push(state);
+    }
+    if (ranked < expanded.length) prunedByBeam = true;
+    beam = kept;
     if (beam.length === 0) {
       return {
         best: null,
