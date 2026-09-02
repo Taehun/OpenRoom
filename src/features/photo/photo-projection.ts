@@ -1,13 +1,27 @@
 import type {
   ProductCategory,
   Scene,
+  SceneObject,
   SceneObjectType,
 } from "../scene/scene-schema";
+import {
+  footprintCorners,
+  objectFootprint,
+} from "../placement/footprint-geometry";
+import type { PointXZ } from "../placement/placement-types";
+import type { NormalizedQuad, PhotoAsset } from "./photo-assets";
 import {
   NOOK_PHOTO_CALIBRATION,
   type NormalizedPoint,
   type PhotoCalibration,
 } from "./photo-calibration";
+import {
+  isValidFloorQuad,
+  projectiveTransformCss,
+  solveProjectiveTransform,
+  type PixelPoint,
+  type ProjectiveTransform,
+} from "./projective-transform";
 
 type SceneRoom = Pick<Scene["room"], "width" | "depth">;
 
@@ -16,6 +30,19 @@ export interface ProjectedPlacement extends NormalizedPoint {
   top: number;
   scale: number;
   zIndex: number;
+}
+
+export interface StageSize {
+  width: number;
+  height: number;
+}
+
+export interface RugProjection {
+  sourcePixels: readonly [PixelPoint, PixelPoint, PixelPoint, PixelPoint];
+  destinationPixels: readonly [PixelPoint, PixelPoint, PixelPoint, PixelPoint];
+  destinationNormalized: NormalizedQuad;
+  transform: ProjectiveTransform;
+  cssTransform: string;
 }
 
 const clamp = (value: number, min: number, max: number) =>
@@ -74,6 +101,75 @@ export function unprojectStagePoint(
   return {
     x: lerp(-room.width / 2, room.width / 2, horizontal),
     z: lerp(-room.depth / 2, room.depth / 2, depth),
+  };
+}
+
+function pointIsInsideRoom(point: PointXZ, room: SceneRoom) {
+  return (
+    point.x >= -room.width / 2 &&
+    point.x <= room.width / 2 &&
+    point.z >= -room.depth / 2 &&
+    point.z <= room.depth / 2
+  );
+}
+
+export function projectRugPlacement(
+  object: SceneObject,
+  asset: PhotoAsset,
+  room: SceneRoom,
+  stage: StageSize,
+): RugProjection | null {
+  if (
+    object.type !== "rug" ||
+    !asset.floorQuad ||
+    !isValidFloorQuad(asset.floorQuad) ||
+    !Number.isFinite(stage.width) ||
+    !Number.isFinite(stage.height) ||
+    stage.width <= 0 ||
+    stage.height <= 0 ||
+    !Number.isFinite(room.width) ||
+    !Number.isFinite(room.depth) ||
+    room.width <= 0 ||
+    room.depth <= 0 ||
+    !Number.isFinite(object.position[0]) ||
+    !Number.isFinite(object.position[2]) ||
+    !Number.isFinite(object.rotation[1]) ||
+    !Number.isFinite(object.dimensionsM.width) ||
+    !Number.isFinite(object.dimensionsM.depth) ||
+    object.dimensionsM.width <= 0 ||
+    object.dimensionsM.depth <= 0 ||
+    !Number.isFinite(asset.intrinsicWidth) ||
+    !Number.isFinite(asset.intrinsicHeight) ||
+    asset.intrinsicWidth <= 0 ||
+    asset.intrinsicHeight <= 0
+  ) {
+    return null;
+  }
+
+  const corners = footprintCorners(objectFootprint(object));
+  if (!corners.every((corner) => pointIsInsideRoom(corner, room))) return null;
+
+  const destinationNormalized = corners.map(({ x, z }) => {
+    const projected = projectRoomPoint({ x, z }, room);
+    return { x: projected.x, y: projected.y };
+  }) as [NormalizedPoint, NormalizedPoint, NormalizedPoint, NormalizedPoint];
+  const sourcePixels = asset.floorQuad.map(({ x, y }) => ({
+    x: x * asset.intrinsicWidth,
+    y: y * asset.intrinsicHeight,
+  })) as [PixelPoint, PixelPoint, PixelPoint, PixelPoint];
+  const destinationPixels = destinationNormalized.map(({ x, y }) => ({
+    x: x * stage.width,
+    y: y * stage.height,
+  })) as [PixelPoint, PixelPoint, PixelPoint, PixelPoint];
+  const transform = solveProjectiveTransform(sourcePixels, destinationPixels);
+  if (!transform) return null;
+
+  return {
+    sourcePixels,
+    destinationPixels,
+    destinationNormalized,
+    transform,
+    cssTransform: projectiveTransformCss(transform),
   };
 }
 

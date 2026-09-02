@@ -10,11 +10,22 @@ test("audits every registered room and cutout image in the browser", async ({
 }) => {
   const rooms = Object.values(ROOM_PHOTO_ASSETS);
   const cutouts = Object.values(PHOTO_ASSETS);
-  const assets = [...rooms, ...cutouts].map(({ id, src }) => ({ id, src }));
+  const assets = [
+    ...rooms.map(({ id, src }) => ({ id, src })),
+    ...cutouts.map(({ id, src, floorQuad }) => ({ id, src, floorQuad })),
+  ];
 
   await page.goto("/demo");
   const audits = await page.evaluate(async (registeredAssets) => {
-    async function inspect({ id, src }: { id: string; src: string }) {
+    async function inspect({
+      id,
+      src,
+      floorQuad,
+    }: {
+      id: string;
+      src: string;
+      floorQuad?: readonly { x: number; y: number }[];
+    }) {
       const image = new Image();
       image.src = src;
       try {
@@ -41,6 +52,7 @@ test("audits every registered room and cutout image in the browser", async ({
 
       return {
         id,
+        floorQuad,
         naturalWidth: image.naturalWidth,
         naturalHeight: image.naturalHeight,
         minimumAlpha,
@@ -74,4 +86,16 @@ test("audits every registered room and cutout image in the browser", async ({
     expect(audit!.minimumAlpha, `${cutout.id} minimum alpha`).toBe(0);
     expect(audit!.maximumAlpha, `${cutout.id} maximum alpha`).toBeGreaterThan(0);
   }
+
+  expect(
+    audits
+      .filter(({ floorQuad }) => floorQuad !== undefined)
+      .map(({ id }) => id)
+      .sort(),
+  ).toEqual([
+    "geometric-flatweave-rug",
+    "seed-pattern-rug",
+    "wool-pebble-rug",
+    "woven-jute-rug",
+  ]);
 });

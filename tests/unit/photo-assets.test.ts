@@ -10,11 +10,46 @@ import {
   ROOM_PHOTO_ASSETS,
   getPhotoAsset,
 } from "../../src/features/photo/photo-assets";
+import { isValidFloorQuad } from "../../src/features/photo/projective-transform";
 import { readWebpMetadata } from "../helpers/webp-metadata";
 
 const categories = [
   "sofa", "coffee_table", "rug", "floor_lamp", "chair", "plant",
 ] as const;
+
+const RUG_ASSET_IDS = [
+  "seed-pattern-rug",
+  "woven-jute-rug",
+  "wool-pebble-rug",
+  "geometric-flatweave-rug",
+] as const;
+
+const EXPECTED_RUG_FLOOR_QUADS = {
+  "seed-pattern-rug": [
+    { x: 0.439, y: 0.112 },
+    { x: 0.995, y: 0.367 },
+    { x: 0.304, y: 0.986 },
+    { x: 0.008, y: 0.224 },
+  ],
+  "woven-jute-rug": [
+    { x: 0.508, y: 0.221 },
+    { x: 0.97, y: 0.322 },
+    { x: 0.756, y: 0.92 },
+    { x: 0.012, y: 0.589 },
+  ],
+  "wool-pebble-rug": [
+    { x: 0.31, y: 0.205 },
+    { x: 0.962, y: 0.492 },
+    { x: 0.793, y: 0.834 },
+    { x: 0.029, y: 0.607 },
+  ],
+  "geometric-flatweave-rug": [
+    { x: 0.521, y: 0.206 },
+    { x: 0.982, y: 0.691 },
+    { x: 0.182, y: 0.928 },
+    { x: 0.022, y: 0.301 },
+  ],
+} as const;
 
 const malformedWebpFixtures = [
   [
@@ -134,6 +169,19 @@ describe("photo assets", () => {
       expect(metadata.height).toBe(asset.intrinsicHeight);
       expect(metadata.hasAlpha).toBe(true);
     }
+  });
+
+  it("registers the exact valid source floor quadrilateral for every rug only", () => {
+    for (const id of RUG_ASSET_IDS) {
+      const quad = PHOTO_ASSETS[id]?.floorQuad;
+      expect(quad, id).toEqual(EXPECTED_RUG_FLOOR_QUADS[id]);
+      expect(isValidFloorQuad(quad!), id).toBe(true);
+    }
+    expect(
+      Object.values(PHOTO_ASSETS).filter(
+        ({ floorQuad }) => floorQuad !== undefined,
+      ),
+    ).toHaveLength(4);
   });
 
   it("has three stable products for every category", () => {
