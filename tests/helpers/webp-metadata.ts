@@ -65,6 +65,7 @@ export function readWebpMetadata(path: string): WebpMetadata {
       if (length < 5) return invalidWebp(path, "truncated VP8L chunk");
       if (buffer[dataOffset] !== 0x2f) return invalidWebp(path, "invalid VP8L signature");
       const packed = buffer.readUInt32LE(dataOffset + 1);
+      if ((packed >>> 29) !== 0) return invalidWebp(path, "invalid VP8L version");
       image = {
         format: "VP8L",
         hasAlpha: ((packed >>> 28) & 1) === 1,
