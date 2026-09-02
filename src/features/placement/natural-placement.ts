@@ -10,6 +10,7 @@ import { PLACEMENT_LIMITS, PLACEMENT_SCORE_WEIGHTS } from "./placement-profile";
 import type {
   NaturalPlacementResult,
   PlacementDiagnostics,
+  PointXZ,
   ProposedPlacement,
 } from "./placement-types";
 import {
@@ -38,6 +39,11 @@ interface SearchState {
   score: number;
 }
 
+interface CandidateSet {
+  candidates: readonly ProposedPlacement[];
+  truncated: boolean;
+}
+
 const CATEGORY_ORDER: readonly SceneObjectType[] = [
   "sofa",
   "rug",
@@ -48,6 +54,7 @@ const CATEGORY_ORDER: readonly SceneObjectType[] = [
 ];
 
 const MILLIMETRES_PER_METRE = 1000;
+const MAX_FIXED_POINT_PASSES = 8;
 
 function millimetres(metres: number): number {
   return Math.round(metres * MILLIMETRES_PER_METRE);
@@ -123,6 +130,10 @@ function hasUnlockedUnknown(scene: Scene): boolean {
   return scene.objects.some(({ locked, type }) => !locked && type === "unknown");
 }
 
+function hasDuplicateObjectIds(scene: Scene): boolean {
+  return new Set(scene.objects.map(({ id }) => id)).size !== scene.objects.length;
+}
+
 function currentPlacements(scene: Scene): readonly ProposedPlacement[] {
   return scene.objects
     .filter(({ locked, type }) => !locked && type !== "unknown")
@@ -141,17 +152,40 @@ function objectIsInsideOpeningClearance(scene: Scene, object: SceneObject): bool
   return openingClearanceZones(scene).some((zone) => footprintsOverlap(footprint, zone));
 }
 
-function tableEdgeGap(sofa: SceneObject, table: SceneObject): number {
-  const sofaCorners = footprintCorners(objectFootprint(sofa));
-  const tableCorners = footprintCorners(objectFootprint(table));
-  const sofaMinimumZ = Math.min(...sofaCorners.map(({ z }) => z));
-  const sofaMaximumZ = Math.max(...sofaCorners.map(({ z }) => z));
-  const tableMinimumZ = Math.min(...tableCorners.map(({ z }) => z));
-  const tableMaximumZ = Math.max(...tableCorners.map(({ z }) => z));
+function axisProjection(point: PointXZ, axis: PointXZ): number {
+  return point.x * axis.x + point.z * axis.z;
+}
 
-  if (tableMinimumZ >= sofaMaximumZ) return tableMinimumZ - sofaMaximumZ;
-  if (sofaMinimumZ >= tableMaximumZ) return sofaMinimumZ - tableMaximumZ;
-  return -Math.min(sofaMaximumZ, tableMaximumZ) + Math.max(sofaMinimumZ, tableMinimumZ);
+function localAxes(rotationY: number): { lateral: PointXZ; forward: PointXZ } {
+  return {
+    lateral: { x: Math.cos(rotationY), z: Math.sin(rotationY) },
+    forward: { x: -Math.sin(rotationY), z: Math.cos(rotationY) },
+  };
+}
+
+function edgeGapAlongAxis(
+  first: SceneObject,
+  second: SceneObject,
+  axis: PointXZ,
+): number {
+  const firstProjections = footprintCorners(objectFootprint(first)).map((point) =>
+    axisProjection(point, axis),
+  );
+  const secondProjections = footprintCorners(objectFootprint(second)).map((point) =>
+    axisProjection(point, axis),
+  );
+  const firstMinimum = Math.min(...firstProjections);
+  const firstMaximum = Math.max(...firstProjections);
+  const secondMinimum = Math.min(...secondProjections);
+  const secondMaximum = Math.max(...secondProjections);
+
+  if (secondMinimum >= firstMaximum) return secondMinimum - firstMaximum;
+  if (firstMinimum >= secondMaximum) return firstMinimum - secondMaximum;
+  return -Math.min(firstMaximum, secondMaximum) + Math.max(firstMinimum, secondMinimum);
+}
+
+function tableEdgeGap(sofa: SceneObject, table: SceneObject): number {
+  return edgeGapAlongAxis(sofa, table, localAxes(sofa.rotation[1]).forward);
 }
 
 function pointInsideFootprint(
@@ -169,6 +203,83 @@ function pointInsideFootprint(
     Math.abs(localX) <= footprint.halfWidth &&
     Math.abs(localZ) <= footprint.halfDepth
   );
+}
+
+function cross(origin: PointXZ, first: PointXZ, second: PointXZ): number {
+  return (
+    (first.x - origin.x) * (second.z - origin.z) -
+    (first.z - origin.z) * (second.x - origin.x)
+  );
+}
+
+function convexHull(points: readonly PointXZ[]): readonly PointXZ[] {
+  const sorted = [...points].sort((first, second) =>
+    first.x - second.x || first.z - second.z,
+  );
+  if (sorted.length <= 2) return sorted;
+  const lower: PointXZ[] = [];
+  for (const point of sorted) {
+    while (
+      lower.length >= 2 &&
+      cross(lower[lower.length - 2]!, lower[lower.length - 1]!, point) <= 0
+    ) {
+      lower.pop();
+    }
+    lower.push(point);
+  }
+  const upper: PointXZ[] = [];
+  for (let index = sorted.length - 1; index >= 0; index -= 1) {
+    const point = sorted[index]!;
+    while (
+      upper.length >= 2 &&
+      cross(upper[upper.length - 2]!, upper[upper.length - 1]!, point) <= 0
+    ) {
+      upper.pop();
+    }
+    upper.push(point);
+  }
+  return [...lower.slice(0, -1), ...upper.slice(0, -1)];
+}
+
+function pointInsideConvexHull(point: PointXZ, hull: readonly PointXZ[]): boolean {
+  if (hull.length < 3) return false;
+  let direction = 0;
+  for (let index = 0; index < hull.length; index += 1) {
+    const edgeDirection = cross(hull[index]!, hull[(index + 1) % hull.length]!, point);
+    if (Math.abs(edgeDirection) < 1e-9) continue;
+    const sign = Math.sign(edgeDirection);
+    if (direction !== 0 && sign !== direction) return false;
+    direction = sign;
+  }
+  return true;
+}
+
+function primarySeatingHull(objects: readonly SceneObject[]): readonly PointXZ[] {
+  const primaryTypes: readonly SceneObjectType[] = [
+    "sofa",
+    "coffee_table",
+    "chair",
+    "rug",
+  ];
+  const primaryObjects = primaryTypes.flatMap((type) => {
+    const object = firstObject(objects, type);
+    return object ? [object] : [];
+  });
+  return convexHull(
+    primaryObjects.flatMap((object) => footprintCorners(objectFootprint(object))),
+  );
+}
+
+function accessoryInsideSeatingHull(objects: readonly SceneObject[]): boolean {
+  const hull = primarySeatingHull(objects);
+  return objects
+    .filter(({ type }) => type === "floor_lamp" || type === "plant")
+    .some((object) =>
+      pointInsideConvexHull(
+        { x: object.position[0], z: object.position[2] },
+        hull,
+      ),
+    );
 }
 
 function respectsHardConstraints(scene: Scene, objects: readonly SceneObject[]): boolean {
@@ -212,6 +323,8 @@ function respectsHardConstraints(scene: Scene, objects: readonly SceneObject[]):
     return false;
   }
 
+  if (accessoryInsideSeatingHull(objects)) return false;
+
   const rugs = objects.filter(({ type }) => type === "rug");
   return hasCirculationPath(scene, objects.map(objectFootprint), rugs);
 }
@@ -231,9 +344,13 @@ function sofaWallAndSideScore(scene: Scene, objects: readonly SceneObject[]): nu
   if (!sofa || !original) return 1000;
 
   const corners = footprintCorners(objectFootprint(sofa));
+  const minimumX = Math.min(...corners.map(({ x }) => x));
+  const maximumX = Math.max(...corners.map(({ x }) => x));
   const minimumZ = Math.min(...corners.map(({ z }) => z));
   const maximumZ = Math.max(...corners.map(({ z }) => z));
   const wallGap = Math.min(
+    Math.abs(minimumX + scene.room.width / 2),
+    Math.abs(scene.room.width / 2 - maximumX),
     Math.abs(minimumZ + scene.room.depth / 2),
     Math.abs(scene.room.depth / 2 - maximumZ),
   );
@@ -249,10 +366,21 @@ function tableRelationScore(objects: readonly SceneObject[]): number {
   const sofa = firstObject(objects, "sofa");
   const table = firstObject(objects, "coffee_table");
   if (!sofa || !table) return 1000;
+  const { lateral } = localAxes(sofa.rotation[1]);
   const gap = proximityScore(millimetres(tableEdgeGap(sofa, table)), 450, 450);
   const alignment = proximityScore(
-    millimetres(Math.abs(table.position[0] - sofa.position[0])),
-    600,
+    millimetres(
+      Math.abs(
+        axisProjection(
+          {
+            x: table.position[0] - sofa.position[0],
+            z: table.position[2] - sofa.position[2],
+          },
+          lateral,
+        ),
+      ),
+    ),
+    0,
     1000,
   );
   return Math.round((gap * 8 + alignment * 2) / 10);
@@ -284,15 +412,42 @@ function chairRelationScore(objects: readonly SceneObject[]): number {
   const table = firstObject(objects, "coffee_table");
   const chair = firstObject(objects, "chair");
   if (!sofa || !table || !chair) return 1000;
-
-  const direction = Math.sign(table.position[2] - sofa.position[2]) || 1;
-  const opposite = Math.sign(chair.position[2] - table.position[2]) === direction ? 1000 : 0;
-  const lateral = proximityScore(
-    millimetres(Math.abs(chair.position[0] - table.position[0])),
+  const { forward, lateral: lateralAxis } = localAxes(sofa.rotation[1]);
+  const tableDirection = Math.sign(
+    axisProjection(
+      {
+        x: table.position[0] - sofa.position[0],
+        z: table.position[2] - sofa.position[2],
+      },
+      forward,
+    ),
+  ) || 1;
+  const chairDirection = Math.sign(
+    axisProjection(
+      {
+        x: chair.position[0] - table.position[0],
+        z: chair.position[2] - table.position[2],
+      },
+      forward,
+    ),
+  );
+  const opposite = chairDirection === tableDirection ? 1000 : 0;
+  const lateralScore = proximityScore(
+    millimetres(
+      Math.abs(
+        axisProjection(
+          {
+            x: chair.position[0] - table.position[0],
+            z: chair.position[2] - table.position[2],
+          },
+          lateralAxis,
+        ),
+      ),
+    ),
     0,
     1400,
   );
-  return Math.round((opposite * 7 + lateral * 3) / 10);
+  return Math.round((opposite * 7 + lateralScore * 3) / 10);
 }
 
 function accessoriesScore(scene: Scene, objects: readonly SceneObject[]): number {
@@ -449,25 +604,39 @@ function sofaCandidates(scene: Scene, object: SceneObject): readonly ProposedPla
 function idealTablePosition(
   scene: Scene,
   objects: readonly SceneObject[],
-): { x: number; z: number } | null {
+): { x: number; z: number; rotationY: number; forwardSign: number } | null {
   const sofa = firstObject(objects, "sofa");
   const table = firstObject(objects, "coffee_table");
   if (!sofa || !table) return null;
-  const direction = sofa.position[2] <= 0 ? 1 : -1;
-  const xOffset = Math.sign(sofa.position[0]) <= 0 ? 0.7 : -0.7;
-  const range = usableCenterRange(scene, table, table.rotation[1]);
+  const { forward } = localAxes(sofa.rotation[1]);
+  const towardRoomCenter = axisProjection(
+    { x: -sofa.position[0], z: -sofa.position[2] },
+    forward,
+  );
+  const forwardSign = towardRoomCenter >= 0 ? 1 : -1;
+  const rotationY = sofa.rotation[1];
+  const range = usableCenterRange(scene, table, rotationY);
+  const distance =
+    sofa.dimensionsM.depth / 2 + table.dimensionsM.depth / 2 + 0.45;
   return {
-    x: quantize(clamp(sofa.position[0] + xOffset, range.minimumX, range.maximumX), PLACEMENT_LIMITS.gridM),
+    x: quantize(
+      clamp(
+        sofa.position[0] + forward.x * forwardSign * distance,
+        range.minimumX,
+        range.maximumX,
+      ),
+      PLACEMENT_LIMITS.gridM,
+    ),
     z: quantize(
       clamp(
-        sofa.position[2] +
-          direction *
-            (sofa.dimensionsM.depth / 2 + table.dimensionsM.depth / 2 + 0.45),
+        sofa.position[2] + forward.z * forwardSign * distance,
         range.minimumZ,
         range.maximumZ,
       ),
       PLACEMENT_LIMITS.gridM,
     ),
+    rotationY,
+    forwardSign,
   };
 }
 
@@ -481,7 +650,8 @@ function rugCandidates(
   const sofa = firstObject(objects, "sofa");
   if (!ideal && !sofa) return result;
   const target = ideal ?? { x: sofa!.position[0], z: sofa!.position[2] };
-  const range = usableCenterRange(scene, object, 0);
+  const rotationY = sofa?.rotation[1] ?? 0;
+  const range = usableCenterRange(scene, object, rotationY);
   for (const deltaZ of [0, -0.1, 0.1, -0.2, 0.2]) {
     for (const deltaX of [0, -0.1, 0.1, -0.2, 0.2]) {
       result.push(
@@ -489,7 +659,7 @@ function rugCandidates(
           object,
           quantize(clamp(target.x + deltaX, range.minimumX, range.maximumX), PLACEMENT_LIMITS.gridM),
           quantize(clamp(target.z + deltaZ, range.minimumZ, range.maximumZ), PLACEMENT_LIMITS.gridM),
-          0,
+          rotationY,
         ),
       );
     }
@@ -506,21 +676,36 @@ function tableCandidates(
   const sofa = firstObject(objects, "sofa");
   const ideal = idealTablePosition(scene, objects);
   if (!sofa || !ideal) return result;
-  const direction = sofa.position[2] <= 0 ? 1 : -1;
-  const range = usableCenterRange(scene, object, 0);
+  const { forward, lateral } = localAxes(sofa.rotation[1]);
+  const range = usableCenterRange(scene, object, ideal.rotationY);
   for (const gap of [0.45, 0.4, 0.5, 0.35, 0.55]) {
-    const z = quantize(
-      sofa.position[2] +
-        direction *
-          (sofa.dimensionsM.depth / 2 + object.dimensionsM.depth / 2 + gap),
-      PLACEMENT_LIMITS.gridM,
-    );
-    if (z < range.minimumZ || z > range.maximumZ) continue;
+    const distance = sofa.dimensionsM.depth / 2 + object.dimensionsM.depth / 2 + gap;
     for (const deltaX of [0, -0.1, 0.1, -0.2, 0.2, -0.3, 0.3]) {
-      const x = quantize(clamp(ideal.x + deltaX, range.minimumX, range.maximumX), PLACEMENT_LIMITS.gridM);
-      const proposed = withPlacement(object, candidate(object, x, z, 0));
+      const x = quantize(
+        clamp(
+          sofa.position[0] +
+            forward.x * ideal.forwardSign * distance +
+            lateral.x * deltaX,
+          range.minimumX,
+          range.maximumX,
+        ),
+        PLACEMENT_LIMITS.gridM,
+      );
+      const z = quantize(
+        clamp(
+          sofa.position[2] +
+            forward.z * ideal.forwardSign * distance +
+            lateral.z * deltaX,
+          range.minimumZ,
+          range.maximumZ,
+        ),
+        PLACEMENT_LIMITS.gridM,
+      );
+      const proposed = withPlacement(object, candidate(object, x, z, ideal.rotationY));
       const gapMm = millimetres(tableEdgeGap(sofa, proposed));
-      if (gapMm >= 350 && gapMm <= 550) result.push(candidate(object, x, z, 0));
+      if (gapMm >= 350 && gapMm <= 550) {
+        result.push(candidate(object, x, z, ideal.rotationY));
+      }
     }
   }
   return result;
@@ -535,21 +720,41 @@ function chairCandidates(
   const sofa = firstObject(objects, "sofa");
   const table = firstObject(objects, "coffee_table");
   if (!sofa || !table) return result;
-  const direction = Math.sign(table.position[2] - sofa.position[2]) || 1;
+  const { forward, lateral } = localAxes(sofa.rotation[1]);
+  const direction = Math.sign(
+    axisProjection(
+      {
+        x: table.position[0] - sofa.position[0],
+        z: table.position[2] - sofa.position[2],
+      },
+      forward,
+    ),
+  ) || 1;
   const range = usableCenterRange(scene, object, sofa.rotation[1] + Math.PI);
   for (const gap of [0.4, 0.5, 0.6, 0.7]) {
-    const z = quantize(
-      table.position[2] +
-        direction *
-          (table.dimensionsM.depth / 2 + object.dimensionsM.depth / 2 + gap),
-      PLACEMENT_LIMITS.gridM,
-    );
-    if (z < range.minimumZ || z > range.maximumZ) continue;
     for (const deltaX of [0, -0.1, 0.1, -0.2, 0.2]) {
+      const distance =
+        table.dimensionsM.depth / 2 + object.dimensionsM.depth / 2 + gap;
+      const x = quantize(
+        clamp(
+          table.position[0] + forward.x * direction * distance + lateral.x * deltaX,
+          range.minimumX,
+          range.maximumX,
+        ),
+        PLACEMENT_LIMITS.gridM,
+      );
+      const z = quantize(
+        clamp(
+          table.position[2] + forward.z * direction * distance + lateral.z * deltaX,
+          range.minimumZ,
+          range.maximumZ,
+        ),
+        PLACEMENT_LIMITS.gridM,
+      );
       result.push(
         candidate(
           object,
-          quantize(clamp(table.position[0] + deltaX, range.minimumX, range.maximumX), PLACEMENT_LIMITS.gridM),
+          x,
           z,
           sofa.rotation[1] + Math.PI,
         ),
@@ -588,17 +793,22 @@ function accessoryCandidates(scene: Scene, object: SceneObject): readonly Propos
 function uniqueCandidates(
   candidates: readonly ProposedPlacement[],
   limit: number,
-): readonly ProposedPlacement[] {
+): CandidateSet {
   const seen = new Set<string>();
   const unique: ProposedPlacement[] = [];
+  let truncated = false;
   for (const placement of candidates) {
     const key = `${millimetres(placement.position[0])}:${millimetres(placement.position[2])}:${placement.rotationY}`;
     if (seen.has(key)) continue;
     seen.add(key);
-    unique.push(placement);
-    if (unique.length === limit) break;
+    if (unique.length < limit) {
+      unique.push(placement);
+    } else {
+      truncated = true;
+      break;
+    }
   }
-  return unique;
+  return { candidates: unique, truncated };
 }
 
 function candidatesFor(
@@ -606,7 +816,7 @@ function candidatesFor(
   object: SceneObject,
   placements: readonly ProposedPlacement[],
   limit: number,
-): readonly ProposedPlacement[] {
+): CandidateSet {
   const objects = layoutObjects(scene, placements);
   let candidates: readonly ProposedPlacement[];
   switch (object.type) {
@@ -659,6 +869,7 @@ function respectsPartialConstraints(
       }
     }
   }
+  if (accessoryInsideSeatingHull(fixedOrPlaced)) return false;
   return true;
 }
 
@@ -673,20 +884,26 @@ function searchLayouts(
     { placements: [], candidateIndices: [], objectIds: [], score: 0 },
   ];
   let prunedByBeam = false;
+  let truncatedCandidates = false;
   let evaluatedLayouts = 0;
 
   for (let objectIndex = 0; objectIndex < movable.length; objectIndex += 1) {
     const object = movable[objectIndex]!;
     const expanded: SearchState[] = [];
     for (const state of beam) {
-      const candidates = candidatesFor(
+      const candidateSet = candidatesFor(
         scene,
         object,
         state.placements,
         limits.candidatesPerObject,
       );
-      for (let candidateIndex = 0; candidateIndex < candidates.length; candidateIndex += 1) {
-        const placements = [...state.placements, candidates[candidateIndex]!];
+      if (candidateSet.truncated) truncatedCandidates = true;
+      for (
+        let candidateIndex = 0;
+        candidateIndex < candidateSet.candidates.length;
+        candidateIndex += 1
+      ) {
+        const placements = [...state.placements, candidateSet.candidates[candidateIndex]!];
         const objectIds = [...state.objectIds, object.id];
         if (!respectsPartialConstraints(scene, placements, new Set(objectIds))) continue;
         const objects = layoutObjects(scene, placements);
@@ -703,7 +920,11 @@ function searchLayouts(
     if (expanded.length > limits.beamWidth) prunedByBeam = true;
     beam = expanded.slice(0, limits.beamWidth);
     if (beam.length === 0) {
-      return { best: null, evaluatedLayouts, exhausted: prunedByBeam };
+      return {
+        best: null,
+        evaluatedLayouts,
+        exhausted: prunedByBeam || truncatedCandidates,
+      };
     }
   }
 
@@ -726,7 +947,7 @@ function searchLayouts(
   return {
     best,
     evaluatedLayouts,
-    exhausted: best === null && prunedByBeam,
+    exhausted: best === null && (prunedByBeam || truncatedCandidates),
   };
 }
 
@@ -741,10 +962,7 @@ function diagnostics(
   };
 }
 
-export function proposeNaturalPlacement(scene: Scene): NaturalPlacementResult {
-  if (!SceneSchema.safeParse(scene).success || hasUnlockedUnknown(scene)) {
-    return { kind: "failed", reason: "invalid-input" };
-  }
+function proposeSinglePass(scene: Scene): NaturalPlacementResult {
   const current = evaluateCompleteLayout(scene, currentPlacements(scene));
   const search = searchLayouts(scene, PLACEMENT_LIMITS);
   if (search.exhausted) return { kind: "failed", reason: "search-limit-exhausted" };
@@ -764,4 +982,76 @@ export function proposeNaturalPlacement(scene: Scene): NaturalPlacementResult {
     placements: search.best.placements,
     diagnostics: diagnostics(current, search),
   };
+}
+
+function sceneWithPlacements(
+  scene: Scene,
+  placements: readonly ProposedPlacement[],
+): Scene {
+  const next = structuredClone(scene);
+  const byId = new Map(placements.map((placement) => [placement.objectId, placement]));
+  for (const object of next.objects) {
+    const placement = byId.get(object.id);
+    if (!placement) continue;
+    object.position = [...placement.position];
+    object.rotation[1] = placement.rotationY;
+  }
+  return next;
+}
+
+function placementSignature(scene: Scene): string {
+  return JSON.stringify(
+    currentPlacements(scene).map(({ objectId, position, rotationY }) => [
+      objectId,
+      millimetres(position[0]),
+      millimetres(position[2]),
+      rotationY,
+    ]),
+  );
+}
+
+export function proposeNaturalPlacement(scene: Scene): NaturalPlacementResult {
+  if (
+    !SceneSchema.safeParse(scene).success ||
+    hasUnlockedUnknown(scene) ||
+    hasDuplicateObjectIds(scene)
+  ) {
+    return { kind: "failed", reason: "invalid-input" };
+  }
+
+  const original = evaluateCompleteLayout(scene, currentPlacements(scene));
+  let working = scene;
+  let evaluatedLayouts = 0;
+  let changed = false;
+  const visited = new Set([placementSignature(scene)]);
+
+  for (let pass = 0; pass < MAX_FIXED_POINT_PASSES; pass += 1) {
+    const result = proposeSinglePass(working);
+    if (result.kind === "failed") return result;
+    evaluatedLayouts += result.diagnostics.evaluatedLayouts;
+    if (result.kind === "unchanged") {
+      if (!changed) return result;
+      const placements = currentPlacements(working);
+      const final = evaluateCompleteLayout(scene, placements);
+      return {
+        kind: "changed",
+        placements,
+        diagnostics: {
+          currentScore: original.valid ? original.score : null,
+          proposedScore: final.score,
+          evaluatedLayouts,
+        },
+      };
+    }
+
+    changed = true;
+    working = sceneWithPlacements(working, result.placements);
+    const signature = placementSignature(working);
+    if (visited.has(signature)) {
+      return { kind: "failed", reason: "search-limit-exhausted" };
+    }
+    visited.add(signature);
+  }
+
+  return { kind: "failed", reason: "search-limit-exhausted" };
 }
