@@ -448,28 +448,10 @@ function respectsHardConstraints(
     }
   }
 
-  return respectsSeatingRelations(objects) && !accessoryInsideSeatingHull(objects) && circulates;
-}
-
-/**
- * The two relations only a complete layout can settle: the sofa-to-table gap and the rug
- * holding the table. Neither is decidable while either object is still unplaced, so they
- * stay out of the partial checks.
- */
-function respectsSeatingRelations(objects: readonly SceneObject[]): boolean {
-  const sofa = firstObject(objects, "sofa");
-  const table = firstObject(objects, "coffee_table");
-  if (sofa && table) {
-    const gapMm = millimetres(tableEdgeGap(sofa, table));
-    if (gapMm < 350 || gapMm > 550) return false;
-  }
-
-  const rug = firstObject(objects, "rug");
-  return !(
-    rug &&
-    table &&
-    !pointInsideFootprint({ x: table.position[0], z: table.position[2] }, rug)
-  );
+  // The sofa-to-table gap and the rug's containment of the table are not on the closed
+  // 6.3 list: 6.4 terms 3 and 4 score them softly, so a room that only misses them stays
+  // valid, keeps a `currentScore`, and is held to the 6.5 improvement threshold.
+  return !accessoryInsideSeatingHull(objects) && circulates;
 }
 
 function proximityScore(valueMm: number, targetMm: number, rangeMm: number): number {
@@ -755,21 +737,17 @@ function evaluateCompleteLayout(
 /**
  * A completed beam state has already satisfied every partial constraint for every object
  * it settled - room bounds, clearance, footprint pairs and the seating hull - and its
- * score terms were kept equal to the full layout's throughout. All that is left of the
- * hard constraints is what a partial cannot decide, so the state is finished rather than
- * re-derived from scratch.
+ * score terms were kept equal to the full layout's throughout. Circulation is the only
+ * 6.3 condition a partial cannot decide, so the state is finished rather than re-derived
+ * from scratch.
  */
 function evaluateSettledState(scene: Scene, state: SearchState): EvaluatedLayout {
   const objects = layoutOf(state);
-  // The score of an invalid layout is never read, so the flood fill is only worth running
-  // once the cheap relations have accepted the layout.
-  const circulates =
-    respectsSeatingRelations(objects) &&
-    hasCirculationPath(
-      scene,
-      objects.map(objectFootprint),
-      objects.filter(({ type }) => type === "rug"),
-    );
+  const circulates = hasCirculationPath(
+    scene,
+    objects.map(objectFootprint),
+    objects.filter(({ type }) => type === "rug"),
+  );
   return {
     valid: circulates,
     score: weightedScore(state.terms, circulates ? 1000 : 0),

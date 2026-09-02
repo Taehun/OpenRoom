@@ -504,7 +504,116 @@ describe("natural placement", () => {
     ).toBe(false);
   });
 
-  it("reports an inconclusive truncated candidate search as exhausted", () => {
+  // Spec 6.3 is a closed list and holds neither the sofa-to-table gap nor the rug's
+  // containment of the table; 6.4 terms 3 and 4 score exactly those relations. A room
+  // that only scores badly on them is valid, so it must carry a `currentScore` and be
+  // held to the 6.5 improvement threshold like any other layout.
+  it.each([
+    [
+      "a 0.6m sofa-to-table gap",
+      () => {
+        const scene = keepObjects(
+          completedProductScene(),
+          "sofa_01",
+          "table_01",
+          "rug_01",
+        );
+        scene.id = "wide-sofa-table-gap";
+        scene.source = "upload";
+        scene.room = { width: 6, height: 2.5, depth: 6 };
+        scene.openings = [];
+        const sofa = scene.objects.find(({ id }) => id === "sofa_01")!;
+        const table = scene.objects.find(({ id }) => id === "table_01")!;
+        const rug = scene.objects.find(({ id }) => id === "rug_01")!;
+        sofa.position = [0, sofa.position[1], -1.8];
+        table.position = [
+          0,
+          table.position[1],
+          sofa.position[2] +
+            sofa.dimensionsM.depth / 2 +
+            table.dimensionsM.depth / 2 +
+            0.6,
+        ];
+        rug.position = [0, rug.position[1], table.position[2]];
+        return scene;
+      },
+    ],
+    [
+      "a table parked off the rug",
+      () => {
+        const scene = keepObjects(
+          completedProductScene(),
+          "sofa_01",
+          "table_01",
+          "rug_01",
+        );
+        scene.id = "table-off-rug";
+        scene.source = "upload";
+        scene.room = { width: 6, height: 2.5, depth: 6 };
+        scene.openings = [];
+        const sofa = scene.objects.find(({ id }) => id === "sofa_01")!;
+        const table = scene.objects.find(({ id }) => id === "table_01")!;
+        const rug = scene.objects.find(({ id }) => id === "rug_01")!;
+        sofa.position = [0, sofa.position[1], -1.8];
+        table.position = [
+          0,
+          table.position[1],
+          sofa.position[2] +
+            sofa.dimensionsM.depth / 2 +
+            table.dimensionsM.depth / 2 +
+            0.45,
+        ];
+        rug.position = [1.5, rug.position[1], 1.5];
+        return scene;
+      },
+    ],
+  ])("scores %s as a valid current layout", (_case, buildScene) => {
+    const scene = buildScene();
+
+    // The room satisfies every hard constraint the spec closes its 6.3 list with.
+    const nonRugs = scene.objects.filter(({ type }) => type !== "rug");
+    for (const object of scene.objects) {
+      expect(
+        footprintInsideRoom(
+          objectFootprint(object),
+          scene.room,
+          PLACEMENT_LIMITS.roomInsetM,
+        ),
+      ).toBe(true);
+      expect(
+        openingClearanceZones(scene).some((zone) =>
+          footprintsOverlap(objectFootprint(object), zone),
+        ),
+      ).toBe(false);
+    }
+    for (let first = 0; first < nonRugs.length; first += 1) {
+      for (let second = first + 1; second < nonRugs.length; second += 1) {
+        expect(
+          footprintsOverlap(
+            objectFootprint(nonRugs[first]!),
+            objectFootprint(nonRugs[second]!),
+          ),
+        ).toBe(false);
+      }
+    }
+    expect(
+      hasCirculationPath(
+        scene,
+        scene.objects.map(objectFootprint),
+        scene.objects.filter(({ type }) => type === "rug"),
+      ),
+    ).toBe(true);
+
+    const result = proposeNaturalPlacement(scene);
+    expect(result.kind).not.toBe("failed");
+    if (result.kind === "failed") return;
+    expect(result.diagnostics.currentScore).not.toBeNull();
+  });
+
+  // A locked object can make the 6.4 seating relations unattainable. The spec keeps such
+  // a room valid and expects a lower-scored layout, not a failure: no hard constraint of
+  // 6.3 is broken by a locked table sitting in the middle of the floor.
+  it("arranges around a locked table the sofa gap cannot reach", () => {
     const scene = keepObjects(completedProductScene(), "sofa_01", "table_01");
     scene.id = "unreachable-table-gap";
     scene.source = "upload";
@@ -513,13 +622,76 @@ describe("natural placement", () => {
     const table = scene.objects.find(({ id }) => id === "table_01")!;
     table.position = [0, table.position[1], 0];
     table.locked = true;
+    const lockedBefore = structuredClone(table);
 
-    // Every sofa candidate hugs a wall, so no layout can hold the 350-550mm
-    // sofa-to-table gap, and the current layout does not hold it either.
+    // Every sofa candidate hugs a wall, so no layout holds the 350-550mm sofa-to-table
+    // gap the 6.4 table term rewards - which costs score, not validity.
+    const result = proposeNaturalPlacement(scene);
+    expect(result.kind).toBe("changed");
+    if (result.kind !== "changed") return;
+    expect(result.placements.some(({ objectId }) => objectId === "table_01")).toBe(
+      false,
+    );
+
+    const applied = validateAndApplyPlacement(scene, result);
+    expect(applied.ok).toBe(true);
+    if (!applied.ok || !applied.changed) return;
+    const arranged = applied.scene;
+    expect(arranged.objects.find(({ id }) => id === "table_01")).toEqual(lockedBefore);
+    const arrangedSofa = arranged.objects.find(({ id }) => id === "sofa_01")!;
+    expect(
+      footprintsOverlap(objectFootprint(arrangedSofa), objectFootprint(lockedBefore)),
+    ).toBe(false);
+    expect(
+      footprintInsideRoom(
+        objectFootprint(arrangedSofa),
+        arranged.room,
+        PLACEMENT_LIMITS.roomInsetM,
+      ),
+    ).toBe(true);
+    expect(
+      hasCirculationPath(arranged, arranged.objects.map(objectFootprint), []),
+    ).toBe(true);
+  });
+
+  // The end-to-end exhaustion path the locked-table fixture used to cover, now driven by
+  // a hard constraint of 6.3: a locked sofa seals the only opening's access zone, so no
+  // candidate layout circulates, and the lamp's inset ring overruns the candidate budget.
+  it("reports a truncated search with no reachable opening as exhausted", () => {
+    const scene = keepObjects(completedProductScene(), "sofa_01", "lamp_01");
+    scene.id = "sealed-opening";
+    scene.source = "upload";
+    scene.room = { width: 6, height: 2.5, depth: 6 };
+    scene.openings = [
+      {
+        id: "back-door",
+        kind: "door",
+        wall: "back",
+        offset: 0.5,
+        widthM: 0.9,
+        heightM: 2.05,
+      },
+    ];
+    const sofa = scene.objects.find(({ id }) => id === "sofa_01")!;
+    const lamp = scene.objects.find(({ id }) => id === "lamp_01")!;
+    sofa.position = [0, sofa.position[1], -2.44];
+    sofa.locked = true;
+    lamp.position = [2.5, lamp.position[1], 2.5];
+
+    // The locked sofa alone denies the 0.75m path, so no placement of the lamp helps...
+    expect(
+      hasCirculationPath(scene, [objectFootprint(sofa)], []),
+    ).toBe(false);
+    // ...while the lamp's own ring is longer than the per-object candidate budget.
+    expect(insetPerimeterRing(scene, lamp).length).toBeGreaterThan(
+      PLACEMENT_LIMITS.candidatesPerObject,
+    );
+
     expect(proposeNaturalPlacement(scene)).toEqual({
       kind: "failed",
       reason: "search-limit-exhausted",
     });
+    expect(scene.objects.find(({ id }) => id === "sofa_01")!.position[2]).toBe(-2.44);
   });
 
   it("moves objects out of opening clearance zones", () => {
