@@ -42,10 +42,15 @@ test("keeps the stage and composer stable while arranging naturally", async ({
     const undoBounds = await undoPlacement.boundingBox();
     if (!undoBounds) throw new Error("Missing Undo placement bounds");
     expect(undoBounds.height).toBeGreaterThanOrEqual(44);
+    const statusBounds = await status.boundingBox();
+    if (!statusBounds) throw new Error("Missing Placement status bounds");
 
     const afterStage = await stage.boundingBox();
     const afterComposer = await composer.boundingBox();
     if (!afterStage || !afterComposer) throw new Error("Missing arranged bounds");
+    // The status sits in the reserved band above the photo, Undo affordance included.
+    expect(statusBounds.y + statusBounds.height).toBeLessThanOrEqual(afterStage.y);
+    expect(statusBounds.y + statusBounds.height).toBeLessThanOrEqual(afterComposer.y);
     for (const key of ["x", "y", "width", "height"] as const) {
       expect(Math.abs(afterStage[key] - beforeStage[key])).toBeLessThanOrEqual(0.5);
       expect(Math.abs(afterComposer[key] - beforeComposer[key])).toBeLessThanOrEqual(0.5);
