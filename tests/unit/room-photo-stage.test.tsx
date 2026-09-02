@@ -1,4 +1,5 @@
 import {
+  act,
   cleanup,
   fireEvent,
   render,
@@ -9,8 +10,10 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, test, vi } from "vitest";
 
 import { createDemoScene } from "../../src/demo/demo-scene";
+import { DEMO_PRODUCTS } from "../../src/features/demo/demo-data";
 import { RoomPhotoStage } from "../../src/features/photo/room-photo-stage";
 import { SceneStoreProvider } from "../../src/features/scene/scene-context";
+import type { CommandResult } from "../../src/features/scene/scene-schema";
 import { createSceneStore } from "../../src/features/scene/scene-store";
 
 const STAGE_RECT = {
@@ -299,6 +302,79 @@ describe("RoomPhotoStage", () => {
 
     await user.click(table);
     expect(store.getState().scene.selectedObjectId).toBe("table_01");
+  });
+
+  test("keeps a failed registered photo asset selectable and resets failure for a new source", () => {
+    const firstScene = createDemoScene();
+    firstScene.selectedObjectId = null;
+    const firstStore = createSceneStore(firstScene);
+    renderStage(firstStore);
+    const firstTable = screen.getByRole("button", { name: "Coffee table" });
+    const firstImage = firstTable.querySelector("img");
+    if (!firstImage) throw new Error("Missing registered coffee-table image");
+
+    fireEvent.error(firstImage);
+    expect(screen.getByRole("button", { name: "Coffee table" })).toBe(firstTable);
+    expect(firstTable).not.toBeDisabled();
+    expect(
+      within(firstTable).getByRole("img", {
+        name: "Coffee table preview unavailable",
+      }),
+    ).toBeVisible();
+    fireEvent.click(firstTable);
+    expect(firstStore.getState().scene.selectedObjectId).toBe("table_01");
+
+    const replacement = DEMO_PRODUCTS.find(
+      ({ id }) => id === "travertine-plinth-table",
+    );
+    if (!replacement) throw new Error("Missing travertine table product");
+    let replacementResult: CommandResult | undefined;
+    act(() => {
+      replacementResult = firstStore.getState().applyCommand({
+        actor: "human",
+        expectedRevision: firstStore.getState().scene.revision,
+        command: {
+          type: "replace",
+          objectId: "table_01",
+          product: {
+            id: replacement.id,
+            variantId: replacement.variantId,
+            title: replacement.title,
+            category: replacement.category,
+            price: replacement.price,
+            dimensionsCm: replacement.dimensionsCm,
+            styleTags: replacement.styleTags,
+            color: replacement.color,
+            material: replacement.material,
+          },
+        },
+      });
+    });
+    if (!replacementResult) throw new Error("Replacement command did not run");
+    expect(replacementResult.ok).toBe(true);
+
+    const secondTable = screen.getByRole("button", {
+      name: "Travertine Plinth Table",
+    });
+    expect(secondTable).toBe(firstTable);
+    const secondImage = secondTable.querySelector("img");
+    if (!secondImage) throw new Error("New registered image did not reset failure");
+    expect(secondImage).toHaveAttribute(
+      "src",
+      "/demo/photo/products/travertine-plinth-table.webp",
+    );
+
+    fireEvent.error(secondImage);
+    expect(
+      screen.getByRole("button", { name: "Travertine Plinth Table" }),
+    ).toBe(secondTable);
+    expect(
+      within(secondTable).getByRole("img", {
+        name: "Travertine Plinth Table preview unavailable",
+      }),
+    ).toBeVisible();
+    fireEvent.click(secondTable);
+    expect(firstStore.getState().scene.selectedObjectId).toBe("table_01");
   });
 
   test("moves a focused object by one keyboard command with normal and Shift steps", () => {

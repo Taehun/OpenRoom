@@ -6,14 +6,41 @@ import { DEMO_PRODUCTS } from "../../src/features/demo/demo-data";
 import {
   NOOK_ROOM_BACKGROUND,
   PHOTO_ASSETS,
+  ROOM_PHOTO_ASSETS,
   getPhotoAsset,
 } from "../../src/features/photo/photo-assets";
+import { readWebpMetadata } from "../helpers/webp-metadata";
 
 const categories = [
   "sofa", "coffee_table", "rug", "floor_lamp", "chair", "plant",
 ] as const;
 
 describe("photo assets", () => {
+  it("registers the complete room and cutout asset inventory with matching WebP metadata", () => {
+    expect(Object.keys(ROOM_PHOTO_ASSETS)).toHaveLength(2);
+    expect(Object.keys(PHOTO_ASSETS)).toHaveLength(24);
+    expect(
+      Object.keys(ROOM_PHOTO_ASSETS).length + Object.keys(PHOTO_ASSETS).length,
+    )
+      .toBe(26);
+
+    for (const room of Object.values(ROOM_PHOTO_ASSETS)) {
+      const metadata = readWebpMetadata(join(process.cwd(), "public", room.src));
+      expect(metadata.width).toBe(1600);
+      expect(metadata.height).toBe(900);
+      expect(metadata.hasAlpha).toBe(false);
+      expect(room.intrinsicWidth).toBe(1600);
+      expect(room.intrinsicHeight).toBe(900);
+    }
+
+    for (const asset of Object.values(PHOTO_ASSETS)) {
+      const metadata = readWebpMetadata(join(process.cwd(), "public", asset.src));
+      expect(metadata.width).toBe(asset.intrinsicWidth);
+      expect(metadata.height).toBe(asset.intrinsicHeight);
+      expect(metadata.hasAlpha).toBe(true);
+    }
+  });
+
   it("has three stable products for every category", () => {
     for (const category of categories) {
       expect(DEMO_PRODUCTS.filter((item) => item.category === category))

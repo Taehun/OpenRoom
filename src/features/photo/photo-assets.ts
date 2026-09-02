@@ -9,8 +9,23 @@ export interface PhotoAsset {
   anchorY: number;
 }
 
-export const NOOK_ROOM_BACKGROUND = "/demo/photo/nook-room-empty.webp";
-export const NOOK_ROOM_BEFORE = "/demo/photo/nook-room-before.webp";
+export const ROOM_PHOTO_ASSETS = {
+  empty: {
+    id: "nook-room-empty",
+    src: "/demo/photo/nook-room-empty.webp",
+    intrinsicWidth: 1600,
+    intrinsicHeight: 900,
+  },
+  before: {
+    id: "nook-room-before",
+    src: "/demo/photo/nook-room-before.webp",
+    intrinsicWidth: 1600,
+    intrinsicHeight: 900,
+  },
+} as const;
+
+export const NOOK_ROOM_BACKGROUND = ROOM_PHOTO_ASSETS.empty.src;
+export const NOOK_ROOM_BEFORE = ROOM_PHOTO_ASSETS.before.src;
 
 export const PHOTO_ASSETS: Record<string, PhotoAsset> = {
   "seed-dated-sofa": { id: "seed-dated-sofa", src: "/demo/photo/seed/seed-dated-sofa.webp", intrinsicWidth: 1536, intrinsicHeight: 1024, anchorX: 0.4974, anchorY: 0.9102 },

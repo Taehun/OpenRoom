@@ -3,10 +3,11 @@ import type {
   KeyboardEventHandler,
   PointerEventHandler,
 } from "react";
+import { useState } from "react";
 
 import styles from "../demo/demo-workspace.module.css";
 import type { SceneObject } from "../scene/scene-schema";
-import { getPhotoAsset } from "./photo-assets";
+import { getPhotoAsset, type PhotoAsset } from "./photo-assets";
 import {
   layerOrder,
   type ProjectedPlacement,
@@ -35,6 +36,41 @@ function layerZIndex(object: SceneObject, zIndex: number) {
   return object.type === "unknown"
     ? zIndex
     : layerOrder(object.type, zIndex);
+}
+
+function PhotoAssetFallback({ label }: { label: string }) {
+  return (
+    <span
+      className={styles.photoAssetFallback}
+      role="img"
+      aria-label={`${label} preview unavailable`}
+    >
+      {label}
+    </span>
+  );
+}
+
+function PhotoAssetImage({
+  asset,
+  label,
+}: {
+  asset: PhotoAsset;
+  label: string;
+}) {
+  const [failed, setFailed] = useState(false);
+
+  return failed ? (
+    <PhotoAssetFallback label={label} />
+  ) : (
+    // Transformable transparent cutouts need the native image box with no layout wrapper.
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      alt=""
+      draggable={false}
+      onError={() => setFailed(true)}
+      src={asset.src}
+    />
+  );
 }
 
 export function PhotoObjectLayer({
@@ -123,17 +159,9 @@ export function PhotoObjectLayer({
         type="button"
       >
         {asset ? (
-          // Transformable transparent cutouts need the native image box with no layout wrapper.
-          // eslint-disable-next-line @next/next/no-img-element
-          <img alt="" draggable={false} src={asset.src} />
+          <PhotoAssetImage key={asset.src} asset={asset} label={label} />
         ) : (
-          <span
-            className={styles.photoAssetFallback}
-            role="img"
-            aria-label={`${label} preview unavailable`}
-          >
-            {label}
-          </span>
+          <PhotoAssetFallback label={label} />
         )}
         {object.locked ? (
           <span aria-hidden="true" className={styles.photoLockedBadge}>
