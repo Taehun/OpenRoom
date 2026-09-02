@@ -28,13 +28,13 @@ import {
   type SceneObjectType,
 } from "../scene/scene-schema";
 
-interface EvaluatedLayout {
+export interface EvaluatedLayout {
   valid: boolean;
   score: number;
   placements: readonly ProposedPlacement[];
 }
 
-interface LayoutSearch {
+export interface LayoutSearch {
   best: EvaluatedLayout | null;
   evaluatedLayouts: number;
   exhausted: boolean;
@@ -111,7 +111,7 @@ function settledFootprintsOf(state: SearchState): readonly Footprint2D[] {
   return state.settledFootprints;
 }
 
-interface CandidateSet {
+export interface CandidateSet {
   candidates: readonly ProposedPlacement[];
   truncated: boolean;
 }
@@ -1182,28 +1182,46 @@ function accessoryCandidates(
     lanes[point.side]!.push(point.placement);
   }
 
-  const result: ProposedPlacement[] = leadsWithIncumbent
-    ? [context.incumbent!]
-    : [];
+  const lead = leadsWithIncumbent ? context.incumbent : null;
+  if (!context.distinct) {
+    // A ring that repeats a position needs the millimetre dedupe, so the whole perimeter
+    // is flattened and handed to it.
+    const flattened = flattenPerimeterLanes(
+      lanes,
+      lead,
+      twinIsFree ? twin : null,
+      Number.POSITIVE_INFINITY,
+    );
+    return uniqueCandidates(flattened.candidates, limit);
+  }
+  return flattenPerimeterLanes(lanes, lead, twinIsFree ? twin : null, limit);
+}
+
+/**
+ * Flattens the perimeter lanes into a candidate list: the free incumbent leads, then one
+ * position from each lane in turn, every lane spread across its own wall. `twin` is the
+ * lane entry the incumbent already occupies and is dropped on the way out - exactly where
+ * the millimetre dedupe used to drop it - so the emitted positions stay distinct and in
+ * the order the uncapped flattening would produce.
+ *
+ * Exported so the cap can be verified against a lane shape that a Scene cannot make
+ * observable: when a single wall survives, the incumbent that leads the list is also the
+ * one the search keeps, so an off-by-one in the cap changes no proposal.
+ */
+export function flattenPerimeterLanes(
+  lanes: readonly (readonly ProposedPlacement[])[],
+  lead: ProposedPlacement | null,
+  twin: ProposedPlacement | null,
+  limit: number,
+): CandidateSet {
+  const result: ProposedPlacement[] = lead === null ? [] : [lead];
   let available = result.length;
   for (const lane of lanes) available += lane.length;
-  if (twinIsFree) available -= 1;
+  if (twin !== null) available -= 1;
 
-  if (!context.distinct) {
-    const spread = lanes.map((lane) => spreadOrder(lane, lane.length));
-    const deepest = spread.reduce((longest, lane) => Math.max(longest, lane.length), 0);
-    for (let depth = 0; depth < deepest; depth += 1) {
-      for (const lane of spread) {
-        const placement = lane[depth];
-        if (placement !== undefined && placement !== twin) result.push(placement);
-      }
-    }
-    return uniqueCandidates(result, limit);
-  }
-
-  // Every emitted position is distinct here, so the list can stop at the cap instead of
-  // building the whole perimeter and throwing most of it away.
-  const wanted = limit - result.length;
+  // The twin costs a lane entry without producing a candidate, so a lane that has to
+  // carry the whole budget alone needs one entry more than the cap by itself asks for.
+  const wanted = limit - result.length + (twin === null ? 0 : 1);
   const spread = lanes.map((lane) => spreadOrder(lane, wanted));
   const deepest = spread.reduce((longest, lane) => Math.max(longest, lane.length), 0);
   for (let depth = 0; depth < deepest && result.length < limit; depth += 1) {
@@ -1494,27 +1512,9 @@ function partialBlocksCirculation(scene: Scene, state: SearchState): boolean {
   );
 }
 
-/**
- * The current layout is itself a complete candidate. When the bounded search keeps no
- * valid layout of its own, a room that already satisfies the hard constraints still has
- * one answer to report, so exhaustion is never raised for a Scene that is already safe.
- */
-function settledSearch(
-  best: EvaluatedLayout | null,
-  evaluatedLayouts: number,
-  exhausted: boolean,
-  incumbent: EvaluatedLayout,
-): LayoutSearch {
-  if (best !== null || !incumbent.valid) {
-    return { best, evaluatedLayouts, exhausted };
-  }
-  return { best: incumbent, evaluatedLayouts: evaluatedLayouts + 1, exhausted: false };
-}
-
 function searchLayouts(
   scene: Scene,
   limits: typeof PLACEMENT_LIMITS,
-  incumbent: EvaluatedLayout,
 ): LayoutSearch {
   const movable = scene.objects
     .filter(isMovable)
@@ -1660,12 +1660,11 @@ function searchLayouts(
     if (ranked < expanded.length) prunedByBeam = true;
     beam = kept;
     if (beam.length === 0) {
-      return settledSearch(
-        null,
+      return {
+        best: null,
         evaluatedLayouts,
-        prunedByBeam || truncatedCandidates,
-        incumbent,
-      );
+        exhausted: prunedByBeam || truncatedCandidates,
+      };
     }
   }
 
@@ -1683,12 +1682,11 @@ function searchLayouts(
     if (evaluated.valid) best = evaluated;
   }
 
-  return settledSearch(
+  return {
     best,
     evaluatedLayouts,
-    best === null && (prunedByBeam || truncatedCandidates),
-    incumbent,
-  );
+    exhausted: best === null && (prunedByBeam || truncatedCandidates),
+  };
 }
 
 function diagnostics(
@@ -1702,26 +1700,59 @@ function diagnostics(
   };
 }
 
-function proposeSinglePass(scene: Scene): NaturalPlacementResult {
-  const current = evaluateCompleteLayout(scene, currentPlacements(scene));
-  const search = searchLayouts(scene, PLACEMENT_LIMITS, current);
-  if (search.exhausted) return { kind: "failed", reason: "search-limit-exhausted" };
-  if (!search.best) return { kind: "failed", reason: "no-valid-layout" };
+/**
+ * Turns a finished search into the proposal it stands for.
+ *
+ * The current layout is itself a complete candidate: when the bounded search keeps no
+ * valid layout of its own, a room that already satisfies the hard constraints still has
+ * one answer to report, so exhaustion is never raised for a Scene that is already safe.
+ * The substituted layout is the incumbent, so it scores exactly the current layout and
+ * resolves to `already-safe`, and it counts as one more complete layout settled. A
+ * current layout that breaks a hard constraint is never substituted, so an unsafe room
+ * still reports the failure it earned.
+ *
+ * Exported so the substitution can be verified on its own inputs: `searchLayouts` cannot
+ * be driven to keep nothing while the current layout stays safe without narrowing the
+ * beam, which the profile fixes.
+ */
+export function resolvePlacementSearch(
+  incumbent: EvaluatedLayout,
+  search: LayoutSearch,
+): NaturalPlacementResult {
+  const settled: LayoutSearch =
+    search.best === null && incumbent.valid
+      ? {
+          best: incumbent,
+          evaluatedLayouts: search.evaluatedLayouts + 1,
+          exhausted: false,
+        }
+      : search;
+
+  if (settled.exhausted) return { kind: "failed", reason: "search-limit-exhausted" };
+  if (!settled.best) return { kind: "failed", reason: "no-valid-layout" };
   if (
-    current.valid &&
-    search.best.score < current.score + PLACEMENT_LIMITS.improvementThreshold
+    incumbent.valid &&
+    settled.best.score < incumbent.score + PLACEMENT_LIMITS.improvementThreshold
   ) {
     return {
       kind: "unchanged",
-      reason: search.best.score === current.score ? "already-safe" : "no-safe-improvement",
-      diagnostics: diagnostics(current, search),
+      reason:
+        settled.best.score === incumbent.score ? "already-safe" : "no-safe-improvement",
+      diagnostics: diagnostics(incumbent, settled),
     };
   }
   return {
     kind: "changed",
-    placements: search.best.placements,
-    diagnostics: diagnostics(current, search),
+    placements: settled.best.placements,
+    diagnostics: diagnostics(incumbent, settled),
   };
+}
+
+function proposeSinglePass(scene: Scene): NaturalPlacementResult {
+  return resolvePlacementSearch(
+    evaluateCompleteLayout(scene, currentPlacements(scene)),
+    searchLayouts(scene, PLACEMENT_LIMITS),
+  );
 }
 
 /**
