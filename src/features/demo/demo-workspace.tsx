@@ -13,6 +13,7 @@ import {
   useSceneStore,
   useSceneStoreApi,
 } from "../scene/scene-context";
+import type { SceneStore } from "../scene/scene-store";
 import { CartApprovalSheet } from "./cart-approval-sheet";
 import { ContextPanel } from "./context-panel";
 import { createInitialDemoState, demoReducer } from "./demo-state";
@@ -24,9 +25,9 @@ import styles from "./demo-workspace.module.css";
 import type { ToolContext } from "../../webmcp/tool-context";
 import { useWebMcpTools } from "../../webmcp/use-webmcp-tools";
 
-export function DemoWorkspace() {
+export function DemoWorkspace({ store }: { store?: SceneStore } = {}) {
   return (
-    <SceneStoreProvider>
+    <SceneStoreProvider store={store}>
       <DemoWorkspaceContent />
     </SceneStoreProvider>
   );

@@ -58,6 +58,9 @@ interface RoomCanvasProps {
 export function RoomCanvas({ dispatch, scene, state }: RoomCanvasProps) {
   const toolMode = useSceneStore((store) => store.toolMode);
   const setToolMode = useSceneStore((store) => store.setToolMode);
+  const arrangeNaturally = useSceneStore((store) => store.arrangeNaturally);
+  const isTransforming = useSceneStore((store) => store.isTransforming);
+  const placementNotice = useSceneStore((store) => store.placementNotice);
   const nativeWebMcpAvailable = useSyncExternalStore(
     subscribeToNativeWebMcp,
     getNativeWebMcpSnapshot,
@@ -185,7 +188,36 @@ export function RoomCanvas({ dispatch, scene, state }: RoomCanvasProps) {
           <div className={styles.canvasTopbar}>
             <span className={styles.demoBadge}>Photo placement</span>
             <span>Live Scene transforms</span>
+            <button
+              className={styles.arrangeButton}
+              disabled={
+                isTransforming || scene.objects.every(({ locked }) => locked)
+              }
+              onClick={() => arrangeNaturally()}
+              type="button"
+            >
+              Arrange naturally
+            </button>
           </div>
+
+          {placementNotice ? (
+            <div
+              aria-atomic="true"
+              aria-label="Placement status"
+              className={styles.placementStatus}
+              role="status"
+            >
+              <span>{placementNotice.message}</span>
+              {placementNotice.kind === "manual-arranged" ? (
+                <button
+                  onClick={() => dispatch({ type: "undo" })}
+                  type="button"
+                >
+                  Undo placement
+                </button>
+              ) : null}
+            </div>
+          ) : null}
 
           {selectedObject ? (
             <div className={styles.sceneSelectionLabel} aria-hidden="true">

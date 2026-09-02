@@ -148,6 +148,8 @@
 .toolButtonActive:focus-visible,
 .objectButton:focus-visible,
 .objectButtonSelected:focus-visible,
+.arrangeButton:focus-visible,
+.placementStatus button:focus-visible,
 .undoToast button:focus-visible,
 .brand:focus-visible {
   outline: 3px solid var(--moss);
@@ -491,10 +493,14 @@
   position: absolute;
   z-index: 2;
   top: 16px;
+  right: 18px;
   left: 18px;
   display: flex;
   align-items: center;
   gap: 9px;
+  min-height: 44px;
+  padding-right: 340px;
+  box-sizing: border-box;
   color: rgba(36, 39, 34, 0.72);
   font-size: 0.68rem;
 }
@@ -509,10 +515,68 @@
   letter-spacing: 0.02em;
 }
 
+.arrangeButton {
+  min-height: 44px;
+  padding: 0 12px;
+  border: 1px solid rgba(36, 39, 34, 0.22);
+  border-radius: 6px;
+  background: var(--paper);
+  color: var(--moss);
+  cursor: pointer;
+  font: inherit;
+  font-weight: 750;
+  white-space: nowrap;
+}
+
+.arrangeButton:hover:not(:disabled) {
+  border-color: var(--moss);
+  background: #e5e9df;
+}
+
+.arrangeButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.52;
+}
+
+.placementStatus {
+  position: absolute;
+  z-index: 4;
+  top: 16px;
+  right: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: min(320px, calc(100% - 36px));
+  min-height: 44px;
+  padding: 6px 7px 6px 12px;
+  border: 1px solid rgba(36, 39, 34, 0.16);
+  border-radius: 7px;
+  box-sizing: border-box;
+  background: var(--paper);
+  color: var(--ink);
+  font-size: 0.72rem;
+  font-weight: 650;
+  line-height: 1.25;
+}
+
+.placementStatus button {
+  min-height: 32px;
+  padding-inline: 10px;
+  border: 0;
+  border-left: 1px solid var(--warm-divider);
+  background: transparent;
+  color: var(--moss);
+  cursor: pointer;
+  font: inherit;
+  font-weight: 750;
+  white-space: nowrap;
+}
+
 .sceneSelectionLabel {
   position: absolute;
   z-index: 3;
-  top: 54px;
+  top: 88px;
   left: 18px;
   padding: 7px 10px;
   border-radius: 5px;
