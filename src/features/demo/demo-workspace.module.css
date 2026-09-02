@@ -561,7 +561,7 @@
 }
 
 .placementStatus button {
-  min-height: 32px;
+  min-height: 44px;
   padding-inline: 10px;
   border: 0;
   border-left: 1px solid var(--warm-divider);

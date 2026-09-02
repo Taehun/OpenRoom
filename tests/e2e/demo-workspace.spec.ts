@@ -36,6 +36,12 @@ test("keeps the stage and composer stable while arranging naturally", async ({
     const status = page.getByRole("status", { name: "Placement status" });
     await expect(status).toContainText("Placement improved");
     await expect(status).toBeVisible();
+    const undoPlacement = page.getByRole("button", {
+      name: "Undo placement",
+    });
+    const undoBounds = await undoPlacement.boundingBox();
+    if (!undoBounds) throw new Error("Missing Undo placement bounds");
+    expect(undoBounds.height).toBeGreaterThanOrEqual(44);
 
     const afterStage = await stage.boundingBox();
     const afterComposer = await composer.boundingBox();
