@@ -79,6 +79,21 @@ function cloneScene(scene: Scene) {
   return SceneSchema.parse(structuredClone(scene));
 }
 
+function measuredPlacementProposal(
+  proposer: typeof proposeNaturalPlacement,
+  scene: Scene,
+) {
+  const start = performance.now();
+  try {
+    return proposer(scene);
+  } finally {
+    performance.measure("nook-natural-placement", {
+      start,
+      duration: performance.now() - start,
+    });
+  }
+}
+
 function completesUnlockedRedesign(
   before: Scene,
   after: Scene,
@@ -116,7 +131,9 @@ export function createSceneStore(
   options: SceneStoreOptions = {},
 ): SceneStore {
   const canonicalSeed = cloneScene(seed);
-  const proposePlacement = options.proposePlacement ?? proposeNaturalPlacement;
+  const proposer = options.proposePlacement ?? proposeNaturalPlacement;
+  const proposePlacement: typeof proposeNaturalPlacement = (scene) =>
+    measuredPlacementProposal(proposer, scene);
   let nextNoticeId = 1;
 
   function notice(
