@@ -472,6 +472,10 @@ The implementation begins RED and adds focused coverage for:
 
 Tests assert public behavior and computed geometry. They do not grep CSS source
 or duplicate the implementation's scoring function as the expected value.
+Locked behavior is exercised through a custom validated Scene store rendered
+with the real components. The shipped demo exposes no Human UI or Core 6 lock
+setter, so browser coverage must not add a test-only state backdoor or seventh
+tool solely to manufacture a lock.
 
 ### 10.2 Browser journeys
 
@@ -479,9 +483,8 @@ Playwright covers these real-browser journeys:
 
 1. Replace all six unlocked placeholders through the existing Core 6 and prove
    only the final successful replacement produces the natural arrangement.
-2. Lock one object, complete the redesign, and prove that object's exact
-   position and rotation are unchanged while the remaining arrangement is
-   valid.
+2. Inspect the completed redesign and prove rug geometry, contact shadows,
+   floor-anchor layer order, and the sighted automatic status in the real DOM.
 3. Move unlocked objects to a valid but poor composition, choose
    **Arrange naturally**, and prove one revision plus one Undo restores every
    prior position.
