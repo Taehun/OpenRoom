@@ -733,4 +733,57 @@ describe("createSceneStore", () => {
     expect(installedDuringCallback).toEqual(store.getState().scene);
     expect(store.getState().scene.objects[0]!.position[0]).not.toBe(999);
   });
+
+  test("keeps a manual arrangement successful when user timing throws", () => {
+    const measure = vi.spyOn(performance, "measure").mockImplementation(() => {
+      throw new Error("no user timing");
+    });
+    const store = createSceneStore(completedProductScene());
+    const before = structuredClone(store.getState().scene);
+    const stateVersion = store.getState().stateVersion;
+
+    try {
+      const result = store.getState().arrangeNaturally();
+
+      expect(result).toMatchObject({ ok: true, changed: true });
+      expect(store.getState().scene.revision).toBe(before.revision + 1);
+      expect(store.getState().stateVersion).toBe(stateVersion + 1);
+      expect(store.getState().placementNotice).toMatchObject({
+        kind: "manual-arranged",
+        message: "Placement improved",
+      });
+      expect(measure).toHaveBeenCalled();
+    } finally {
+      measure.mockRestore();
+    }
+  });
+
+  test("keeps the automatic redesign arranged when user timing throws", () => {
+    const store = createSceneStore();
+    const lastObjectId = completeFirstFive(store);
+    const beforeFinal = structuredClone(store.getState().scene);
+    const measure = vi.spyOn(performance, "measure").mockImplementation(() => {
+      throw new Error("no user timing");
+    });
+
+    try {
+      const result = replaceDemoObject(store, lastObjectId);
+
+      expect(result).toMatchObject({
+        ok: true,
+        placementOutcome: { kind: "auto-arranged" },
+        scene: { revision: beforeFinal.revision + 1 },
+      });
+      expect(
+        changedObjectIds(beforeFinal, store.getState().scene).length,
+      ).toBeGreaterThan(1);
+      expect(store.getState().placementNotice).toMatchObject({
+        kind: "auto-arranged",
+        message: "Redesign arranged",
+      });
+      expect(measure).toHaveBeenCalled();
+    } finally {
+      measure.mockRestore();
+    }
+  });
 });

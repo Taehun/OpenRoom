@@ -87,10 +87,15 @@ function measuredPlacementProposal(
   try {
     return proposer(scene);
   } finally {
-    performance.measure("nook-natural-placement", {
-      start,
-      duration: performance.now() - start,
-    });
+    try {
+      performance.measure("nook-natural-placement", {
+        start,
+        duration: performance.now() - start,
+      });
+    } catch {
+      // Best-effort timing: an environment without User Timing L3 must not turn a
+      // successful placement into a failed command.
+    }
   }
 }
 
