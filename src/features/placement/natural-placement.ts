@@ -4,14 +4,18 @@ import {
   occupiesEntryZone,
 } from "./circulation";
 import {
+  footprintBounds,
   footprintCorners,
+  footprintExtent,
   footprintInsideRoom,
+  footprintProjection,
   footprintsOverlap,
   objectFootprint,
   openingClearanceZones,
 } from "./footprint-geometry";
 import { PLACEMENT_LIMITS, PLACEMENT_SCORE_WEIGHTS } from "./placement-profile";
 import type {
+  Footprint2D,
   NaturalPlacementResult,
   PlacementDiagnostics,
   PointXZ,
@@ -36,11 +40,75 @@ interface LayoutSearch {
   exhausted: boolean;
 }
 
+/**
+ * A partial layout plus everything needed to extend it without re-deriving the whole
+ * room: the layout objects, the settled obstacles, the seating hull those obstacles
+ * form, the score terms, and the running totals the averaged terms are built from.
+ */
+/**
+ * A partial layout plus the running totals its averaged score terms are built from. The
+ * derived views - the layout objects, the settled obstacles and their footprints, and the
+ * seating hull - are memoized on first use: most partials are ranked out of the beam
+ * before anything asks for them.
+ */
 interface SearchState {
-  placements: readonly ProposedPlacement[];
-  candidateIndices: readonly number[];
+  candidateIndex: number;
   objectIds: readonly string[];
   score: number;
+  terms: TermScores;
+  movementTotal: number;
+  accessoryTotal: number;
+  parent: SearchState | null;
+  placedIndex: number;
+  placedTemplate: SceneObject | null;
+  placement: ProposedPlacement | null;
+  placedFootprint: Footprint2D | null;
+  placedObject: SceneObject | null;
+  placements: readonly ProposedPlacement[] | null;
+  objects: readonly SceneObject[] | null;
+  settled: readonly SceneObject[] | null;
+  settledFootprints: readonly Footprint2D[] | null;
+  hull: readonly PointXZ[] | null;
+}
+
+function placedObjectOf(state: SearchState): SceneObject {
+  if (state.placedObject === null) {
+    state.placedObject = withPlacement(state.placedTemplate!, state.placement!);
+  }
+  return state.placedObject;
+}
+
+function placementsOf(state: SearchState): readonly ProposedPlacement[] {
+  if (state.placements === null) {
+    state.placements = [...placementsOf(state.parent!), state.placement!];
+  }
+  return state.placements;
+}
+
+function layoutOf(state: SearchState): readonly SceneObject[] {
+  if (state.objects === null) {
+    const objects = layoutOf(state.parent!).slice();
+    objects[state.placedIndex] = placedObjectOf(state);
+    state.objects = objects;
+  }
+  return state.objects;
+}
+
+function settledOf(state: SearchState): readonly SceneObject[] {
+  if (state.settled === null) {
+    state.settled = [...settledOf(state.parent!), placedObjectOf(state)];
+  }
+  return state.settled;
+}
+
+function settledFootprintsOf(state: SearchState): readonly Footprint2D[] {
+  if (state.settledFootprints === null) {
+    state.settledFootprints = [
+      ...settledFootprintsOf(state.parent!),
+      state.placedFootprint!,
+    ];
+  }
+  return state.settledFootprints;
 }
 
 interface CandidateSet {
@@ -67,8 +135,13 @@ const PERIMETER_SIDES = [
 type PerimeterSide = (typeof PERIMETER_SIDES)[number];
 
 interface PerimeterPoint extends PointXZ {
-  side: PerimeterSide;
+  side: number;
 }
+
+const PERIMETER_SIDE_INDEX: Readonly<Record<PerimeterSide, number>> =
+  Object.fromEntries(
+    PERIMETER_SIDES.map((side, index) => [side, index]),
+  ) as Record<PerimeterSide, number>;
 
 const CATEGORY_ORDER: readonly SceneObjectType[] = [
   "sofa",
@@ -88,19 +161,17 @@ function millimetres(metres: number): number {
 
 function quantize(value: number, gridM: number): number {
   const quantized = Math.round(value / gridM) * gridM;
-  return Object.is(quantized, -0) ? 0 : Number(quantized.toFixed(6));
+  if (Object.is(quantized, -0)) return 0;
+  // Scaling to whole micrometres lands on the same double as the six-decimal round trip
+  // for every grid multiple this can produce, without formatting and reparsing one.
+  const micrometres = Math.round(quantized * 1e6);
+  return Number.isSafeInteger(micrometres)
+    ? micrometres / 1e6
+    : Number(quantized.toFixed(6));
 }
 
 function clamp(value: number, minimum: number, maximum: number): number {
   return Math.min(Math.max(value, minimum), maximum);
-}
-
-function compareNumbers(first: readonly number[], second: readonly number[]): number {
-  for (let index = 0; index < Math.min(first.length, second.length); index += 1) {
-    const difference = first[index]! - second[index]!;
-    if (difference !== 0) return difference;
-  }
-  return first.length - second.length;
 }
 
 function compareText(first: string, second: string): number {
@@ -109,9 +180,20 @@ function compareText(first: string, second: string): number {
   return 0;
 }
 
+/**
+ * Lexicographic order of two partials' candidate paths, read down the shared parent
+ * chain. Both are always at the same depth, so this is the array comparison without the
+ * array.
+ */
+function compareCandidatePaths(first: SearchState, second: SearchState): number {
+  if (first === second) return 0;
+  const parentOrder = compareCandidatePaths(first.parent!, second.parent!);
+  return parentOrder !== 0 ? parentOrder : first.candidateIndex - second.candidateIndex;
+}
+
 function compareSearchStates(first: SearchState, second: SearchState): number {
   if (first.score !== second.score) return second.score - first.score;
-  const candidateOrder = compareNumbers(first.candidateIndices, second.candidateIndices);
+  const candidateOrder = compareCandidatePaths(first, second);
   if (candidateOrder !== 0) return candidateOrder;
   return compareText(first.objectIds.join("\u0000"), second.objectIds.join("\u0000"));
 }
@@ -121,6 +203,20 @@ function placementFor(object: SceneObject): ProposedPlacement {
     objectId: object.id,
     position: [...object.position],
     rotationY: object.rotation[1],
+  };
+}
+
+/** The footprint `objectFootprint(withPlacement(object, placement))` would produce. */
+function placementFootprint(
+  object: SceneObject,
+  placement: ProposedPlacement,
+): Footprint2D {
+  return {
+    objectId: object.id,
+    center: { x: placement.position[0], z: placement.position[2] },
+    halfWidth: object.dimensionsM.width / 2,
+    halfDepth: object.dimensionsM.depth / 2,
+    rotationY: placement.rotationY,
   };
 }
 
@@ -147,9 +243,12 @@ function firstObject(
   objects: readonly SceneObject[],
   type: SceneObjectType,
 ): SceneObject | undefined {
-  return objects
-    .filter((object) => object.type === type)
-    .sort((first, second) => compareText(first.id, second.id))[0];
+  let first: SceneObject | undefined;
+  for (const object of objects) {
+    if (object.type !== type) continue;
+    if (first === undefined || compareText(object.id, first.id) < 0) first = object;
+  }
+  return first;
 }
 
 function hasUnlockedUnknown(scene: Scene): boolean {
@@ -173,9 +272,15 @@ function compareObjects(first: SceneObject, second: SceneObject): number {
   return categoryDifference || compareText(first.id, second.id);
 }
 
-function objectIsInsideOpeningClearance(scene: Scene, object: SceneObject): boolean {
-  const footprint = objectFootprint(object);
+function footprintIsInsideOpeningClearance(
+  scene: Scene,
+  footprint: Footprint2D,
+): boolean {
   return openingClearanceZones(scene).some((zone) => footprintsOverlap(footprint, zone));
+}
+
+function objectIsInsideOpeningClearance(scene: Scene, object: SceneObject): boolean {
+  return footprintIsInsideOpeningClearance(scene, objectFootprint(object));
 }
 
 function axisProjection(point: PointXZ, axis: PointXZ): number {
@@ -194,16 +299,12 @@ function edgeGapAlongAxis(
   second: SceneObject,
   axis: PointXZ,
 ): number {
-  const firstProjections = footprintCorners(objectFootprint(first)).map((point) =>
-    axisProjection(point, axis),
-  );
-  const secondProjections = footprintCorners(objectFootprint(second)).map((point) =>
-    axisProjection(point, axis),
-  );
-  const firstMinimum = Math.min(...firstProjections);
-  const firstMaximum = Math.max(...firstProjections);
-  const secondMinimum = Math.min(...secondProjections);
-  const secondMaximum = Math.max(...secondProjections);
+  const firstSpan = footprintProjection(objectFootprint(first), axis.x, axis.z);
+  const secondSpan = footprintProjection(objectFootprint(second), axis.x, axis.z);
+  const firstMinimum = firstSpan.minimum;
+  const firstMaximum = firstSpan.maximum;
+  const secondMinimum = secondSpan.minimum;
+  const secondMaximum = secondSpan.maximum;
 
   if (secondMinimum >= firstMaximum) return secondMinimum - firstMaximum;
   if (firstMinimum >= secondMaximum) return firstMinimum - secondMaximum;
@@ -211,11 +312,12 @@ function edgeGapAlongAxis(
 }
 
 function footprintRadiusAlongAxis(object: SceneObject, axis: PointXZ): number {
-  const centerProjection = axisProjection(objectFootprint(object).center, axis);
+  const footprint = objectFootprint(object);
+  const centerProjection = axisProjection(footprint.center, axis);
+  const span = footprintProjection(footprint, axis.x, axis.z);
   return Math.max(
-    ...footprintCorners(objectFootprint(object)).map((point) =>
-      Math.abs(axisProjection(point, axis) - centerProjection),
-    ),
+    Math.abs(span.minimum - centerProjection),
+    Math.abs(span.maximum - centerProjection),
   );
 }
 
@@ -317,7 +419,11 @@ function accessoryInsideSeatingHull(objects: readonly SceneObject[]): boolean {
     );
 }
 
-function respectsHardConstraints(scene: Scene, objects: readonly SceneObject[]): boolean {
+function respectsHardConstraints(
+  scene: Scene,
+  objects: readonly SceneObject[],
+  circulates: boolean,
+): boolean {
   for (const object of objects) {
     if (
       !object.locked &&
@@ -342,6 +448,15 @@ function respectsHardConstraints(scene: Scene, objects: readonly SceneObject[]):
     }
   }
 
+  return respectsSeatingRelations(objects) && !accessoryInsideSeatingHull(objects) && circulates;
+}
+
+/**
+ * The two relations only a complete layout can settle: the sofa-to-table gap and the rug
+ * holding the table. Neither is decidable while either object is still unplaced, so they
+ * stay out of the partial checks.
+ */
+function respectsSeatingRelations(objects: readonly SceneObject[]): boolean {
   const sofa = firstObject(objects, "sofa");
   const table = firstObject(objects, "coffee_table");
   if (sofa && table) {
@@ -350,18 +465,11 @@ function respectsHardConstraints(scene: Scene, objects: readonly SceneObject[]):
   }
 
   const rug = firstObject(objects, "rug");
-  if (
+  return !(
     rug &&
     table &&
     !pointInsideFootprint({ x: table.position[0], z: table.position[2] }, rug)
-  ) {
-    return false;
-  }
-
-  if (accessoryInsideSeatingHull(objects)) return false;
-
-  const rugs = objects.filter(({ type }) => type === "rug");
-  return hasCirculationPath(scene, objects.map(objectFootprint), rugs);
+  );
 }
 
 function proximityScore(valueMm: number, targetMm: number, rangeMm: number): number {
@@ -378,11 +486,9 @@ function sofaWallAndSideScore(scene: Scene, objects: readonly SceneObject[]): nu
   const original = firstObject(scene.objects, "sofa");
   if (!sofa || !original) return 1000;
 
-  const corners = footprintCorners(objectFootprint(sofa));
-  const minimumX = Math.min(...corners.map(({ x }) => x));
-  const maximumX = Math.max(...corners.map(({ x }) => x));
-  const minimumZ = Math.min(...corners.map(({ z }) => z));
-  const maximumZ = Math.max(...corners.map(({ z }) => z));
+  const { minimumX, maximumX, minimumZ, maximumZ } = footprintExtent(
+    objectFootprint(sofa),
+  );
   const wallGap = Math.min(
     Math.abs(minimumX + scene.room.width / 2),
     Math.abs(scene.room.width / 2 - maximumX),
@@ -485,26 +591,52 @@ function chairRelationScore(objects: readonly SceneObject[]): number {
   return Math.round((opposite * 7 + lateralScore * 3) / 10);
 }
 
-function accessoriesScore(scene: Scene, objects: readonly SceneObject[]): number {
-  const accessories = objects.filter(
-    ({ type }) => type === "floor_lamp" || type === "plant",
-  );
-  if (accessories.length === 0) return 1000;
+function isAccessory({ type }: SceneObject): boolean {
+  return type === "floor_lamp" || type === "plant";
+}
 
-  const total = accessories.reduce((sum, object) => {
-    const corners = footprintCorners(objectFootprint(object));
-    const minimumX = Math.min(...corners.map(({ x }) => x));
-    const maximumX = Math.max(...corners.map(({ x }) => x));
-    const minimumZ = Math.min(...corners.map(({ z }) => z));
-    const maximumZ = Math.max(...corners.map(({ z }) => z));
-    const perimeterGap = Math.min(
-      Math.abs(minimumX + scene.room.width / 2),
-      Math.abs(scene.room.width / 2 - maximumX),
-      Math.abs(minimumZ + scene.room.depth / 2),
-      Math.abs(scene.room.depth / 2 - maximumZ),
-    );
-    return sum + proximityScore(millimetres(perimeterGap), millimetres(PLACEMENT_LIMITS.roomInsetM), 800);
-  }, 0);
+function isMovable({ locked, type }: SceneObject): boolean {
+  return !locked && type !== "unknown";
+}
+
+/** One accessory's share of the perimeter-hugging term. */
+function accessoryContribution(scene: Scene, footprint: Footprint2D): number {
+  const { minimumX, maximumX, minimumZ, maximumZ } = footprintExtent(footprint);
+  const perimeterGap = Math.min(
+    Math.abs(minimumX + scene.room.width / 2),
+    Math.abs(scene.room.width / 2 - maximumX),
+    Math.abs(minimumZ + scene.room.depth / 2),
+    Math.abs(scene.room.depth / 2 - maximumZ),
+  );
+  return proximityScore(
+    millimetres(perimeterGap),
+    millimetres(PLACEMENT_LIMITS.roomInsetM),
+    800,
+  );
+}
+
+/** One movable object's share of the stay-put term. */
+function movementContribution(
+  original: SceneObject,
+  placement: ProposedPlacement,
+): number {
+  const distanceMm = Math.hypot(
+    millimetres(placement.position[0] - original.position[0]),
+    millimetres(placement.position[2] - original.position[2]),
+  );
+  const rotationDelta = Math.abs(placement.rotationY - original.rotation[1]);
+  const normalizedRotation = Math.min(rotationDelta, Math.PI * 2 - rotationDelta);
+  const movementMm = Math.round(distanceMm + normalizedRotation * 250);
+  return proximityScore(movementMm, 0, 1000);
+}
+
+function accessoriesScore(scene: Scene, objects: readonly SceneObject[]): number {
+  const accessories = objects.filter(isAccessory);
+  if (accessories.length === 0) return 1000;
+  let total = 0;
+  for (const object of accessories) {
+    total += accessoryContribution(scene, objectFootprint(object));
+  }
   return Math.round(total / accessories.length);
 }
 
@@ -512,61 +644,136 @@ function movementScore(
   scene: Scene,
   objects: readonly SceneObject[],
 ): number {
-  const movable = objects.filter(({ locked, type }) => !locked && type !== "unknown");
+  const movable = objects.filter(isMovable);
   if (movable.length === 0) return 1000;
-
-  const total = movable.reduce((sum, object) => {
-    const original = scene.objects.find(({ id }) => id === object.id)!;
-    const distanceMm = Math.hypot(
-      millimetres(object.position[0] - original.position[0]),
-      millimetres(object.position[2] - original.position[2]),
+  let total = 0;
+  for (const object of movable) {
+    total += movementContribution(
+      scene.objects.find(({ id }) => id === object.id)!,
+      placementFor(object),
     );
-    const rotationDelta = Math.abs(object.rotation[1] - original.rotation[1]);
-    const normalizedRotation = Math.min(rotationDelta, Math.PI * 2 - rotationDelta);
-    const movementMm = Math.round(distanceMm + normalizedRotation * 250);
-    return sum + proximityScore(movementMm, 0, 1000);
-  }, 0);
+  }
   return Math.round(total / movable.length);
+}
+
+/**
+ * The six non-circulation score terms, packed in a fixed order so a partial can copy and
+ * patch them without rebuilding the layout's whole score.
+ */
+type TermScores = Int32Array;
+
+const TERM_SOFA_WALL = 0;
+const TERM_TABLE = 1;
+const TERM_RUG = 2;
+const TERM_CHAIR = 3;
+const TERM_ACCESSORIES = 4;
+const TERM_MOVEMENT = 5;
+const TERM_COUNT = 6;
+
+const TERM_WEIGHTS: readonly number[] = [
+  PLACEMENT_SCORE_WEIGHTS.sofaWallAndSide,
+  PLACEMENT_SCORE_WEIGHTS.tableRelation,
+  PLACEMENT_SCORE_WEIGHTS.rugRelation,
+  PLACEMENT_SCORE_WEIGHTS.chairRelation,
+  PLACEMENT_SCORE_WEIGHTS.accessories,
+  PLACEMENT_SCORE_WEIGHTS.movement,
+];
+
+const TERM_SCORERS: readonly ((
+  scene: Scene,
+  objects: readonly SceneObject[],
+) => number)[] = [
+  sofaWallAndSideScore,
+  (_scene, objects) => tableRelationScore(objects),
+  (_scene, objects) => rugRelationScore(objects),
+  (_scene, objects) => chairRelationScore(objects),
+  accessoriesScore,
+  movementScore,
+];
+
+function layoutTerms(scene: Scene, objects: readonly SceneObject[]): TermScores {
+  const terms = new Int32Array(TERM_COUNT);
+  for (let term = 0; term < TERM_COUNT; term += 1) {
+    terms[term] = TERM_SCORERS[term]!(scene, objects);
+  }
+  return terms;
+}
+
+function weightedScore(terms: TermScores, circulation: number): number {
+  let score = Math.round(
+    (circulation * PLACEMENT_SCORE_WEIGHTS.circulation) / 1000,
+  );
+  for (let term = 0; term < TERM_COUNT; term += 1) {
+    score += Math.round((terms[term]! * TERM_WEIGHTS[term]!) / 1000);
+  }
+  return score;
 }
 
 function aggregateScore(
   scene: Scene,
   objects: readonly SceneObject[],
-  includeCirculation: boolean,
+  circulation: number,
 ): number {
-  const rugs = objects.filter(({ type }) => type === "rug");
-  const circulation =
-    includeCirculation && hasCirculationPath(scene, objects.map(objectFootprint), rugs)
-      ? 1000
-      : 0;
-  const terms = {
-    circulation,
-    sofaWallAndSide: sofaWallAndSideScore(scene, objects),
-    tableRelation: tableRelationScore(objects),
-    rugRelation: rugRelationScore(objects),
-    chairRelation: chairRelationScore(objects),
-    accessories: accessoriesScore(scene, objects),
-    movement: movementScore(scene, objects),
-  };
-
-  return (Object.keys(PLACEMENT_SCORE_WEIGHTS) as (keyof typeof PLACEMENT_SCORE_WEIGHTS)[])
-    .reduce(
-      (score, term) =>
-        score + Math.round((terms[term] * PLACEMENT_SCORE_WEIGHTS[term]) / 1000),
-      0,
-    );
+  return weightedScore(layoutTerms(scene, objects), circulation);
 }
+
+/**
+ * Which relational terms a newly placed object can move. The averaged accessories and
+ * movement terms are kept as running totals instead, so they are absent here.
+ */
+const TERM_DEPENDENCIES: Readonly<Record<SceneObjectType, readonly number[]>> = {
+  sofa: [TERM_SOFA_WALL, TERM_TABLE, TERM_RUG, TERM_CHAIR],
+  rug: [TERM_RUG],
+  coffee_table: [TERM_TABLE, TERM_RUG, TERM_CHAIR],
+  chair: [TERM_CHAIR],
+  floor_lamp: [],
+  plant: [],
+  unknown: [],
+};
 
 function evaluateCompleteLayout(
   scene: Scene,
   placements: readonly ProposedPlacement[],
 ): EvaluatedLayout {
   const objects = layoutObjects(scene, placements);
-  const valid = respectsHardConstraints(scene, objects);
+  const circulates = hasCirculationPath(
+    scene,
+    objects.map(objectFootprint),
+    objects.filter(({ type }) => type === "rug"),
+  );
+  const valid = respectsHardConstraints(scene, objects, circulates);
   return {
     valid,
-    score: aggregateScore(scene, objects, true),
+    score: aggregateScore(scene, objects, circulates ? 1000 : 0),
     placements: placements.map((placement) => ({
+      ...placement,
+      position: [...placement.position],
+    })),
+  };
+}
+
+/**
+ * A completed beam state has already satisfied every partial constraint for every object
+ * it settled - room bounds, clearance, footprint pairs and the seating hull - and its
+ * score terms were kept equal to the full layout's throughout. All that is left of the
+ * hard constraints is what a partial cannot decide, so the state is finished rather than
+ * re-derived from scratch.
+ */
+function evaluateSettledState(scene: Scene, state: SearchState): EvaluatedLayout {
+  const objects = layoutOf(state);
+  // The score of an invalid layout is never read, so the flood fill is only worth running
+  // once the cheap relations have accepted the layout.
+  const circulates =
+    respectsSeatingRelations(objects) &&
+    hasCirculationPath(
+      scene,
+      objects.map(objectFootprint),
+      objects.filter(({ type }) => type === "rug"),
+    );
+  return {
+    valid: circulates,
+    score: weightedScore(state.terms, circulates ? 1000 : 0),
+    placements: placementsOf(state).map((placement) => ({
       ...placement,
       position: [...placement.position],
     })),
@@ -823,7 +1030,7 @@ function perimeterRing(
   scene: Scene,
   object: SceneObject,
   rotationY: number,
-): readonly PerimeterPoint[] {
+): { points: readonly PerimeterPoint[]; distinct: boolean } {
   const range = usableCenterRange(scene, object, rotationY);
   const [minimumX, maximumX] = inwardGridRange(range.minimumX, range.maximumX, PLACEMENT_LIMITS.gridM);
   const [minimumZ, maximumZ] = inwardGridRange(range.minimumZ, range.maximumZ, PLACEMENT_LIMITS.gridM);
@@ -834,16 +1041,22 @@ function perimeterRing(
   const ring: PerimeterPoint[] = [];
   for (let index = 0; index < xValues.length; index += 1) {
     const x = xValues[index]!;
-    const corner = index === 0 ? "left" : index === xValues.length - 1 ? "right" : null;
-    ring.push({ x, z: minimumZ, side: corner ? `back-${corner}` : "back" });
-    ring.push({ x, z: maximumZ, side: corner ? `front-${corner}` : "front" });
+    const last = index === xValues.length - 1;
+    const backSide: PerimeterSide =
+      index === 0 ? "back-left" : last ? "back-right" : "back";
+    const frontSide: PerimeterSide =
+      index === 0 ? "front-left" : last ? "front-right" : "front";
+    ring.push({ x, z: minimumZ, side: PERIMETER_SIDE_INDEX[backSide] });
+    ring.push({ x, z: maximumZ, side: PERIMETER_SIDE_INDEX[frontSide] });
   }
   for (let z = minimumZ + PLACEMENT_LIMITS.gridM; z < maximumZ - 1e-9; z += PLACEMENT_LIMITS.gridM) {
     const quantizedZ = quantize(z, PLACEMENT_LIMITS.gridM);
-    ring.push({ x: minimumX, z: quantizedZ, side: "left" });
-    ring.push({ x: maximumX, z: quantizedZ, side: "right" });
+    ring.push({ x: minimumX, z: quantizedZ, side: PERIMETER_SIDE_INDEX.left });
+    ring.push({ x: maximumX, z: quantizedZ, side: PERIMETER_SIDE_INDEX.right });
   }
-  return ring;
+  // The two rows coincide in a room only one cell deep, and the two columns in one only a
+  // cell wide; anywhere else every ring position appears exactly once.
+  return { points: ring, distinct: minimumZ !== maximumZ && minimumX !== maximumX };
 }
 
 /**
@@ -851,25 +1064,49 @@ function perimeterRing(
  * first, then the midpoint, then the quarter points. Taking the first n entries
  * therefore samples the whole wall instead of the run nearest one corner.
  */
+let takenScratch = new Uint8Array(0);
+let segmentScratch = new Int32Array(0);
+
 function spreadOrder(
   points: readonly ProposedPlacement[],
+  needed: number,
 ): readonly ProposedPlacement[] {
+  if (needed <= 0) return [];
   if (points.length <= 2) return points;
   const last = points.length - 1;
-  const ordered: ProposedPlacement[] = [points[0]!, points[last]!];
-  const taken = new Uint8Array(points.length);
+  const ordered: ProposedPlacement[] = [points[0]!];
+  if (needed === 1) return ordered;
+  ordered.push(points[last]!);
+  if (takenScratch.length < points.length) {
+    takenScratch = new Uint8Array(points.length);
+    // The subdivision visits at most 2n segments, each a low/high pair.
+    segmentScratch = new Int32Array((points.length + 2) * 4);
+  } else {
+    takenScratch.fill(0, 0, points.length);
+  }
+  const taken = takenScratch;
+  const segments = segmentScratch;
   taken[0] = 1;
   taken[last] = 1;
-  const segments: [number, number][] = [[0, last]];
-  for (let head = 0; head < segments.length; head += 1) {
-    const [low, high] = segments[head]!;
+  segments[0] = 0;
+  segments[1] = last;
+
+  let tail = 2;
+  for (let head = 0; head < tail; head += 2) {
+    const low = segments[head]!;
+    const high = segments[head + 1]!;
     if (high - low < 2) continue;
     const middle = low + Math.floor((high - low) / 2);
-    if (!taken[middle]) {
+    if (taken[middle] === 0) {
       taken[middle] = 1;
       ordered.push(points[middle]!);
+      if (ordered.length >= needed) return ordered;
     }
-    segments.push([low, middle], [middle, high]);
+    segments[tail] = low;
+    segments[tail + 1] = middle;
+    segments[tail + 2] = middle;
+    segments[tail + 3] = high;
+    tail += 4;
   }
   return ordered;
 }
@@ -880,57 +1117,143 @@ function spreadOrder(
  * applies, and the survivors are drawn round-robin from every wall and corner, so the
  * cap can never be spent on the single arc nearest the object's current position.
  */
+let blockerScratch = new Float64Array(0);
+
+/** Lane buffers reused across partials; accessory generation never runs reentrantly. */
+const laneScratch: ProposedPlacement[][] = PERIMETER_SIDES.map(
+  () => [] as ProposedPlacement[],
+);
+
 function accessoryCandidates(
-  scene: Scene,
   object: SceneObject,
-  obstacles: readonly SceneObject[],
-): readonly ProposedPlacement[] {
-  const rotationY = object.rotation[1];
-  const blockers = obstacles
-    .filter(({ id, type }) => id !== object.id && type !== "rug")
-    .map(objectFootprint);
-  const clearances = openingClearanceZones(scene);
-  const isFree = (placement: ProposedPlacement): boolean => {
-    const footprint = objectFootprint(withPlacement(object, placement));
-    return (
-      footprintInsideRoom(footprint, scene.room, PLACEMENT_LIMITS.roomInsetM) &&
-      !clearances.some((zone) => footprintsOverlap(footprint, zone)) &&
-      !blockers.some((blocker) => footprintsOverlap(footprint, blocker))
-    );
+  state: SearchState,
+  context: AccessoryContext,
+  limit: number,
+): CandidateSet {
+  const settled = settledOf(state);
+  const footprints = settledFootprintsOf(state);
+  const blockers: Footprint2D[] = [];
+  for (let index = 0; index < settled.length; index += 1) {
+    const other = settled[index]!;
+    if (other.id === object.id || other.type === "rug") continue;
+    blockers.push(footprints[index]!);
+  }
+  // Centres and reach in one flat buffer: the candidates all share their extents, so this
+  // distance test rejects the far blockers before the separating-axis test sees any.
+  if (blockerScratch.length < blockers.length * 4) {
+    blockerScratch = new Float64Array(blockers.length * 8);
+  }
+  const reach = blockerScratch;
+  for (let index = 0; index < blockers.length; index += 1) {
+    const blocker = blockers[index]!;
+    const bounds = footprintBounds(blocker);
+    reach[index * 4] = blocker.center.x;
+    reach[index * 4 + 1] = blocker.center.z;
+    reach[index * 4 + 2] = bounds.x + context.boundX;
+    reach[index * 4 + 3] = bounds.z + context.boundZ;
+  }
+  const isFree = (footprint: Footprint2D): boolean => {
+    const centerX = footprint.center.x;
+    const centerZ = footprint.center.z;
+    for (let index = 0; index < blockers.length; index += 1) {
+      const base = index * 4;
+      if (
+        Math.abs(centerX - reach[base]!) > reach[base + 2]! ||
+        Math.abs(centerZ - reach[base + 1]!) > reach[base + 3]!
+      ) {
+        continue;
+      }
+      if (footprintsOverlap(footprint, blockers[index]!)) return false;
+    }
+    return true;
   };
 
-  const lanes = new Map<PerimeterSide, ProposedPlacement[]>(
-    PERIMETER_SIDES.map((side) => [side, []]),
-  );
-  for (const point of perimeterRing(scene, object, rotationY)) {
-    const placement = candidate(object, point.x, point.z, rotationY);
-    if (isFree(placement)) lanes.get(point.side)!.push(placement);
+  const leadsWithIncumbent =
+    context.incumbent !== null && isFree(context.incumbentFootprint!);
+  // The incumbent already leads the list, so its ring twin is dropped where the millimetre
+  // dedupe used to drop it: on the way out, leaving every other position in place.
+  const twin = leadsWithIncumbent ? context.duplicate : null;
+  const lanes = laneScratch;
+  let twinIsFree = false;
+  for (const lane of lanes) lane.length = 0;
+  for (const point of context.points) {
+    if (!isFree(point.footprint)) continue;
+    if (point.placement === twin) twinIsFree = true;
+    lanes[point.side]!.push(point.placement);
   }
 
-  const incumbent = placementFor(object);
-  const result: ProposedPlacement[] = isFree(incumbent) ? [incumbent] : [];
-  const spread = PERIMETER_SIDES.map((side) => spreadOrder(lanes.get(side)!));
+  const result: ProposedPlacement[] = leadsWithIncumbent
+    ? [context.incumbent!]
+    : [];
+  let available = result.length;
+  for (const lane of lanes) available += lane.length;
+  if (twinIsFree) available -= 1;
+
+  if (!context.distinct) {
+    const spread = lanes.map((lane) => spreadOrder(lane, lane.length));
+    const deepest = spread.reduce((longest, lane) => Math.max(longest, lane.length), 0);
+    for (let depth = 0; depth < deepest; depth += 1) {
+      for (const lane of spread) {
+        const placement = lane[depth];
+        if (placement !== undefined && placement !== twin) result.push(placement);
+      }
+    }
+    return uniqueCandidates(result, limit);
+  }
+
+  // Every emitted position is distinct here, so the list can stop at the cap instead of
+  // building the whole perimeter and throwing most of it away.
+  const wanted = limit - result.length;
+  const spread = lanes.map((lane) => spreadOrder(lane, wanted));
   const deepest = spread.reduce((longest, lane) => Math.max(longest, lane.length), 0);
-  for (let depth = 0; depth < deepest; depth += 1) {
+  for (let depth = 0; depth < deepest && result.length < limit; depth += 1) {
     for (const lane of spread) {
+      if (result.length >= limit) break;
       const placement = lane[depth];
-      if (placement) result.push(placement);
+      if (placement !== undefined && placement !== twin) result.push(placement);
     }
   }
-  return result;
+  return { candidates: result, truncated: available > limit };
 }
+
+const DEDUPE_Z_SPAN = 1 << 21;
+const DEDUPE_ROTATIONS = 8;
 
 function uniqueCandidates(
   candidates: readonly ProposedPlacement[],
   limit: number,
 ): CandidateSet {
-  const seen = new Set<string>();
+  // Quantized millimetres and a small rotation table pack a candidate's identity into one
+  // exact integer, so the millimetre-grid dedupe needs no string per candidate.
+  const seen = new Set<number>();
+  let seenWide: Set<string> | null = null;
+  const rotations: number[] = [];
   const unique: ProposedPlacement[] = [];
   let truncated = false;
   for (const placement of candidates) {
-    const key = `${millimetres(placement.position[0])}:${millimetres(placement.position[2])}:${placement.rotationY}`;
-    if (seen.has(key)) continue;
-    seen.add(key);
+    let rotationIndex = rotations.indexOf(placement.rotationY);
+    if (rotationIndex < 0) {
+      rotationIndex = rotations.length;
+      rotations.push(placement.rotationY);
+    }
+    const millimetreX = millimetres(placement.position[0]);
+    const millimetreZ = millimetres(placement.position[2]);
+    const packable =
+      rotationIndex < DEDUPE_ROTATIONS &&
+      Math.abs(millimetreX) < DEDUPE_Z_SPAN &&
+      Math.abs(millimetreZ) < DEDUPE_Z_SPAN;
+    if (packable) {
+      const key =
+        (millimetreX * DEDUPE_Z_SPAN * 2 + millimetreZ) * DEDUPE_ROTATIONS +
+        rotationIndex;
+      if (seen.has(key)) continue;
+      seen.add(key);
+    } else {
+      const key = `${millimetreX}:${millimetreZ}:${placement.rotationY}`;
+      seenWide ??= new Set<string>();
+      if (seenWide.has(key)) continue;
+      seenWide.add(key);
+    }
     if (unique.length < limit) {
       unique.push(placement);
     } else {
@@ -941,39 +1264,96 @@ function uniqueCandidates(
   return { candidates: unique, truncated };
 }
 
+interface AccessoryPoint {
+  placement: ProposedPlacement;
+  footprint: Footprint2D;
+  side: number;
+}
+
+/**
+ * The perimeter work an accessory step would otherwise repeat for every partial in the
+ * beam. Room bounds and opening clearance do not depend on the partial, so the ring is
+ * reduced to the admissible positions once and each keeps its footprint; only the
+ * obstacle test is left to do per partial.
+ */
+interface AccessoryContext {
+  points: readonly AccessoryPoint[];
+  incumbent: ProposedPlacement | null;
+  incumbentFootprint: Footprint2D | null;
+  /** The ring placement the incumbent already occupies, if it stands on the grid. */
+  duplicate: ProposedPlacement | null;
+  /** False when the ring itself repeats a position, as a room thinner than one cell can. */
+  distinct: boolean;
+  /** Shared by every candidate: they differ only in where they are centered. */
+  boundX: number;
+  boundZ: number;
+}
+
+function accessoryContext(scene: Scene, object: SceneObject): AccessoryContext {
+  const rotationY = object.rotation[1];
+  const clearances = openingClearanceZones(scene);
+  const admissible = (placement: ProposedPlacement): Footprint2D | null => {
+    const footprint = objectFootprint(withPlacement(object, placement));
+    const usable =
+      footprintInsideRoom(footprint, scene.room, PLACEMENT_LIMITS.roomInsetM) &&
+      !clearances.some((zone) => footprintsOverlap(footprint, zone));
+    return usable ? footprint : null;
+  };
+
+  const ring = perimeterRing(scene, object, rotationY);
+  const points: AccessoryPoint[] = [];
+  for (const point of ring.points) {
+    const placement = candidate(object, point.x, point.z, rotationY);
+    const footprint = admissible(placement);
+    if (footprint) points.push({ placement, footprint, side: point.side });
+  }
+
+  const incumbent = placementFor(object);
+  const incumbentFootprint = admissible(incumbent);
+  const bounds = footprintBounds(objectFootprint(withPlacement(object, incumbent)));
+  const incumbentX = millimetres(incumbent.position[0]);
+  const incumbentZ = millimetres(incumbent.position[2]);
+  return {
+    points,
+    incumbent: incumbentFootprint ? incumbent : null,
+    incumbentFootprint,
+    duplicate:
+      points.find(
+        ({ placement }) =>
+          millimetres(placement.position[0]) === incumbentX &&
+          millimetres(placement.position[2]) === incumbentZ &&
+          placement.rotationY === incumbent.rotationY,
+      )?.placement ?? null,
+    distinct: ring.distinct,
+    boundX: bounds.x,
+    boundZ: bounds.z,
+  };
+}
+
 function candidatesFor(
   scene: Scene,
   object: SceneObject,
-  placements: readonly ProposedPlacement[],
-  placedIds: ReadonlySet<string>,
+  state: SearchState,
+  accessory: AccessoryContext | null,
   limit: number,
 ): CandidateSet {
-  const objects = layoutObjects(scene, placements);
   let candidates: readonly ProposedPlacement[];
   switch (object.type) {
     case "sofa":
       candidates = sofaCandidates(scene, object);
       break;
     case "rug":
-      candidates = rugCandidates(scene, object, objects);
+      candidates = rugCandidates(scene, object, layoutOf(state));
       break;
     case "coffee_table":
-      candidates = tableCandidates(scene, object, objects);
+      candidates = tableCandidates(scene, object, layoutOf(state));
       break;
     case "chair":
-      candidates = chairCandidates(scene, object, objects);
+      candidates = chairCandidates(scene, object, layoutOf(state));
       break;
     case "floor_lamp":
     case "plant":
-      candidates = accessoryCandidates(
-        scene,
-        object,
-        objects.filter(
-          (other) =>
-            other.locked || other.type === "unknown" || placedIds.has(other.id),
-        ),
-      );
-      break;
+      return accessoryCandidates(object, state, accessory!, limit);
     case "unknown":
       candidates = [];
       break;
@@ -981,45 +1361,110 @@ function candidatesFor(
   return uniqueCandidates(candidates, limit);
 }
 
-function respectsPartialConstraints(
+const SEATING_TYPES: ReadonlySet<SceneObjectType> = new Set<SceneObjectType>([
+  "sofa",
+  "coffee_table",
+  "chair",
+  "rug",
+]);
+
+/**
+ * The seating hull of a partial's settled obstacles. Only seating objects shape it, so a
+ * partial that adds an accessory inherits its parent's, and most partials never need it
+ * at all - accessories are placed last, and a room with no locked accessory has nothing
+ * to test against the hull until then.
+ */
+function seatingHull(state: SearchState): readonly PointXZ[] {
+  if (state.hull === null) state.hull = primarySeatingHull(settledOf(state));
+  return state.hull;
+}
+
+/**
+ * The partial constraints that hold over the locked and unknown objects alone. They do
+ * not depend on any candidate, so the search settles them once per pass.
+ */
+function admitsSettledRoot(
   scene: Scene,
-  placements: readonly ProposedPlacement[],
-  placedIds: ReadonlySet<string>,
+  settled: readonly SceneObject[],
+  hull: readonly PointXZ[],
 ): boolean {
-  const objects = layoutObjects(scene, placements);
-  const fixedOrPlaced = objects.filter(
-    (object) => object.locked || object.type === "unknown" || placedIds.has(object.id),
-  );
-  for (const object of fixedOrPlaced) {
-    if (
-      placedIds.has(object.id) &&
-      (!footprintInsideRoom(objectFootprint(object), scene.room, PLACEMENT_LIMITS.roomInsetM) ||
-        objectIsInsideOpeningClearance(scene, object))
-    ) {
-      return false;
-    }
-  }
-  const nonRugs = fixedOrPlaced.filter(({ type }) => type !== "rug");
+  const nonRugs = settled.filter(({ type }) => type !== "rug");
   for (let first = 0; first < nonRugs.length; first += 1) {
     for (let second = first + 1; second < nonRugs.length; second += 1) {
-      if (footprintsOverlap(objectFootprint(nonRugs[first]!), objectFootprint(nonRugs[second]!))) {
+      if (
+        footprintsOverlap(
+          objectFootprint(nonRugs[first]!),
+          objectFootprint(nonRugs[second]!),
+        )
+      ) {
         return false;
       }
     }
   }
-  if (accessoryInsideSeatingHull(fixedOrPlaced)) return false;
-  return true;
+  return !settled.some(
+    (object) => isAccessory(object) && pointInsideConvexHull(objectCenter(object), hull),
+  );
 }
 
-function settledObstacles(
+function objectCenter(object: SceneObject): PointXZ {
+  return { x: object.position[0], z: object.position[2] };
+}
+
+/**
+ * The partial hard constraints, decided against a parent that already satisfies them.
+ * Only the newly settled object can break the room bound, the clearance zones or a
+ * footprint pair, and the seating hull only moves when a seating object joins - so the
+ * answer matches a full re-check of the partial while touching one object's worth of it.
+ */
+function admitsPlacement(
   scene: Scene,
-  placements: readonly ProposedPlacement[],
-  placedIds: ReadonlySet<string>,
-): readonly SceneObject[] {
-  return layoutObjects(scene, placements).filter(
-    (object) =>
-      object.locked || object.type === "unknown" || placedIds.has(object.id),
+  state: SearchState,
+  object: SceneObject,
+  placement: ProposedPlacement,
+  footprint: Footprint2D,
+  geometryChecked: boolean,
+): boolean {
+  if (!geometryChecked) {
+    if (
+      !footprintInsideRoom(footprint, scene.room, PLACEMENT_LIMITS.roomInsetM) ||
+      footprintIsInsideOpeningClearance(scene, footprint)
+    ) {
+      return false;
+    }
+    if (object.type !== "rug") {
+      const settled = settledOf(state);
+      const footprints = settledFootprintsOf(state);
+      for (let index = 0; index < settled.length; index += 1) {
+        if (settled[index]!.type === "rug") continue;
+        if (footprintsOverlap(footprint, footprints[index]!)) return false;
+      }
+    }
+  }
+
+  if (!SEATING_TYPES.has(object.type)) {
+    return !(
+      isAccessory(object) &&
+      pointInsideConvexHull(footprint.center, seatingHull(state))
+    );
+  }
+
+  const settledAccessories = settledOf(state).filter(isAccessory);
+  if (settledAccessories.length === 0) return true;
+  const hull = primarySeatingHull([
+    ...settledOf(state),
+    withPlacement(object, placement),
+  ]);
+  return !settledAccessories.some((accessory) =>
+    pointInsideConvexHull(objectCenter(accessory), hull),
   );
+}
+
+/** A seating object reshapes the hull; anything else leaves the parent's in place. */
+function hullAfter(
+  state: SearchState,
+  type: SceneObjectType,
+): readonly PointXZ[] | null {
+  return SEATING_TYPES.has(type) ? null : state.hull;
 }
 
 /**
@@ -1030,24 +1475,22 @@ function settledObstacles(
  */
 function partialBlocksEntryZone(
   entryPoints: readonly PointXZ[],
-  obstacles: readonly SceneObject[],
+  state: SearchState,
 ): boolean {
+  const settled = settledOf(state);
   return occupiesEntryZone(
     entryPoints,
-    obstacles
-      .filter(({ type }) => type !== "rug")
-      .map(objectFootprint),
+    settledFootprintsOf(state).filter(
+      (_, index) => settled[index]!.type !== "rug",
+    ),
   );
 }
 
-function partialBlocksCirculation(
-  scene: Scene,
-  obstacles: readonly SceneObject[],
-): boolean {
+function partialBlocksCirculation(scene: Scene, state: SearchState): boolean {
   return !hasCirculationPath(
     scene,
-    obstacles.map(objectFootprint),
-    obstacles.filter(({ type }) => type === "rug"),
+    settledFootprintsOf(state),
+    settledOf(state).filter(({ type }) => type === "rug"),
   );
 }
 
@@ -1074,11 +1517,45 @@ function searchLayouts(
   incumbent: EvaluatedLayout,
 ): LayoutSearch {
   const movable = scene.objects
-    .filter(({ locked, type }) => !locked && type !== "unknown")
+    .filter(isMovable)
     .sort(compareObjects);
-  let beam: SearchState[] = [
-    { placements: [], candidateIndices: [], objectIds: [], score: 0 },
-  ];
+  const sceneIndexById = new Map(
+    scene.objects.map((object, index) => [object.id, index] as const),
+  );
+  const settledRoot = scene.objects.filter(
+    (object) => object.locked || object.type === "unknown",
+  );
+  const accessoryCount = scene.objects.filter(isAccessory).length;
+  const baseTerms = layoutTerms(scene, scene.objects);
+  const root: SearchState = {
+    candidateIndex: -1,
+    objectIds: [],
+    score: 0,
+    parent: null,
+    placedIndex: -1,
+    placedTemplate: null,
+    placement: null,
+    placedFootprint: null,
+    placedObject: null,
+    placements: [],
+    objects: scene.objects,
+    settled: settledRoot,
+    settledFootprints: settledRoot.map(objectFootprint),
+    hull: primarySeatingHull(settledRoot),
+    terms: baseTerms,
+    movementTotal: movable.length * 1000,
+    accessoryTotal: scene.objects
+      .filter(isAccessory)
+      .reduce(
+        (sum, object) => sum + accessoryContribution(scene, objectFootprint(object)),
+        0,
+      ),
+  };
+  // The locked room has to satisfy the partial constraints on its own; when it does not,
+  // no extension of it can either, which is what the per-candidate re-check used to
+  // rediscover for every candidate of every step.
+  const rootAdmits = admitsSettledRoot(scene, settledRoot, seatingHull(root));
+  let beam: SearchState[] = [root];
   let prunedByBeam = false;
   let truncatedCandidates = false;
   let evaluatedLayouts = 0;
@@ -1086,32 +1563,85 @@ function searchLayouts(
 
   for (let objectIndex = 0; objectIndex < movable.length; objectIndex += 1) {
     const object = movable[objectIndex]!;
+    const sceneIndex = sceneIndexById.get(object.id)!;
+    const accessory = isAccessory(object) ? accessoryContext(scene, object) : null;
+    // Accessory candidates are produced already inside the room, clear of the openings
+    // and clear of the partial's obstacles, so re-testing that geometry would repeat the
+    // filter that generated them.
+    const geometryChecked = accessory !== null;
+    const original = scene.objects[sceneIndex]!;
+    const baseMovement = movementContribution(original, placementFor(object));
+    const baseAccessory = isAccessory(object)
+      ? accessoryContribution(scene, objectFootprint(object))
+      : 0;
+    const affected = TERM_DEPENDENCIES[object.type];
     const expanded: SearchState[] = [];
     for (const state of beam) {
-      const placedIds = new Set(state.objectIds);
       const candidateSet = candidatesFor(
         scene,
         object,
-        state.placements,
-        placedIds,
+        state,
+        accessory,
         limits.candidatesPerObject,
       );
       if (candidateSet.truncated) truncatedCandidates = true;
       const objectIds = [...state.objectIds, object.id];
-      const nextIds = new Set(objectIds);
       for (
         let candidateIndex = 0;
         candidateIndex < candidateSet.candidates.length;
         candidateIndex += 1
       ) {
-        const placements = [...state.placements, candidateSet.candidates[candidateIndex]!];
-        if (!respectsPartialConstraints(scene, placements, nextIds)) continue;
-        const objects = layoutObjects(scene, placements);
+        const placement = candidateSet.candidates[candidateIndex]!;
+        const footprint = placementFootprint(object, placement);
+        if (
+          !rootAdmits ||
+          !admitsPlacement(scene, state, object, placement, footprint, geometryChecked)
+        ) {
+          continue;
+        }
+
+        let placed: SceneObject | null = null;
+        let objects: readonly SceneObject[] | null = null;
+        const terms = state.terms.slice();
+        if (affected.length > 0) {
+          placed = withPlacement(object, placement);
+          const patched = layoutOf(state).slice();
+          patched[sceneIndex] = placed;
+          objects = patched;
+          for (const term of affected) {
+            terms[term] = TERM_SCORERS[term]!(scene, patched);
+          }
+        }
+        const movementTotal =
+          state.movementTotal -
+          baseMovement +
+          movementContribution(original, placement);
+        terms[TERM_MOVEMENT] = Math.round(movementTotal / movable.length);
+        let accessoryTotal = state.accessoryTotal;
+        if (accessory) {
+          accessoryTotal =
+            accessoryTotal - baseAccessory + accessoryContribution(scene, footprint);
+          terms[TERM_ACCESSORIES] = Math.round(accessoryTotal / accessoryCount);
+        }
+
         expanded.push({
-          placements,
-          candidateIndices: [...state.candidateIndices, candidateIndex],
+          candidateIndex,
           objectIds,
-          score: aggregateScore(scene, objects, false),
+          score: weightedScore(terms, 0),
+          terms,
+          movementTotal,
+          accessoryTotal,
+          parent: state,
+          placedIndex: sceneIndex,
+          placedTemplate: object,
+          placement,
+          placedFootprint: footprint,
+          placedObject: placed,
+          placements: null,
+          objects,
+          settled: null,
+          settledFootprints: null,
+          hull: hullAfter(state, object.type),
         });
       }
     }
@@ -1121,13 +1651,8 @@ function searchLayouts(
     let ranked = 0;
     for (; ranked < expanded.length && kept.length < limits.beamWidth; ranked += 1) {
       const state = expanded[ranked]!;
-      const obstacles = settledObstacles(
-        scene,
-        state.placements,
-        new Set(state.objectIds),
-      );
-      if (partialBlocksEntryZone(entryPoints, obstacles)) continue;
-      if (objectIndex === 0 && partialBlocksCirculation(scene, obstacles)) {
+      if (partialBlocksEntryZone(entryPoints, state)) continue;
+      if (objectIndex === 0 && partialBlocksCirculation(scene, state)) {
         continue;
       }
       kept.push(state);
@@ -1144,20 +1669,18 @@ function searchLayouts(
     }
   }
 
-  let bestState: SearchState | null = null;
   let best: EvaluatedLayout | null = null;
   for (const state of beam) {
     evaluatedLayouts += 1;
-    const evaluated = evaluateCompleteLayout(scene, state.placements);
-    if (!evaluated.valid) continue;
-    if (
-      !best ||
-      evaluated.score > best.score ||
-      (evaluated.score === best.score && bestState && compareSearchStates(state, bestState) < 0)
-    ) {
-      best = evaluated;
-      bestState = state;
-    }
+    // The beam is held in `compareSearchStates` order and a valid layout always scores
+    // its partial score plus the full circulation term, so the first valid state in that
+    // order is the one the ranking would settle on - later states can only tie lower.
+    if (best !== null) continue;
+    const evaluated =
+      movable.length === 0
+        ? evaluateCompleteLayout(scene, placementsOf(state))
+        : evaluateSettledState(scene, state);
+    if (evaluated.valid) best = evaluated;
   }
 
   return settledSearch(
@@ -1201,19 +1724,22 @@ function proposeSinglePass(scene: Scene): NaturalPlacementResult {
   };
 }
 
+/**
+ * The Scene the next fixed-point pass works from. Untouched objects are shared rather
+ * than cloned: nothing in this module mutates a Scene it is handed.
+ */
 function sceneWithPlacements(
   scene: Scene,
   placements: readonly ProposedPlacement[],
 ): Scene {
-  const next = structuredClone(scene);
   const byId = new Map(placements.map((placement) => [placement.objectId, placement]));
-  for (const object of next.objects) {
-    const placement = byId.get(object.id);
-    if (!placement) continue;
-    object.position = [...placement.position];
-    object.rotation[1] = placement.rotationY;
-  }
-  return next;
+  return {
+    ...scene,
+    objects: scene.objects.map((object) => {
+      const placement = byId.get(object.id);
+      return placement ? withPlacement(object, placement) : object;
+    }),
+  };
 }
 
 function placementSignature(scene: Scene): string {
