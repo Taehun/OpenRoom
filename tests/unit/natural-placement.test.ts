@@ -12,6 +12,7 @@ import {
   flattenPerimeterLanes,
   proposeNaturalPlacement,
   resolvePlacementSearch,
+  sofaCandidates,
   type EvaluatedLayout,
 } from "../../src/features/placement/natural-placement";
 import { validateAndApplyPlacement } from "../../src/features/scene/natural-placement-command";
@@ -151,6 +152,58 @@ function poorRedesignedJourneyScene(): Scene {
   for (const [objectId, position] of Object.entries(POOR_JOURNEY_TARGETS)) {
     scene = commit(scene, { type: "move", objectId, position });
   }
+  return scene;
+}
+
+/** The three real-data journeys Task 2b measured, in the order it reports them. */
+const REAL_DATA_JOURNEYS: readonly (readonly [string, () => Scene])[] = [
+  ["the seed placeholder room", createDemoScene],
+  ["the six-product redesign before arrangement", redesignedProductScene],
+  ["the redesign dragged to the poor journey layout", poorRedesignedJourneyScene],
+];
+
+/** The sofa's local forward axis, spelled out here so the test does not borrow the
+ * solver's own helper to check the solver's answer. */
+function forwardAxis(rotationY: number): { x: number; z: number } {
+  return { x: -Math.sin(rotationY), z: Math.cos(rotationY) };
+}
+
+function forwardProjection(
+  sofa: SceneObject,
+  object: SceneObject,
+): number {
+  const forward = forwardAxis(sofa.rotation[1]);
+  return (
+    (object.position[0] - sofa.position[0]) * forward.x +
+    (object.position[2] - sofa.position[2]) * forward.z
+  );
+}
+
+/** The grid-aligned centre bound an object of the given half extent can reach on an axis
+ * of the given span, matching the inset the solver samples. */
+function insetBound(span: number, half: number): { minimum: number; maximum: number } {
+  const grid = PLACEMENT_LIMITS.gridM;
+  const round = (value: number) => Number(value.toFixed(6));
+  return {
+    minimum: round(
+      Math.ceil((-span / 2 + PLACEMENT_LIMITS.roomInsetM + half - 1e-9) / grid) * grid,
+    ),
+    maximum: round(
+      Math.floor((span / 2 - PLACEMENT_LIMITS.roomInsetM - half + 1e-9) / grid) * grid,
+    ),
+  };
+}
+
+/** A bare 6.0 x 6.0 room holding one sofa at the given placement. */
+function singleSofaScene(rotationY: number, x: number, z: number): Scene {
+  const scene = keepObjects(completedProductScene(), "sofa_01");
+  scene.id = "sofa-wall-candidates";
+  scene.source = "upload";
+  scene.room = { width: 6, height: 2.5, depth: 6 };
+  scene.openings = [];
+  const sofa = scene.objects[0]!;
+  sofa.position = [x, sofa.position[1], z];
+  sofa.rotation = [0, rotationY, 0];
   return scene;
 }
 
@@ -558,6 +611,52 @@ describe("natural placement", () => {
     expect(proposeNaturalPlacement(arranged).kind).toBe("unchanged");
   });
 
+  it.each(REAL_DATA_JOURNEYS)(
+    "seats the table and the chair in front of the sofa for %s",
+    (_journey, buildScene) => {
+      const scene = buildScene();
+      const proposal = proposeNaturalPlacement(scene);
+
+      expect(proposal.kind).toBe("changed");
+      if (proposal.kind !== "changed") return;
+
+      const applied = validateAndApplyPlacement(scene, proposal);
+      expect(applied.ok).toBe(true);
+      if (!applied.ok || !applied.changed) return;
+
+      const arranged = applied.scene;
+      const sofa = arranged.objects.find(({ id }) => id === "sofa_01")!;
+      const table = arranged.objects.find(({ id }) => id === "table_01")!;
+      const chair = arranged.objects.find(({ id }) => id === "chair_01")!;
+
+      expect(forwardProjection(sofa, table)).toBeGreaterThan(0);
+      expect(forwardProjection(sofa, chair)).toBeGreaterThan(0);
+    },
+  );
+
+  it("arranges the poor journey layout with the seating group at higher z", () => {
+    const scene = poorRedesignedJourneyScene();
+    const proposal = proposeNaturalPlacement(scene);
+
+    expect(proposal.kind).toBe("changed");
+    if (proposal.kind !== "changed") return;
+
+    const applied = validateAndApplyPlacement(scene, proposal);
+    expect(applied.ok).toBe(true);
+    if (!applied.ok || !applied.changed) return;
+
+    const arranged = applied.scene;
+    const sofa = arranged.objects.find(({ id }) => id === "sofa_01")!;
+    const table = arranged.objects.find(({ id }) => id === "table_01")!;
+    const chair = arranged.objects.find(({ id }) => id === "chair_01")!;
+
+    // Every demo sofa keeps rotation 0, so its forward axis is +z: the camera-side half
+    // of the room is where the table and the chair belong.
+    expect(sofa.rotation[1]).toBe(0);
+    expect(table.position[2]).toBeGreaterThan(sofa.position[2]);
+    expect(chair.position[2]).toBeGreaterThan(sofa.position[2]);
+  });
+
   it("samples the free perimeter when the accessory's nearest arc is blocked", () => {
     const scene = blockedAccessoryArcScene();
     const sofa = scene.objects.find(({ id }) => id === "sofa_01")!;
@@ -811,4 +910,55 @@ describe("perimeter lane flattening", () => {
       expect(flattened.candidates.some((candidate) => lane.includes(candidate))).toBe(true);
     }
   });
+});
+
+describe("sofa wall candidates", () => {
+  it("never backs a rotation-0 sofa onto the maximum-z wall", () => {
+    const scene = singleSofaScene(0, -1.2, 0.4);
+    const sofa = scene.objects[0]!;
+    const depthBound = insetBound(scene.room.depth, sofa.dimensionsM.depth / 2);
+
+    const candidates = sofaCandidates(scene, sofa);
+    const walls = candidates.slice(1);
+
+    expect(candidates[0]).toEqual({
+      objectId: sofa.id,
+      position: [...sofa.position],
+      rotationY: 0,
+    });
+    expect(walls.length).toBeGreaterThan(0);
+    expect(walls.every(({ rotationY }) => rotationY === 0)).toBe(true);
+    expect(new Set(walls.map(({ position }) => position[2]))).toEqual(
+      new Set([depthBound.minimum]),
+    );
+    expect(
+      walls.some(({ position }) => position[2] === depthBound.maximum),
+    ).toBe(false);
+    expect(
+      new Set(walls.map(({ position }) => position[0])).size,
+    ).toBeGreaterThan(1);
+  });
+
+  it.each([
+    ["a quarter turn", Math.PI / 2, 1.2, "maximum" as const],
+    ["a quarter turn the other way", -Math.PI / 2, -1.2, "minimum" as const],
+  ])(
+    "backs a sofa given %s onto the matching side wall only",
+    (_turn, rotationY, x, side) => {
+      const scene = singleSofaScene(rotationY, x, 0.4);
+      const sofa = scene.objects[0]!;
+      const widthBound = insetBound(scene.room.width, sofa.dimensionsM.depth / 2);
+
+      const walls = sofaCandidates(scene, sofa).slice(1);
+
+      expect(walls.length).toBeGreaterThan(0);
+      expect(walls.every((candidate) => candidate.rotationY === rotationY)).toBe(true);
+      expect(new Set(walls.map(({ position }) => position[0]))).toEqual(
+        new Set([widthBound[side]]),
+      );
+      expect(
+        new Set(walls.map(({ position }) => position[2])).size,
+      ).toBeGreaterThan(1);
+    },
+  );
 });

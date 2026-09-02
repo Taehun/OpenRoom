@@ -821,7 +821,72 @@ function inwardGridRange(
   ];
 }
 
-function sofaCandidates(scene: Scene, object: SceneObject): readonly ProposedPlacement[] {
+/**
+ * The grid positions a wall sweep offers on one axis, nearest the sofa's current
+ * placement first so the candidate cap keeps the placements closest to it.
+ */
+function gridSweep(
+  minimum: number,
+  maximum: number,
+  near: number,
+  keep: (value: number) => boolean,
+): readonly number[] {
+  const values: number[] = [];
+  for (let value = minimum; value <= maximum + 1e-9; value += PLACEMENT_LIMITS.gridM) {
+    const quantized = quantize(value, PLACEMENT_LIMITS.gridM);
+    if (keep(quantized)) values.push(quantized);
+  }
+  return values.sort(
+    (first, second) =>
+      Math.abs(first - near) - Math.abs(second - near) || first - second,
+  );
+}
+
+/**
+ * A wall of the room, named by the axis it bounds and the direction the room lies in from
+ * it: the minimum-z wall has an inward direction of +1 along z.
+ */
+interface RoomWall {
+  readonly axis: "x" | "z";
+  readonly inward: 1 | -1;
+}
+
+const ROOM_WALLS: readonly RoomWall[] = [
+  { axis: "z", inward: 1 },
+  { axis: "z", inward: -1 },
+  { axis: "x", inward: 1 },
+  { axis: "x", inward: -1 },
+];
+
+// A forward axis parallel to a wall leaves the sofa facing along it rather than into the
+// room, and the components that stand for a right angle are only zero to rounding, so a
+// wall counts as usable only once the sofa clearly faces away from it.
+const WALL_FACING_EPSILON = 1e-6;
+
+/**
+ * The walls the sofa can back onto without being turned. Its Y rotation is preserved
+ * (spec 4.3), so a wall is usable only when the sofa's forward axis points away from that
+ * wall, into the room: a rotation-0 sofa (forward +z) can only back onto the minimum-z
+ * wall, and the side walls open up for the quarter turns that face the sofa across them.
+ */
+function usableSofaWalls(rotationY: number): readonly RoomWall[] {
+  const { forward } = localAxes(rotationY);
+  return ROOM_WALLS.filter(
+    ({ axis, inward }) =>
+      (axis === "x" ? forward.x : forward.z) * inward > WALL_FACING_EPSILON,
+  );
+}
+
+/**
+ * The sofa's own candidates: its current placement, then one sweep along every wall it
+ * can back onto. Exported so the wall rule can be verified on the candidates themselves -
+ * which wall a search settles on is otherwise only visible through the whole scored
+ * layout.
+ */
+export function sofaCandidates(
+  scene: Scene,
+  object: SceneObject,
+): readonly ProposedPlacement[] {
   const result: ProposedPlacement[] = [placementFor(object)];
   const sign = Math.sign(object.position[0]) || -1;
   const rotationY = object.rotation[1];
@@ -836,34 +901,38 @@ function sofaCandidates(scene: Scene, object: SceneObject): readonly ProposedPla
     range.maximumZ,
     PLACEMENT_LIMITS.gridM,
   );
-  const xValues: number[] = [];
-  for (let x = minimumX; x <= maximumX + 1e-9; x += PLACEMENT_LIMITS.gridM) {
-    const quantizedX = quantize(x, PLACEMENT_LIMITS.gridM);
-    if (Math.sign(quantizedX) === sign) xValues.push(quantizedX);
-  }
-  xValues.sort((first, second) =>
-    Math.abs(first - object.position[0]) - Math.abs(second - object.position[0]) ||
-    first - second,
-  );
-  for (const z of [minimumZ, maximumZ]) {
-    for (const x of xValues) result.push(candidate(object, x, z, rotationY));
+
+  for (const wall of usableSofaWalls(rotationY)) {
+    if (wall.axis === "z") {
+      const z = wall.inward === 1 ? minimumZ : maximumZ;
+      // Along a back wall the sofa keeps to the room side it was already on.
+      const sweep = gridSweep(minimumX, maximumX, object.position[0], (value) =>
+        Math.sign(value) === sign,
+      );
+      for (const x of sweep) result.push(candidate(object, x, z, rotationY));
+    } else {
+      const x = wall.inward === 1 ? minimumX : maximumX;
+      const sweep = gridSweep(minimumZ, maximumZ, object.position[2], () => true);
+      for (const z of sweep) result.push(candidate(object, x, z, rotationY));
+    }
   }
   return result;
 }
 
+/**
+ * Where the coffee table belongs: one conversation gap out from the sofa along the sofa's
+ * own forward axis. The offset is never flipped toward the room center - the sofa's seats
+ * face its forward axis whatever corner of the room it stands in, and the far side of the
+ * sofa is its back (spec 4.3, 6.4 term 3).
+ */
 function idealTablePosition(
   scene: Scene,
   objects: readonly SceneObject[],
-): { x: number; z: number; rotationY: number; forwardSign: number } | null {
+): { x: number; z: number; rotationY: number } | null {
   const sofa = firstObject(objects, "sofa");
   const table = firstObject(objects, "coffee_table");
   if (!sofa || !table) return null;
   const { forward } = localAxes(sofa.rotation[1]);
-  const towardRoomCenter = axisProjection(
-    { x: -sofa.position[0], z: -sofa.position[2] },
-    forward,
-  );
-  const forwardSign = towardRoomCenter >= 0 ? 1 : -1;
   const rotationY = table.rotation[1];
   const range = usableCenterRange(scene, table, rotationY);
   const distance =
@@ -873,7 +942,7 @@ function idealTablePosition(
   return {
     x: quantize(
       clamp(
-        sofa.position[0] + forward.x * forwardSign * distance,
+        sofa.position[0] + forward.x * distance,
         range.minimumX,
         range.maximumX,
       ),
@@ -881,14 +950,13 @@ function idealTablePosition(
     ),
     z: quantize(
       clamp(
-        sofa.position[2] + forward.z * forwardSign * distance,
+        sofa.position[2] + forward.z * distance,
         range.minimumZ,
         range.maximumZ,
       ),
       PLACEMENT_LIMITS.gridM,
     ),
     rotationY,
-    forwardSign,
   };
 }
 
@@ -938,9 +1006,7 @@ function tableCandidates(
     for (const deltaX of [0, -0.1, 0.1, -0.2, 0.2, -0.3, 0.3]) {
       const x = quantize(
         clamp(
-          sofa.position[0] +
-            forward.x * ideal.forwardSign * distance +
-            lateral.x * deltaX,
+          sofa.position[0] + forward.x * distance + lateral.x * deltaX,
           range.minimumX,
           range.maximumX,
         ),
@@ -948,9 +1014,7 @@ function tableCandidates(
       );
       const z = quantize(
         clamp(
-          sofa.position[2] +
-            forward.z * ideal.forwardSign * distance +
-            lateral.z * deltaX,
+          sofa.position[2] + forward.z * distance + lateral.z * deltaX,
           range.minimumZ,
           range.maximumZ,
         ),
@@ -975,16 +1039,9 @@ function chairCandidates(
   const sofa = firstObject(objects, "sofa");
   const table = firstObject(objects, "coffee_table");
   if (!sofa || !table) return result;
+  // The chair closes the conversation area from beyond the table, on the side of it the
+  // sofa faces - the same forward axis the table itself is measured along.
   const { forward, lateral } = localAxes(sofa.rotation[1]);
-  const direction = Math.sign(
-    axisProjection(
-      {
-        x: table.position[0] - sofa.position[0],
-        z: table.position[2] - sofa.position[2],
-      },
-      forward,
-    ),
-  ) || 1;
   const rotationY = object.rotation[1];
   const range = usableCenterRange(scene, object, rotationY);
   for (const gap of [0.4, 0.5, 0.6, 0.7]) {
@@ -995,7 +1052,7 @@ function chairCandidates(
         gap;
       const x = quantize(
         clamp(
-          table.position[0] + forward.x * direction * distance + lateral.x * deltaX,
+          table.position[0] + forward.x * distance + lateral.x * deltaX,
           range.minimumX,
           range.maximumX,
         ),
@@ -1003,7 +1060,7 @@ function chairCandidates(
       );
       const z = quantize(
         clamp(
-          table.position[2] + forward.z * direction * distance + lateral.z * deltaX,
+          table.position[2] + forward.z * distance + lateral.z * deltaX,
           range.minimumZ,
           range.maximumZ,
         ),
