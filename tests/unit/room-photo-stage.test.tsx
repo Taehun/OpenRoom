@@ -1038,3 +1038,65 @@ describe("RoomPhotoStage", () => {
     expect(screen.getByText(/approximate/i)).toBeInTheDocument();
   });
 });
+
+describe("keyboard focus", () => {
+  test("follows a new selection onto that object's cutout", () => {
+    const { store } = renderStage();
+    expect(document.activeElement).toBe(document.body);
+
+    act(() => store.getState().selectObject("chair_01"));
+
+    const chair = screen.getByRole("button", { name: "Chair" });
+    expect(chair).toHaveAttribute("data-object-id", "chair_01");
+    expect(document.activeElement).toBe(chair);
+  });
+
+  test("leaves focus where it is when the user is typing", () => {
+    const store = fixtureStore();
+    vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockReturnValue(
+      STAGE_RECT,
+    );
+    render(
+      <SceneStoreProvider store={store}>
+        <input aria-label="Ask OpenRoom" />
+        <RoomPhotoStage />
+      </SceneStoreProvider>,
+    );
+    const field = screen.getByRole("textbox", { name: "Ask OpenRoom" });
+    act(() => field.focus());
+
+    act(() => store.getState().selectObject("chair_01"));
+
+    expect(document.activeElement).toBe(field);
+    expect(store.getState().scene.selectedObjectId).toBe("chair_01");
+  });
+
+  test("moves off another object's cutout, where the arrows would be dead", () => {
+    const { store } = renderStage();
+    const chair = screen.getByRole("button", { name: "Chair" });
+    act(() => chair.focus());
+
+    act(() => store.getState().selectObject("plant_01"));
+
+    expect(document.activeElement).toBe(
+      screen.getByRole("button", { name: "Plant" }),
+    );
+  });
+
+  test("reaches the cutout when the move tool is picked, so arrows move it", () => {
+    const { store } = renderStage();
+    expect(store.getState().scene.selectedObjectId).toBe("table_01");
+    const before = objectFromStore(store, "table_01").position[0];
+
+    act(() => store.getState().setToolMode("move"));
+
+    const table = screen.getByRole("button", { name: "Coffee table" });
+    expect(document.activeElement).toBe(table);
+
+    fireEvent.keyDown(document.activeElement!, { key: "ArrowRight" });
+
+    expect(objectFromStore(store, "table_01").position[0]).toBeCloseTo(
+      before + 0.08,
+    );
+  });
+});
