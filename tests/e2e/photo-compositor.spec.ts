@@ -41,6 +41,9 @@ interface CartRequestObservation {
 
 declare global {
   interface Window {
+    // Names collapse when two workspaces register the same tool; the counter
+    // is what distinguishes a live leak from a clean re-registration.
+    __photoActiveRegistrations: number;
     __photoActiveToolNames: Set<string>;
     __photoFetchCount: number;
     __photoTools: Record<string, CapturedTool>;
@@ -269,6 +272,7 @@ function undoPlacementControl(page: Page) {
 
 async function captureModelContextTools(page: Page) {
   await page.addInitScript(() => {
+    window.__photoActiveRegistrations = 0;
     window.__photoActiveToolNames = new Set();
     window.__photoFetchCount = 0;
     window.__photoTools = {};
@@ -281,9 +285,13 @@ async function captureModelContextTools(page: Page) {
         ) {
           window.__photoTools[tool.name] = tool;
           window.__photoActiveToolNames.add(tool.name);
+          window.__photoActiveRegistrations += 1;
           options?.signal?.addEventListener(
             "abort",
-            () => window.__photoActiveToolNames.delete(tool.name),
+            () => {
+              window.__photoActiveToolNames.delete(tool.name);
+              window.__photoActiveRegistrations -= 1;
+            },
             { once: true },
           );
         },
@@ -736,7 +744,12 @@ test("redesigns the whole photo room through Core 6 and preserves human transfor
   await page.getByRole("link", { name: "Nook home" }).click();
   await expect(page).toHaveURL("/");
   // `/` is the dashboard whenever WebMCP is present, so it remounts the
-  // workspace. The guide is the workspace-free view that proves teardown.
+  // workspace: exactly six registrations stay live. A `/demo` unmount that
+  // stopped aborting would leave twelve behind the same six names.
+  await expect
+    .poll(() => page.evaluate(() => window.__photoActiveRegistrations))
+    .toBe(6);
+  // The guide is the workspace-free view that proves teardown.
   await page.getByRole("link", { name: "Guide" }).click();
   await expect(page).toHaveURL("/?view=guide");
   await expect
@@ -744,6 +757,9 @@ test("redesigns the whole photo room through Core 6 and preserves human transfor
       page.evaluate(() => [...window.__photoActiveToolNames].sort()),
     )
     .toEqual([]);
+  await expect
+    .poll(() => page.evaluate(() => window.__photoActiveRegistrations))
+    .toBe(0);
   expect(consoleErrors).toEqual([]);
 });
 
