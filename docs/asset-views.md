@@ -168,7 +168,7 @@ header only and is never logged.
 | Provider | Endpoint | Key header | Reference image | Default model |
 | --- | --- | --- | --- | --- |
 | `gemini` | `POST https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent` | `x-goog-api-key` | an `inlineData` part | `gemini-3.1-flash-image` |
-| `openai` | `POST https://api.openai.com/v1/images/edits` with a reference, `…/images/generations` without | `Authorization: Bearer …` | the multipart `image` field | `gpt-image-1` |
+| `openai` | `POST https://api.openai.com/v1/images/edits` with a reference, `…/images/generations (unexercised: only the Gemini path has been run against the live API)` without | `Authorization: Bearer …` | the multipart `image` field | `gpt-image-1` |
 
 The Gemini body is `{ contents: [{ parts: [{ text }, …{ inlineData: { mimeType,
 data } }] }], generationConfig: { responseModalities: ["IMAGE"], imageConfig: {
