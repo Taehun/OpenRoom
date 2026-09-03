@@ -678,3 +678,36 @@ test("explains an insecure context instead of pairing", async () => {
   ).toBe("Claude: Not connected");
   expect(server.requests).toHaveLength(0);
 });
+
+// The seed table sits at x = 0, so the front-quarter tie resolves to the
+// mirrored twin and the inspector has to disclose that choice.
+test("discloses the selected object's facing and chosen view", async () => {
+  const user = userEvent.setup();
+  render(<DemoWorkspace />);
+
+  const inspector = screen
+    .getByRole("heading", { name: "Object inspector" })
+    .closest("section");
+  if (!inspector) throw new Error("Missing inspector section");
+  const facing = within(inspector).getByText("Facing").nextElementSibling;
+  expect(facing).toHaveTextContent("x 0.00 · z 1.00 · front-quarter · mirrored");
+  expect(within(inspector).getByText("Rotation")).toBeVisible();
+
+  const stage = screen.getByRole("region", { name: "Editable room photo" });
+  const sofa = within(stage).getByRole("button", { name: "Sofa" });
+  await user.click(sofa);
+  const sofaFacing = within(inspector).getByText("Facing").nextElementSibling;
+  expect(sofaFacing).toHaveTextContent("x 0.00 · z 1.00 · front-quarter");
+  expect(sofaFacing?.textContent).not.toContain("mirrored");
+
+  // Six Shift steps turn the sofa 90°, further than the front-quarter pair can
+  // show truthfully, so the inspector has to say the view is approximate.
+  await user.click(screen.getByRole("button", { name: "Rotate tool" }));
+  for (let step = 0; step < 6; step += 1) {
+    fireEvent.keyDown(sofa, { key: "ArrowRight", shiftKey: true });
+  }
+  expect(within(inspector).getByText("Facing").nextElementSibling)
+    .toHaveTextContent(
+      "x −1.00 · z 0.00 · front-quarter · mirrored · approximate",
+    );
+});

@@ -403,6 +403,15 @@
   user-select: none;
 }
 
+/*
+ * A mirrored view is the cutout's left/right twin, so the pixels flip about the
+ * image centre and the frame's anchor is mirrored with them. The layer also sets
+ * this transform inline on the image, so the flip survives a missing stylesheet.
+ */
+.photoMirrored img {
+  transform: scaleX(-1);
+}
+
 .photoObjectSelected {
   outline: 3px solid var(--moss);
   outline-offset: 4px;
@@ -523,6 +532,24 @@
 }
 
 /*
+ * A human may turn an object further than any registered view can show. The
+ * nearest view is still drawn; this discloses that it is only approximate.
+ */
+.photoApproximateBadge {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  padding: 4px 6px;
+  border-radius: 999px;
+  background: rgba(146, 106, 42, 0.92);
+  color: var(--paper);
+  font-size: 0.58rem;
+  font-weight: 750;
+  line-height: 1;
+  pointer-events: none;
+}
+
+/*
  * A floor-projected rug is clipped to its quad while the layer holding the badge spans
  * the whole stage, so the shared corner offsets park the badge outside the rug where it
  * is never drawn. Its inline left/top carry the quad's centre instead.
@@ -553,8 +580,9 @@
   touch-action: none;
 }
 
+/* Only a rug frame still rotates, and it is the one that sets --photo-rotation. */
 .rotationHandle span {
-  transform: rotate(calc(var(--photo-rotation) * -1));
+  transform: rotate(calc(var(--photo-rotation, 0deg) * -1));
 }
 
 .rotationHandle:active {

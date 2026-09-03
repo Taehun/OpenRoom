@@ -125,18 +125,36 @@ function selectedObjectId(result: BrowserToolResult) {
   return (result.structuredContent.data as { id: string }).id;
 }
 
+// The chosen view replaces the old CSS rotation: a cutout is never tilted, so the
+// truthful part of its presentation is which registered view is drawn and whether
+// it is mirrored. Both live on the frame, which is the element itself or its ancestor.
 async function visualPlacement(layer: Locator) {
   return layer.evaluate((element) => {
     const style = (element as HTMLElement).style;
+    const frame = (element as HTMLElement).closest<HTMLElement>(
+      '[data-testid^="photo-object-frame-"]',
+    );
     return {
       left: style.getPropertyValue("--photo-left"),
-      rotation: style.getPropertyValue("--photo-rotation"),
+      mirrored: frame?.getAttribute("data-photo-mirrored") ?? null,
       scale: style.getPropertyValue("--photo-scale"),
       top: style.getPropertyValue("--photo-top"),
+      view: frame?.getAttribute("data-photo-view") ?? null,
       width: style.getPropertyValue("--photo-width"),
       zIndex: style.zIndex,
     };
   });
+}
+
+/** Every rendered frame transform, so a stray CSS rotation cannot hide. */
+async function objectFrameTransforms(page: Page) {
+  return page.evaluate(() =>
+    [
+      ...document.querySelectorAll<HTMLElement>(
+        '[data-testid^="photo-object-frame-"]',
+      ),
+    ].map((frame) => frame.style.transform),
+  );
 }
 
 async function largestExposedHorizontalEdgeRatio(
@@ -811,6 +829,27 @@ test("arranges the room explicitly, settles, and restores it with one undo", asy
   expect(openingBlockingObjectIds(arrangedScene)).toEqual([]);
   expect(reachesOpening(arrangedScene)).toBe(true);
   expect(placementSignature(arrangedScene)).not.toEqual(savedPlacement);
+
+  // Only the photographed front-quarter pair is registered today and the solver does
+  // not turn objects yet, so the arranged chair shows the mirrored cutout exactly
+  // when it sits at or right of the room centre, facing the room. Task 4 teaches the
+  // solver to turn the chair and tightens this to its pinned flanking rotation.
+  const arrangedChair = arrangedScene.objects.find(
+    (object) => object.id === "chair_01",
+  );
+  if (!arrangedChair) throw new Error("Missing chair_01 after arranging");
+  expect(arrangedChair.rotation[1]).toBe(0);
+  const chairFrame = page.getByTestId("photo-object-frame-chair_01");
+  await expect(chairFrame).toHaveAttribute(
+    "data-photo-mirrored",
+    String(arrangedChair.position[0] >= 0),
+  );
+  await expect(chairFrame).toHaveAttribute("data-photo-view", "front-quarter");
+  const arrangedTransforms = await objectFrameTransforms(page);
+  expect(arrangedTransforms).toHaveLength(5);
+  for (const transform of arrangedTransforms) {
+    expect(transform).not.toContain("rotate(");
+  }
 
   await arrangeControl(page).click();
   await expect(placementStatus(page)).toHaveText(
