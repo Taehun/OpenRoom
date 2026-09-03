@@ -1,6 +1,6 @@
 import type { CommerceContext, ShopifyVariantMap } from "../../src/features/commerce/commerce-types";
 
-export const PLACEHOLDER_STORE_DOMAIN = "nook-placeholder.myshopify.com";
+export const PLACEHOLDER_STORE_DOMAIN = "openinterior-placeholder.myshopify.com";
 
 export const FIXTURE_VARIANTS: ShopifyVariantMap = {
   "coffee-table": "gid://shopify/ProductVariant/1001",

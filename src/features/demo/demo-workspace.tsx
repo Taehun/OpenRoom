@@ -214,8 +214,8 @@ function DemoWorkspaceContent({
           scene={scene}
         />
         <div className={styles.desktopNotice} role="note">
-          Nook’s room editor is desktop-first. Use a viewport at least 1280px
-          wide for the complete atelier.
+          OpenInterior’s room editor is desktop-first. Use a viewport at
+          least 1280px wide for the complete atelier.
         </div>
         <div className={styles.workspaceBody}>
           <RoomCanvas dispatch={routeAction} scene={scene} state={state} />

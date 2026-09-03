@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { PHOTO_ASSETS } from "../../src/features/photo/photo-assets";
 import type { NormalizedQuad } from "../../src/features/photo/photo-assets";
-import { NOOK_PHOTO_CALIBRATION } from "../../src/features/photo/photo-calibration";
+import { OPENINTERIOR_PHOTO_CALIBRATION } from "../../src/features/photo/photo-calibration";
 import {
   layerOrder,
   objectVisualWidth,
@@ -31,14 +31,14 @@ describe("photo projection", () => {
 
   it("maps back and front room corners to calibrated floor limits", () => {
     expect(projectRoomPoint({ x: -3, z: -2.4 }, room)).toMatchObject({
-      left: NOOK_PHOTO_CALIBRATION.backLeft.x,
-      top: NOOK_PHOTO_CALIBRATION.backFloorY,
-      scale: NOOK_PHOTO_CALIBRATION.minScale,
+      left: OPENINTERIOR_PHOTO_CALIBRATION.backLeft.x,
+      top: OPENINTERIOR_PHOTO_CALIBRATION.backFloorY,
+      scale: OPENINTERIOR_PHOTO_CALIBRATION.minScale,
     });
     expect(projectRoomPoint({ x: 3, z: 2.4 }, room)).toMatchObject({
-      left: NOOK_PHOTO_CALIBRATION.frontRight.x,
-      top: NOOK_PHOTO_CALIBRATION.frontFloorY,
-      scale: NOOK_PHOTO_CALIBRATION.maxScale,
+      left: OPENINTERIOR_PHOTO_CALIBRATION.frontRight.x,
+      top: OPENINTERIOR_PHOTO_CALIBRATION.frontFloorY,
+      scale: OPENINTERIOR_PHOTO_CALIBRATION.maxScale,
     });
   });
 

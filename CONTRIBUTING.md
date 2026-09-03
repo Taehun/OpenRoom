@@ -1,4 +1,4 @@
-# Contributing to Nook
+# Contributing to OpenInterior
 
 Keep changes focused and update documentation when behavior or setup changes.
 

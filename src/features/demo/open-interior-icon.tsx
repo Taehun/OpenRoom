@@ -1,4 +1,4 @@
-export type NookIconName =
+export type OpenInteriorIconName =
   | "cart"
   | "check"
   | "close"
@@ -9,12 +9,12 @@ export type NookIconName =
   | "sparkles"
   | "undo";
 
-interface NookIconProps {
-  name: NookIconName;
+interface OpenInteriorIconProps {
+  name: OpenInteriorIconName;
   size?: number;
 }
 
-export function NookIcon({ name, size = 18 }: NookIconProps) {
+export function OpenInteriorIcon({ name, size = 18 }: OpenInteriorIconProps) {
   const common = {
     fill: "none",
     stroke: "currentColor",

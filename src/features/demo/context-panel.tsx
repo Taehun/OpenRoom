@@ -2,7 +2,7 @@ import type { Dispatch } from "react";
 import type { Scene, SceneObject } from "../scene/scene-schema";
 import { DEMO_PRODUCTS } from "./demo-data";
 import type { DemoAction, DemoState } from "./demo-types";
-import { NookIcon } from "./nook-icon";
+import { OpenInteriorIcon } from "./open-interior-icon";
 import styles from "./demo-workspace.module.css";
 
 interface ContextPanelProps {
@@ -248,7 +248,7 @@ function ActivityPanel({
 
       <div className={styles.revisionCard}>
         <span className={styles.revisionSpark} aria-hidden="true">
-          <NookIcon name="sparkles" size={17} />
+          <OpenInteriorIcon name="sparkles" size={17} />
         </span>
         <span>
           <small>Scene diagnostics</small>

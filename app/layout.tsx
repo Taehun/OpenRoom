@@ -16,7 +16,7 @@ const ui = DM_Sans({
 });
 
 export const metadata: Metadata = {
-  title: "Nook",
+  title: "OpenInterior",
   description: "The room becomes the storefront.",
 };
 
