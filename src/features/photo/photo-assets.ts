@@ -1,5 +1,8 @@
+import { z } from "zod";
+
 import type { SceneObject } from "../scene/scene-schema";
 import type { NormalizedPoint } from "./photo-calibration";
+import { GENERATED_PRODUCT_ASSETS } from "./photo-products.generated";
 
 export type NormalizedQuad = readonly [
   NormalizedPoint,
@@ -17,6 +20,53 @@ export interface PhotoAsset {
   anchorY: number;
   floorQuad?: NormalizedQuad;
 }
+
+/**
+ * One cutout written by `pnpm assets:products`. `provider`, `model` and
+ * `generatedAt` are provenance only and never reach the compositor;
+ * `quadSource: "bbox"` marks a rug quad that was derived from the alpha
+ * bounding box rather than measured by hand.
+ */
+export interface GeneratedProductAsset {
+  id: string;
+  src: string;
+  intrinsicWidth: number;
+  intrinsicHeight: number;
+  anchorX: number;
+  anchorY: number;
+  floorQuad?: NormalizedQuad;
+  quadSource?: "bbox";
+  provider: "openai" | "gemini";
+  model: string;
+  generatedAt: string;
+}
+
+const NormalizedPointSchema = z
+  .object({ x: z.number(), y: z.number() })
+  .strict();
+
+export const GeneratedProductAssetSchema = z
+  .object({
+    id: z.string().min(1),
+    src: z.string().startsWith("/demo/photo/"),
+    intrinsicWidth: z.number().int().positive(),
+    intrinsicHeight: z.number().int().positive(),
+    anchorX: z.number().min(0).max(1),
+    anchorY: z.number().min(0).max(1),
+    floorQuad: z
+      .tuple([
+        NormalizedPointSchema,
+        NormalizedPointSchema,
+        NormalizedPointSchema,
+        NormalizedPointSchema,
+      ])
+      .optional(),
+    quadSource: z.literal("bbox").optional(),
+    provider: z.enum(["openai", "gemini"]),
+    model: z.string().min(1),
+    generatedAt: z.iso.datetime(),
+  })
+  .strict() satisfies z.ZodType<GeneratedProductAsset>;
 
 const RUG_FLOOR_QUADS = {
   "seed-pattern-rug": [
@@ -63,7 +113,7 @@ export const ROOM_PHOTO_ASSETS = {
 export const OPENROOM_ROOM_BACKGROUND = ROOM_PHOTO_ASSETS.empty.src;
 export const OPENROOM_ROOM_BEFORE = ROOM_PHOTO_ASSETS.before.src;
 
-export const PHOTO_ASSETS: Record<string, PhotoAsset> = {
+const HAND_REGISTERED_ASSETS: Record<string, PhotoAsset> = {
   "seed-dated-sofa": { id: "seed-dated-sofa", src: "/demo/photo/seed/seed-dated-sofa.webp", intrinsicWidth: 1536, intrinsicHeight: 1024, anchorX: 0.4974, anchorY: 0.9102 },
   "seed-glass-table": { id: "seed-glass-table", src: "/demo/photo/seed/seed-glass-table.webp", intrinsicWidth: 1536, intrinsicHeight: 1024, anchorX: 0.5007, anchorY: 0.8613 },
   "seed-pattern-rug": { id: "seed-pattern-rug", src: "/demo/photo/seed/seed-pattern-rug.webp", intrinsicWidth: 1536, intrinsicHeight: 1024, anchorX: 0.5023, anchorY: 1, floorQuad: RUG_FLOOR_QUADS["seed-pattern-rug"] },
@@ -89,6 +139,48 @@ export const PHOTO_ASSETS: Record<string, PhotoAsset> = {
   "stone-planter-ficus": { id: "stone-planter-ficus", src: "/demo/photo/products/stone-planter-ficus.webp", intrinsicWidth: 1024, intrinsicHeight: 1536, anchorX: 0.5073, anchorY: 0.9844 },
   "teak-planter-palm": { id: "teak-planter-palm", src: "/demo/photo/products/teak-planter-palm.webp", intrinsicWidth: 1024, intrinsicHeight: 1536, anchorX: 0.5127, anchorY: 0.9876 },
 };
+
+/** Validated at import, so a malformed generated entry fails loudly. */
+const GENERATED_ASSETS: readonly GeneratedProductAsset[] =
+  GENERATED_PRODUCT_ASSETS.map((entry) =>
+    GeneratedProductAssetSchema.parse(entry),
+  );
+
+function toPhotoAsset(entry: GeneratedProductAsset): PhotoAsset {
+  return {
+    id: entry.id,
+    src: entry.src,
+    intrinsicWidth: entry.intrinsicWidth,
+    intrinsicHeight: entry.intrinsicHeight,
+    anchorX: entry.anchorX,
+    anchorY: entry.anchorY,
+    ...(entry.floorQuad ? { floorQuad: entry.floorQuad } : {}),
+  };
+}
+
+/**
+ * The union of the hand-registered cutouts and the ones `pnpm assets:products`
+ * generated. A hand-registered entry always wins: the pinned catalog assets,
+ * anchors, and quads never change.
+ */
+export const PHOTO_ASSETS: Record<string, PhotoAsset> = {
+  ...Object.fromEntries(
+    GENERATED_ASSETS.map((entry) => [entry.id, toPhotoAsset(entry)]),
+  ),
+  ...HAND_REGISTERED_ASSETS,
+};
+
+/**
+ * The catalog products the product pipeline still has to photograph. Takes the
+ * catalog rather than importing it, so the pipeline and its tests can plan over
+ * a fixture list.
+ */
+export function productsWithoutAssets<T extends { id: string }>(
+  products: readonly T[],
+  assets: Readonly<Record<string, PhotoAsset>> = PHOTO_ASSETS,
+): T[] {
+  return products.filter((product) => !assets[product.id]);
+}
 
 export function getPhotoAsset(object: SceneObject): PhotoAsset | null {
   return object.assetId ? PHOTO_ASSETS[object.assetId] ?? null : null;
