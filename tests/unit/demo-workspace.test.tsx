@@ -233,7 +233,7 @@ test("opens a four-item approval sheet and confirms without an external cart req
 
   await user.click(
     within(sheet).getByRole("button", {
-      name: "Continue to Shopify · $626",
+      name: "Approve demo cart · $626",
     }),
   );
 
@@ -258,7 +258,7 @@ test("keeps keyboard focus inside the cart approval sheet", async () => {
     name: "Close cart review",
   });
   const continueToShopify = within(sheet).getByRole("button", {
-    name: "Continue to Shopify · $626",
+    name: "Approve demo cart · $626",
   });
   const keepEditing = within(sheet).getByRole("button", {
     name: "Keep editing",

@@ -1,4 +1,5 @@
 import type { Dispatch } from "react";
+import { PHOTO_ASSETS } from "../photo/photo-assets";
 import { facingOf, roundFacing } from "../photo/photo-facing";
 import { getPhotoAssetSet, selectPhotoView } from "../photo/photo-views";
 import type { Scene, SceneObject } from "../scene/scene-schema";
@@ -150,8 +151,8 @@ function InspectorPanel({
           〼
         </span>
         <span>
-          <strong>{selectedObject.locked ? "Placement locked" : "Placement editable"}</strong>
-          <small>Preview swaps preserve this transform.</small>
+          <strong>{selectedObject.locked ? "Position locked" : "Position kept"}</strong>
+          <small>Previewing an alternative keeps this position and rotation.</small>
         </span>
       </div>
 
@@ -225,13 +226,26 @@ function ProductsPanel({
               className={isPreviewing ? styles.productActive : styles.product}
               key={product.id}
             >
-              <div
-                aria-hidden="true"
-                className={styles.productMaterial}
-                data-material={index + 1}
-              >
-                <span />
-              </div>
+              {PHOTO_ASSETS[product.id] ? (
+                <div aria-hidden="true" className={styles.productThumb}>
+                  {/* Registered local cutout; the native box keeps the aspect exact. */}
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    alt=""
+                    decoding="async"
+                    loading="lazy"
+                    src={PHOTO_ASSETS[product.id]!.src}
+                  />
+                </div>
+              ) : (
+                <div
+                  aria-hidden="true"
+                  className={styles.productMaterial}
+                  data-material={index + 1}
+                >
+                  <span />
+                </div>
+              )}
               <div className={styles.productCopy}>
                 <div className={styles.productTitleRow}>
                   <h3>{product.title}</h3>
@@ -239,6 +253,9 @@ function ProductsPanel({
                 </div>
                 <p>{product.description}</p>
                 <button
+                  aria-label={
+                    isPreviewing ? "Active preview" : `Preview ${product.title}`
+                  }
                   aria-pressed={isPreviewing}
                   className={
                     isPreviewing
@@ -253,7 +270,7 @@ function ProductsPanel({
                   }
                   type="button"
                 >
-                  {isPreviewing ? "Active preview" : `Preview ${product.title}`}
+                  {isPreviewing ? "Active preview" : "Preview"}
                 </button>
               </div>
             </article>

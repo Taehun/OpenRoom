@@ -69,7 +69,7 @@ describe("CartApprovalSheet in demo mode", () => {
     const dispatch = vi.fn();
     render(<CartApprovalSheet commerce={DEMO_COMMERCE} dispatch={dispatch} />);
     fireEvent.click(
-      screen.getByRole("button", { name: "Continue to Shopify · $626" }),
+      screen.getByRole("button", { name: "Approve demo cart · $626" }),
     );
     expect(dispatch).toHaveBeenCalledWith({ type: "confirm-demo-cart" });
     expect(screen.queryByText("Not mapped to a Shopify variant")).toBeNull();
@@ -281,7 +281,7 @@ describe("CartApprovalSheet configuration reasons", () => {
     );
     expect(screen.queryByText(/Shopify checkout is/)).toBeNull();
     fireEvent.click(
-      screen.getByRole("button", { name: "Continue to Shopify · $626" }),
+      screen.getByRole("button", { name: "Approve demo cart · $626" }),
     );
     expect(dispatch).toHaveBeenCalledWith({ type: "confirm-demo-cart" });
   });

@@ -976,6 +976,23 @@
   box-shadow: inset 3px 0 var(--moss);
 }
 
+/* The product cutout on a quiet surface; the swatch below is the fallback. */
+.productThumb {
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  background: var(--md-sys-color-surface-container);
+}
+
+.productThumb img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  padding: 8px;
+  box-sizing: border-box;
+}
+
 .productMaterial {
   position: relative;
   overflow: hidden;

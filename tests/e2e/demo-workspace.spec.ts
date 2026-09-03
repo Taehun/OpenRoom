@@ -141,7 +141,7 @@ test("completes the deterministic spatial commerce UI journey", async ({
   const dialog = page.getByRole("dialog", { name: "Review your room" });
   await expect(dialog.getByRole("listitem")).toHaveCount(4);
   await expect(
-    dialog.getByRole("button", { name: "Continue to Shopify · $626" }),
+    dialog.getByRole("button", { name: "Approve demo cart · $626" }),
   ).toBeInViewport();
   await page.keyboard.press("Escape");
   await expect(dialog).toBeHidden();

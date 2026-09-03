@@ -128,8 +128,11 @@ export function CartApprovalSheet({
   const canCheckout = isShopify && checkoutUrl !== null;
   const storeDomain =
     commerce.config.provider === "shopify" ? commerce.config.storeDomain : null;
-  const buttonLabel =
-    draft && !isShopify ? "Approve Scene cart" : "Continue to Shopify";
+  const buttonLabel = isShopify
+    ? "Continue to Shopify"
+    : draft
+      ? "Approve Scene cart"
+      : "Approve demo cart";
   const notice = configurationNotice(commerce.config);
 
   useEffect(() => {
@@ -213,7 +216,7 @@ export function CartApprovalSheet({
             ? "Approving opens Shopify checkout in a new tab. OpenRoom sends nothing itself."
             : draft
               ? `OpenRoom has prepared ${draft.items.length} Scene item${draft.items.length === 1 ? "" : "s"} from Scene revision ${draft.sceneRevision} for your approval. Nothing has been sent to Shopify.`
-              : "OpenRoom has prepared these four fixtures for your approval. Nothing has been sent to Shopify."}
+              : "OpenRoom has prepared these four fixtures for your approval. Nothing leaves this page in demo mode."}
         </p>
 
         <ul className={styles.cartItems}>
