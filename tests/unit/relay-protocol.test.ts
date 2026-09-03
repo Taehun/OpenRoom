@@ -200,6 +200,7 @@ describe("RelayErrorSchema", () => {
       "CALL_TIMEOUT",
       "SESSION_DISCONNECTED",
       "PAGE_UNAVAILABLE",
+      "UNKNOWN_TOOL",
     ]);
     expect(RELAY_ERROR_RETRYABLE).toEqual({
       PAIR_REJECTED: false,
@@ -208,6 +209,7 @@ describe("RelayErrorSchema", () => {
       CALL_TIMEOUT: false,
       SESSION_DISCONNECTED: false,
       PAGE_UNAVAILABLE: true,
+      UNKNOWN_TOOL: false,
     });
   });
 

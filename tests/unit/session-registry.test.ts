@@ -89,6 +89,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  vi.unstubAllGlobals();
   vi.useRealTimers();
 });
 
@@ -424,5 +425,123 @@ describe("explicit disconnect", () => {
     await expect(registry.forwardToolCall("get_scene", {}, controller.signal)).rejects.toThrowError(
       "PAGE_UNAVAILABLE",
     );
+  });
+});
+
+describe("unknown tool names", () => {
+  it("refuses a tool outside the Core 6 without queuing it", async () => {
+    const { token } = pairPage();
+    await expect(
+      registry.forwardToolCall("not_a_tool" as never, {}, new AbortController().signal),
+    ).rejects.toMatchObject({ code: "UNKNOWN_TOOL", retryable: false });
+    expect(vi.getTimerCount()).toBe(0);
+    await expect(drainPoll(token)).resolves.toBeNull();
+  });
+
+  it("refuses an unknown tool even before a page pairs", async () => {
+    await expect(
+      registry.forwardToolCall("" as never, {}, new AbortController().signal),
+    ).rejects.toThrowError("UNKNOWN_TOOL");
+  });
+});
+
+describe("held long polls count as liveness", () => {
+  it("never reaps a session while its poll is held, and resumes the clock when it ends", async () => {
+    const { token } = pairPage();
+    const controller = new AbortController();
+    const polled = registry.poll(token, controller.signal);
+
+    advance(HEARTBEAT_TIMEOUT_MS - 1);
+    registry.sweepExpired();
+    advance(2);
+    registry.sweepExpired();
+    controller.abort();
+    await expect(polled).resolves.toBeNull();
+
+    advance(HEARTBEAT_TIMEOUT_MS - 1);
+    registry.sweepExpired();
+    await expect(drainPoll(token)).resolves.toBeNull();
+
+    advance(HEARTBEAT_TIMEOUT_MS);
+    registry.sweepExpired();
+    await expect(drainPoll(token)).rejects.toThrowError("UNAUTHORIZED");
+  });
+});
+
+describe("process shutdown", () => {
+  it("rejects pending calls, clears every timer, and fails closed afterwards", async () => {
+    const { token } = pairPage();
+    const first = forward("get_scene");
+    const second = forward("get_selection");
+    const rejections = [
+      expect(first.promise).rejects.toThrowError("SESSION_DISCONNECTED"),
+      expect(second.promise).rejects.toThrowError("SESSION_DISCONNECTED"),
+    ];
+
+    registry.shutdown();
+    await Promise.all(rejections);
+    expect(vi.getTimerCount()).toBe(0);
+
+    await expect(drainPoll(token)).rejects.toThrowError("SESSION_DISCONNECTED");
+    await expect(
+      registry.forwardToolCall("get_scene", {}, new AbortController().signal),
+    ).rejects.toThrowError("PAGE_UNAVAILABLE");
+    expect(() => registry.issuePairCode()).toThrowError("SESSION_DISCONNECTED");
+    expect(() =>
+      registry.pair({ code: "123456", origin: ORIGIN, manifestHash: MANIFEST_HASH, pageNonce: PAGE_NONCE }),
+    ).toThrowError("SESSION_DISCONNECTED");
+    expect(() =>
+      registry.resolve(token, { requestId: "u".repeat(24), result: sceneResult("x") }),
+    ).toThrowError("SESSION_DISCONNECTED");
+    expect(() => registry.disconnect(token)).toThrowError("SESSION_DISCONNECTED");
+
+    registry.sweepExpired();
+    registry.shutdown();
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it("ends a held poll and invalidates an unused pair code", async () => {
+    const issued = registry.issuePairCode();
+    const paired = registry.pair({
+      code: issued.code,
+      origin: ORIGIN,
+      manifestHash: MANIFEST_HASH,
+      pageNonce: PAGE_NONCE,
+    });
+    const stale = registry.issuePairCode();
+    const controller = new AbortController();
+    const rejection = expect(registry.poll(paired.sessionToken, controller.signal)).rejects.toThrowError(
+      "SESSION_DISCONNECTED",
+    );
+
+    registry.shutdown();
+    await rejection;
+    expect(stale.code).toMatch(/^\d{6}$/);
+    expect(() =>
+      registry.pair({ code: stale.code, origin: ORIGIN, manifestHash: MANIFEST_HASH, pageNonce: PAGE_NONCE }),
+    ).toThrowError("SESSION_DISCONNECTED");
+  });
+
+  it("clears call timers whose handles have no unref", async () => {
+    const handles: number[] = [];
+    let nextHandle = 1;
+    vi.stubGlobal("setTimeout", () => {
+      const handle = nextHandle;
+      nextHandle += 1;
+      handles.push(handle);
+      return handle;
+    });
+    vi.stubGlobal("clearTimeout", (handle: number) => {
+      const index = handles.indexOf(handle);
+      if (index !== -1) handles.splice(index, 1);
+    });
+
+    pairPage();
+    const { promise } = forward("get_scene");
+    expect(handles).toHaveLength(1);
+
+    registry.shutdown();
+    await expect(promise).rejects.toThrowError("SESSION_DISCONNECTED");
+    expect(handles).toHaveLength(0);
   });
 });

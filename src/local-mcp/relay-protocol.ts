@@ -98,6 +98,7 @@ export const RELAY_ERROR_CODES = [
   "CALL_TIMEOUT",
   "SESSION_DISCONNECTED",
   "PAGE_UNAVAILABLE",
+  "UNKNOWN_TOOL",
 ] as const;
 export type RelayErrorCode = (typeof RELAY_ERROR_CODES)[number];
 
@@ -109,6 +110,7 @@ export const RELAY_ERROR_RETRYABLE: Readonly<Record<RelayErrorCode, boolean>> = 
   CALL_TIMEOUT: false,
   SESSION_DISCONNECTED: false,
   PAGE_UNAVAILABLE: true,
+  UNKNOWN_TOOL: false,
 };
 
 export const RelayErrorSchema = z

@@ -5,13 +5,14 @@ import {
   PAIR_CODE_TTL_MS,
   PairRequestSchema,
   RelayError,
+  RelayToolCallSchema,
   RelayToolResultSchema,
   type PairRequest,
   type PairResponse,
   type RelayToolCall,
   type RelayToolResult,
 } from "../../src/local-mcp/relay-protocol";
-import type { CoreToolName } from "../../src/webmcp/tool-contracts";
+import { CORE_TOOL_NAMES, type CoreToolName } from "../../src/webmcp/tool-contracts";
 import type { ToolResult } from "../../src/webmcp/tool-result";
 
 export interface SessionRegistryOptions {
@@ -98,6 +99,7 @@ export class SessionRegistry {
   private readonly onDiagnostic: (message: string) => void;
   private pairCode: { code: string; expiresAt: number } | null = null;
   private session: Session | null = null;
+  private stopped = false;
 
   constructor(options: SessionRegistryOptions) {
     this.manifestHash = options.manifestHash;
@@ -109,6 +111,7 @@ export class SessionRegistry {
 
   /** Mints the single active pair code, replacing any earlier unused code. */
   issuePairCode(): { code: string; expiresAt: number } {
+    this.ensureRunning();
     this.sweepExpired();
     const expiresAt = this.now() + PAIR_CODE_TTL_MS;
     this.pairCode = { code: sixDigitCode(this.randomBytes), expiresAt };
@@ -122,6 +125,7 @@ export class SessionRegistry {
    * with the identical `PAIR_REJECTED` error and the same diagnostic line.
    */
   pair(input: PairRequest): PairResponse {
+    this.ensureRunning();
     this.sweepExpired();
     const parsed = PairRequestSchema.safeParse(input);
     const request = parsed.success ? parsed.data : null;
@@ -160,6 +164,7 @@ export class SessionRegistry {
    * one arrives. Rejects if the session is replaced or disconnected while held.
    */
   async poll(sessionToken: string, signal: AbortSignal): Promise<RelayToolCall | null> {
+    this.ensureRunning();
     this.sweepExpired();
     const session = this.authenticate(sessionToken);
     session.lastSeenAt = this.now();
@@ -177,6 +182,7 @@ export class SessionRegistry {
       const waiter: PollWaiter = {
         resolve: (call) => {
           detach();
+          session.lastSeenAt = this.now();
           resolve(call);
         },
         reject: (error) => {
@@ -187,6 +193,7 @@ export class SessionRegistry {
       const onAbort = () => {
         if (session.waiter === waiter) session.waiter = null;
         detach();
+        session.lastSeenAt = this.now();
         resolve(null);
       };
       detach = () => signal.removeEventListener("abort", onAbort);
@@ -206,9 +213,13 @@ export class SessionRegistry {
     input: unknown,
     signal: AbortSignal,
   ): Promise<ToolResult<unknown>> {
+    // Checked before anything else: a name outside the Core 6 must never reach
+    // the queue, whatever the session state, because the page executes only the
+    // six manifest tools.
+    if (!CORE_TOOL_NAMES.includes(toolName)) throw new RelayError("UNKNOWN_TOOL");
     this.sweepExpired();
     const session = this.session;
-    if (!session) throw new RelayError("PAGE_UNAVAILABLE");
+    if (this.stopped || !session) throw new RelayError("PAGE_UNAVAILABLE");
     if (session.pending.size >= MAX_PENDING_CALLS) throw new RelayError("TOO_MANY_PENDING_CALLS");
     if (signal.aborted) throw new RelayError("CALL_TIMEOUT");
 
@@ -240,6 +251,9 @@ export class SessionRegistry {
         this.onDiagnostic(`tool call timed out: ${toolName}`);
         abandon();
       }, CALL_TIMEOUT_MS);
+      // An in-flight call must not by itself hold the Node event loop open;
+      // guarded because a browser or stubbed timer handle has no unref.
+      (timer as unknown as { unref?: () => void }).unref?.();
       detach = () => {
         clearTimeout(timer);
         signal.removeEventListener("abort", onAbort);
@@ -258,6 +272,7 @@ export class SessionRegistry {
    * exist. The result is handed straight to the waiting promise and not stored.
    */
   resolve(sessionToken: string, message: RelayToolResult): void {
+    this.ensureRunning();
     this.sweepExpired();
     const session = this.authenticate(sessionToken);
     const parsed = RelayToolResultSchema.safeParse(message);
@@ -273,21 +288,44 @@ export class SessionRegistry {
 
   /** Ends the session and rejects everything still in flight. */
   disconnect(sessionToken: string): void {
+    this.ensureRunning();
     const session = this.authenticate(sessionToken);
     this.destroySession(session, "disconnected by the paired page");
   }
 
+  /**
+   * Terminal teardown for process exit. Rejects every in-flight call, ends the
+   * held poll, invalidates the session and any unused pair code, and clears
+   * every timer. The registry then fails closed: no later request can open a
+   * session or queue a call.
+   */
+  shutdown(): void {
+    if (this.stopped) return;
+    this.stopped = true;
+    this.pairCode = null;
+    const session = this.session;
+    if (session) this.destroySession(session, "relay shutting down");
+    this.onDiagnostic("relay shut down");
+  }
+
   /** Drops an expired pair code and an expired session; safe to call on a timer. */
   sweepExpired(): void {
+    if (this.stopped) return;
     const now = this.now();
     if (this.pairCode && this.pairCode.expiresAt <= now) {
       this.pairCode = null;
       this.onDiagnostic("pair code expired");
     }
     const session = this.session;
-    if (session && session.lastSeenAt + HEARTBEAT_TIMEOUT_MS <= now) {
+    // A held poll is itself proof of life, so the heartbeat clock only runs
+    // between polls; the HTTP layer aborts the poll when the socket closes.
+    if (session && !session.waiter && session.lastSeenAt + HEARTBEAT_TIMEOUT_MS <= now) {
       this.destroySession(session, "heartbeat expired");
     }
+  }
+
+  private ensureRunning(): void {
+    if (this.stopped) throw new RelayError("SESSION_DISCONNECTED");
   }
 
   private authenticate(sessionToken: string): Session {
@@ -303,8 +341,20 @@ export class SessionRegistry {
       const requestId = session.queue.shift();
       const call = requestId === undefined ? undefined : session.pending.get(requestId);
       if (!call) continue;
+      // Re-validated on the way out so a malformed envelope is refused here
+      // rather than handed to the page.
+      const parsed = RelayToolCallSchema.safeParse({
+        requestId: call.requestId,
+        toolName: call.toolName,
+        input: call.input,
+      });
+      if (!parsed.success) {
+        this.discard(session, call.requestId);
+        call.reject(new RelayError("UNKNOWN_TOOL"));
+        continue;
+      }
       call.delivered = true;
-      return { requestId: call.requestId, toolName: call.toolName, input: call.input };
+      return parsed.data;
     }
     return null;
   }
