@@ -1,3 +1,4 @@
+import { CORE_TOOL_MANIFEST } from "../../src/webmcp/core-tool-manifest";
 import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, test, vi } from "vitest";
