@@ -545,7 +545,9 @@ clears after four seconds; an in-flow gate replaces the workspace under
 Later still: the selection outline and rotation handle follow the measured
 silhouette (`photoSilhouetteOutline`, mirrored with the twin); tooltips,
 the redesign prompt, and "Standing on" read plainly; "Prompt copied" clears
-after 2.5 s.
+after 2.5 s. The cart sheet shows product cutouts with plain approval copy;
+copies are announced to screen readers, copy buttons have distinct names,
+and new-tab links say so.
 
 Open: README/docs staleness sweep beyond the catalog counts (check
 `docs/local-mcp.md` lifecycle wording and `docs/asset-views.md` category list);
