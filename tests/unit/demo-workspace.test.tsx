@@ -599,11 +599,13 @@ test("offers accessible manual pairing controls beside the native WebMCP status"
     screen.queryByRole("button", { name: "Disconnect Claude" }),
   ).not.toBeInTheDocument();
   expect(screen.getByLabelText("Relay port")).toHaveValue(43_110);
-  expect(
-    screen.getByText(
-      "Start pnpm mcp:openinterior, then enter the code printed in that terminal.",
-    ),
-  ).toBeVisible();
+  // The hint is visually hidden and reaches the operator only through
+  // `aria-describedby`, so assert the wiring rather than its visibility: jsdom
+  // applies no CSS module rules, which would make `toBeVisible` pass even with
+  // the description detached.
+  expect(code).toHaveAccessibleDescription(
+    "Start pnpm mcp:openinterior, then enter the code printed in that terminal.",
+  );
 });
 
 test("enables Connect Claude only for exactly six digits", async () => {
