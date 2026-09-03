@@ -204,21 +204,23 @@
  */
 .commandRow {
   display: flex;
-  align-items: baseline;
+  align-items: flex-start;
   gap: 6px;
 }
 
 /*
- * A command is one line: `white-space: pre` keeps `mcp:openroom` and the repo
- * path from breaking mid-token, and the row scrolls sideways instead of the
- * page. `.md-code` keeps wrapping for the inline spans elsewhere in the guide.
+ * A command wraps only at its spaces: every token (`--dir`, `<repo>`,
+ * `mcp:openroom`) stays whole, and nothing scrolls or clips. `.md-code` keeps
+ * its default wrapping for the inline spans elsewhere in the guide.
  */
 .commandRow code {
   flex: 0 1 auto;
   min-width: 0;
   max-width: 100%;
-  overflow-x: auto;
-  white-space: pre;
+  white-space: pre-wrap;
+  overflow-wrap: normal;
+  word-break: normal;
+  line-height: 1.5;
 }
 
 .stepCopy {
