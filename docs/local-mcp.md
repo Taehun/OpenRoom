@@ -33,8 +33,10 @@ pnpm mcp:openroom ──── HTTP on 127.0.0.1 only ────► OpenRoom p
 ## Lifecycle
 
 1. Start the app: `pnpm dev`, then open <http://localhost:3000/demo>.
-2. Start the companion: `pnpm mcp:openroom`. Configure your MCP client with
-   one of the entries below and it will start the companion for you instead.
+2. Register the companion with your MCP client, using one of the entries under
+   [Client configuration](#client-configuration). The client starts the process
+   itself; `pnpm mcp:openroom` is the script it runs, and running a second copy
+   in a terminal does not help (see step 3).
 3. Read the banner on **stderr** (stdout carries MCP framing and nothing else):
 
    ```text

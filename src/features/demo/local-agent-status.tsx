@@ -32,8 +32,14 @@ const PAIR_ERROR_NOTES = {
   PAIR_REJECTED: "Pairing was rejected. Check the code and try again.",
 } as const;
 
+/*
+ * The MCP client launches the companion and keeps its stderr, so the code is
+ * read from the log the registered `sh -c … 2>>` command appends to, not from
+ * a companion started by hand. The guide at `/` carries the full recipe, and
+ * `docs/local-mcp.md` is its source.
+ */
 const PAIRING_HINT =
-  "Run pnpm mcp:openroom in the repository and type the six-digit code it prints.";
+  "Type the six-digit code the companion wrote to ~/openroom-mcp.log.";
 
 export function LocalAgentStatus({ relay }: { relay: LocalMcpRelay }) {
   const [code, setCode] = useState("");

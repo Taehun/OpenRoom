@@ -75,7 +75,7 @@ reached. `tests/e2e/webmcp-core.spec.ts` asserts that parity.
 | --- | --- | --- |
 | ChatGPT Work and Codex in the ChatGPT desktop app's browser | Native WebMCP through `document.modelContext` | Open OpenRoom. Nothing else. |
 | Any other Chromium browser exposing `document.modelContext` | Native WebMCP | Open OpenRoom. Nothing else. |
-| Claude Desktop | Local MCP companion over stdio | `pnpm mcp:openroom`, then pair the page. See [docs/local-mcp.md](docs/local-mcp.md). |
+| Claude Desktop | Local MCP companion over stdio | Register the companion with the client — the client starts it — then pair the page with the six-digit code it logs. See [docs/local-mcp.md](docs/local-mcp.md). |
 | Claude Code | Local MCP companion over stdio | Same. |
 | Codex CLI | Local MCP companion over stdio | Same. |
 | Claude for Chrome | Not supported as a WebMCP site-tool surface | Anthropic documents it as browser automation, not WebMCP site-tool discovery. Use the companion. |
@@ -95,7 +95,7 @@ Start and verify:
 
 ```bash
 pnpm dev                                                       # serve the app on :3000
-pnpm mcp:openroom                                              # start the companion on 127.0.0.1:43110
+pnpm mcp:openroom                                              # the script the client runs; by hand only to debug
 pnpm exec vitest run tests/integration/local-mcp-companion.test.ts   # real client, real process
 pnpm test                                                      # unit suite plus that integration test
 ```
@@ -187,8 +187,10 @@ a photographed one.
 - Desktop Chrome with WebMCP support to use the Core 6 enhancement. Browsers
   without `document.modelContext` retain the complete human demo.
 - No WebMCP-capable browser is needed for the local MCP companion path: Claude
-  Desktop, Claude Code, and Codex CLI reach the same six tools through
-  `pnpm mcp:openroom`. See [docs/local-mcp.md](docs/local-mcp.md).
+  Desktop, Claude Code, and Codex CLI reach the same six tools through the
+  companion, which each client starts from the command you register with it.
+  See [docs/local-mcp.md](docs/local-mcp.md) for that command and for how to
+  read the pair code.
 
 ## Setup
 
@@ -215,8 +217,7 @@ local environment file; never commit them.
 | `pnpm test:watch` | Run Vitest in watch mode. |
 | `pnpm test:e2e` | Run the Playwright demo-mode end-to-end tests (port 3000). |
 | `pnpm test:e2e:commerce` | Run the Playwright Shopify-mode journeys (port 3001). |
-| `pnpm mcp:openroom` | Start the localhost MCP companion for Claude Desktop, Claude Code, or Codex CLI. |
-| `pnpm mcp:openroom` | Start the localhost MCP companion for Claude Desktop, Claude Code, or Codex CLI. |
+| `pnpm mcp:openroom` | The localhost MCP companion for Claude Desktop, Claude Code, and Codex CLI. Your client runs this for you once the command in [docs/local-mcp.md](docs/local-mcp.md) is registered; run it by hand only to debug. |
 | `pnpm assets:views` | Generate the missing cutout views offline (developer-run; needs `GEMINI_API_KEY` or `OPENAI_API_KEY`). Add `--dry-run` to only print the plan. |
 | `pnpm assets:products` | Generate the missing product front-quarter cutouts offline (developer-run; same keys). Add `--dry-run` to only print the plan. |
 | `pnpm cf-typegen` | Generate Cloudflare Worker types. |

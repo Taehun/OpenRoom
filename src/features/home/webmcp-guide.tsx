@@ -21,14 +21,26 @@ const CONNECT_HEADING_ID = "connect-an-ai-app-heading";
  * The commands a reader copies to reach the local companion. `<repo>` is
  * literal text the reader replaces with their checkout path, and the copy
  * buttons write these strings verbatim.
+ *
+ * The client starts the companion itself, so there is no separate command to
+ * run first: a second companion in a terminal either fails with `EADDRINUSE`
+ * or prints a code for a relay no client is attached to. The client also owns
+ * the companion's stderr, which is where the pair code lands, so the
+ * registered command wraps it in `sh -c` and appends stderr to a log the
+ * reader can `tail`. See `docs/local-mcp.md`.
  */
 export const CONNECT_COMMANDS = {
-  start: "pnpm mcp:openroom",
-  claude: "claude mcp add openroom -- pnpm --silent --dir <repo> mcp:openroom",
-  codex: "codex mcp add openroom -- pnpm --silent --dir <repo> mcp:openroom",
+  claude:
+    'claude mcp add --transport stdio openroom -- sh -c \'exec pnpm --silent --dir <repo> mcp:openroom 2>>"$HOME/openroom-mcp.log"\'',
+  codex:
+    'codex mcp add openroom -- sh -c \'exec pnpm --silent --dir <repo> mcp:openroom 2>>"$HOME/openroom-mcp.log"\'',
+  log: "tail -f ~/openroom-mcp.log",
 } as const;
 
-const PAIR_STEP = "Type the six-digit code into the dashboard.";
+const REPO_PLACEHOLDER_NOTE = "Replace <repo> with your OpenRoom checkout path.";
+
+const PAIR_STEP =
+  "Start a chat; your app launches the companion, which writes a six-digit code to the log. Type it into the dashboard.";
 
 type ConnectStep = { command: string } | { note: string };
 
@@ -46,19 +58,19 @@ const CONNECT_CARDS: ReadonlyArray<ConnectCardContent> = [
   },
   {
     title: "Claude Code & Claude Desktop",
-    body: null,
+    body: REPO_PLACEHOLDER_NOTE,
     steps: [
-      { command: CONNECT_COMMANDS.start },
       { command: CONNECT_COMMANDS.claude },
+      { command: CONNECT_COMMANDS.log },
       { note: PAIR_STEP },
     ],
   },
   {
     title: "Codex CLI",
-    body: null,
+    body: REPO_PLACEHOLDER_NOTE,
     steps: [
-      { command: CONNECT_COMMANDS.start },
       { command: CONNECT_COMMANDS.codex },
+      { command: CONNECT_COMMANDS.log },
       { note: PAIR_STEP },
     ],
   },

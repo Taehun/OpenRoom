@@ -60,8 +60,15 @@ test("guides a browser without WebMCP to the flag and the demo", async ({
   // companion, so this browser must still be able to open the dashboard.
   const connect = page.getByRole("region", { name: "Connect an AI app" });
   await expect(connect).toBeVisible();
+  // The client launches the companion behind the stderr-log wrapper; the
+  // reader never starts a second one. `docs/local-mcp.md` is the source.
   await expect(
-    connect.getByText("claude mcp add openroom -- pnpm --silent --dir <repo> mcp:openroom"),
+    connect.getByText(
+      `claude mcp add --transport stdio openroom -- sh -c 'exec pnpm --silent --dir <repo> mcp:openroom 2>>"$HOME/openroom-mcp.log"'`,
+    ),
+  ).toBeVisible();
+  await expect(
+    connect.getByText("tail -f ~/openroom-mcp.log").first(),
   ).toBeVisible();
   const dashboard = connect
     .getByRole("link", { name: "Open the dashboard" })
