@@ -41,7 +41,7 @@ pnpm mcp:openroom ──── HTTP on 127.0.0.1 only ────► OpenRoom p
    openroom-mcp: relay listening on http://127.0.0.1:43110
    openroom-mcp: allowed page origins: http://localhost:3000, http://127.0.0.1:3000
    openroom-mcp: pairing code 481902 expires 2026-09-03T09:14:53.267Z
-   openroom-mcp: enter it in OpenRoom's "Pairing code" field, then press "Connect Claude"
+   openroom-mcp: in OpenRoom press "Connect an AI app", type it into the "Pairing code" field, then press "Connect"
    ```
 
    Where that text lands depends on the client, because the client owns the
@@ -53,16 +53,17 @@ pnpm mcp:openroom ──── HTTP on 127.0.0.1 only ────► OpenRoom p
    a terminal is not a way to read the code: it either fails with `EADDRINUSE`
    on 43110 or, on another port, prints a code for a relay no MCP client is
    attached to.
-4. In the page, type the six digits into **Pairing code** and press **Connect
-   Claude**. The status line changes to `Claude: Connected`. Leave the port field
-   at `43110` unless you changed `OPENROOM_MCP_PORT`.
+4. In the page, press **Connect an AI app**, type the six digits into
+   **Pairing code**, and press **Connect**. The status chip changes to
+   `Local agent: Connected`. The relay port sits behind **Advanced** in that
+   dialog; leave it at `43110` unless you changed `OPENROOM_MCP_PORT`.
 5. Ask your model to call a tool — "call get_scene and tell me what is in the
    room" is enough. The call runs in the page you are looking at.
 
 The pair code is **single use** and expires **ten minutes** after it is printed.
 Exactly one code is live at a time, and the companion prints a replacement
 whenever the current one becomes useless. When a paired page goes away — you
-press **Disconnect Claude**, you close the tab, or the session misses its
+press **Disconnect**, you close the tab, or the session misses its
 heartbeat — the replacement is printed straight away, so re-pairing is just
 "read the new code off stderr and type it in"; the companion and your MCP client
 keep running. When five wrong attempts retire a code instead, the replacement is
@@ -209,14 +210,14 @@ on both paths, and `tests/e2e/webmcp-core.spec.ts` asserts that.
 
 | Symptom | Cause and fix |
 | --- | --- |
-| A tool call returns `PAGE_UNAVAILABLE` | No page is paired. Open OpenRoom, enter the code from the companion's stderr, press **Connect Claude**, then retry. |
+| A tool call returns `PAGE_UNAVAILABLE` | No page is paired. Open OpenRoom, press **Connect an AI app**, enter the code from the companion's stderr, press **Connect**, then retry. |
 | You cannot find the pair code | Your client is keeping the companion's stderr. Register it behind the `sh -c … 2>>"$HOME/openroom-mcp.log"` wrapper above and `tail -f ~/openroom-mcp.log`. Starting a second companion in a terminal does not help: it fails with `EADDRINUSE`, or prints a code for a relay no client is attached to. |
 | A tool call returns `SESSION_DISCONNECTED` | The page went away mid-call. The companion has already printed a fresh code on stderr — enter it in the page and retry. |
 | Pairing returns 403 | The code, the page origin, or the manifest hash did not match. Retype the code; if the page is not on `http://localhost:3000`, add its exact origin to `OPENROOM_ALLOWED_ORIGINS`; if you are running a different build in the tab than in the terminal, rebuild so both share one manifest. |
 | Pairing keeps failing after several tries | Five wrong attempts retire the code. The companion prints a replacement after a short delay that doubles with each lockout (1 s, 2 s, 4 s … up to 60 s) — wait for the `pairing code` line and use that one. |
 | `no pair code reissued after 10 lockouts` | Ten codes have been retired by wrong attempts in this process, which is the ceiling on guessing. Stop the companion and start it again; if you did not mistype ten times, something else on an allowed origin is posting to the relay. |
 | The page shows `Pairing needs HTTPS or localhost.` | The page is in an insecure context, so it cannot hash the manifest. Use `http://localhost:3000` or an HTTPS origin. |
-| The status flips to `Claude: Connection lost` | The long poll stopped reaching the relay (the machine slept, the port changed, or the companion exited). If the companion is still running it has printed a fresh code on stderr; enter that and press **Connect Claude** again. |
+| The status chip flips to `Local agent: Connection lost` | The long poll stopped reaching the relay (the machine slept, the port changed, or the companion exited). If the companion is still running it has printed a fresh code on stderr; enter that and press **Connect** again. |
 | The companion exits with `EADDRINUSE` | Port 43110 is taken. Set `OPENROOM_MCP_PORT` and update the page's **Relay port** field. |
 | `Invalid OPENROOM_ALLOWED_ORIGINS entry` | An entry is not a bare origin. Use `scheme://host[:port]` with no trailing slash, path, or wildcard. |
 | The client reports a protocol parse error | Something other than the companion wrote to stdout. Keep `--silent` in the `pnpm` invocation; the companion itself only writes to stderr. |

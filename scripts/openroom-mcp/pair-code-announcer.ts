@@ -107,7 +107,9 @@ export function createPairCodeAnnouncer(options: PairCodeAnnouncerOptions): Pair
       const issued = options.issue();
       if (issued === null) return;
       options.log(`pairing code ${issued.code} expires ${new Date(issued.expiresAt).toISOString()}`);
-      options.log('enter it in OpenRoom\'s "Pairing code" field, then press "Connect Claude"');
+      options.log(
+        'in OpenRoom press "Connect an AI app", type it into the "Pairing code" field, then press "Connect"',
+      );
     } catch (error) {
       // A failure here must not break whatever request produced the diagnostic.
       options.log(

@@ -37,7 +37,7 @@ function wireAnnotations(entry: (typeof CORE_TOOL_MANIFEST)[number]) {
 function relayFailureText(error: RelayError): string {
   switch (error.code) {
     case "PAGE_UNAVAILABLE":
-      return "PAGE_UNAVAILABLE: no OpenRoom page is paired with this companion. Open the app, type the pairing code printed on the companion's stderr into the Pairing code field, press Connect Claude, then retry.";
+      return "PAGE_UNAVAILABLE: no OpenRoom page is paired with this companion. Open the app, press Connect an AI app, type the pairing code printed on the companion's stderr into the Pairing code field, press Connect, then retry.";
     case "SESSION_DISCONNECTED":
       return "SESSION_DISCONNECTED: the paired page went away mid-call. The companion prints a fresh pairing code on stderr when that happens; enter it in the page and retry.";
     case "TOO_MANY_PENDING_CALLS":
