@@ -50,10 +50,53 @@ mode the original human four-item `$626 USD` fixture and product-backed WebMCP
 Scene drafts both emit no external cart write or network request. Shopify
 checkout is available through cart permalinks and the store's Storefront MCP
 endpoint, with no server route, no access token, and no request made by
-OpenInterior itself; see [Commerce integration](#commerce-integration). The
-planned local Claude MCP companion is not implemented in this branch.
-Tripo/R2/D1 integrations, upload, analysis, persistence, and server-side cart
-writes remain future work.
+OpenInterior itself; see [Commerce integration](#commerce-integration). A
+localhost MCP companion (`pnpm mcp:openinterior`) serves the same Core 6 over
+stdio to Claude Desktop, Claude Code, and Codex CLI by relaying each call to one
+explicitly paired browser page; see
+[Agent surface compatibility](#agent-surface-compatibility) and
+[docs/local-mcp.md](docs/local-mcp.md). Tripo/R2/D1 integrations, upload,
+analysis, persistence, and server-side cart writes remain future work.
+
+## Agent surface compatibility
+
+There is one manifest (`src/webmcp/core-tool-manifest.ts`) and one live browser
+Scene. Both paths register the same six tool names, descriptions, and input JSON
+Schemas, and both execute the same `createCoreTools(context)` descriptors against
+the same Zustand store, so a tool behaves identically whichever way it is
+reached. `tests/e2e/webmcp-core.spec.ts` asserts that parity.
+
+| Agent surface | How it reaches Core 6 | Setup |
+| --- | --- | --- |
+| ChatGPT Work and Codex in the ChatGPT desktop app's browser | Native WebMCP through `document.modelContext` | Open OpenInterior. Nothing else. |
+| Any other Chromium browser exposing `document.modelContext` | Native WebMCP | Open OpenInterior. Nothing else. |
+| Claude Desktop | Local MCP companion over stdio | `pnpm mcp:openinterior`, then pair the page. See [docs/local-mcp.md](docs/local-mcp.md). |
+| Claude Code | Local MCP companion over stdio | Same. |
+| Codex CLI | Local MCP companion over stdio | Same. |
+| Claude for Chrome | Not supported as a WebMCP site-tool surface | Anthropic documents it as browser automation, not WebMCP site-tool discovery. Use the companion. |
+| Browsers with no `document.modelContext` | No agent path | The complete human editor still works. |
+
+Cart semantics do not change with the surface. `add_scene_to_cart` always opens
+the local approval sheet in the page, and in the default `demo` mode it makes no
+external request at all — the companion relays the call, it does not perform one.
+
+Start and verify:
+
+```bash
+pnpm dev                                                       # serve the app on :3000
+pnpm mcp:openinterior                                          # start the companion on 127.0.0.1:43110
+pnpm exec vitest run tests/integration/local-mcp-companion.test.ts   # real client, real process
+pnpm test                                                      # unit suite plus that integration test
+```
+
+Sources: OpenAI documents site tools as ChatGPT's implementation of the proposed
+WebMCP standard, discoverable by ChatGPT Work and Codex in the ChatGPT desktop
+app's built-in browser (<https://learn.chatgpt.com/docs/webmcp>). Anthropic
+documents local MCP connectivity for Claude Desktop and Claude Code
+(<https://docs.anthropic.com/en/docs/claude-code/mcp>), while its Chrome
+integration is documented as browser automation rather than WebMCP site-tool
+discovery
+(<https://support.anthropic.com/en/articles/12012173-getting-started-with-claude-for-chrome>).
 
 ## Photo architecture and assets
 
@@ -78,6 +121,9 @@ browser QA has no missing-resource console error.
 - pnpm 10.27.0 (the package manager recorded in `package.json`)
 - Desktop Chrome with WebMCP support to use the Core 6 enhancement. Browsers
   without `document.modelContext` retain the complete human demo.
+- No WebMCP-capable browser is needed for the local MCP companion path: Claude
+  Desktop, Claude Code, and Codex CLI reach the same six tools through
+  `pnpm mcp:openinterior`. See [docs/local-mcp.md](docs/local-mcp.md).
 
 ## Setup
 
@@ -100,10 +146,11 @@ local environment file; never commit them.
 | `pnpm start` | Start the Next.js production server. |
 | `pnpm typecheck` | Type-check without emitting files. |
 | `pnpm lint` | Run ESLint. |
-| `pnpm test` | Run the Vitest suite once. |
+| `pnpm test` | Run the Vitest suite once, including the companion integration test. |
 | `pnpm test:watch` | Run Vitest in watch mode. |
 | `pnpm test:e2e` | Run the Playwright demo-mode end-to-end tests (port 3000). |
 | `pnpm test:e2e:commerce` | Run the Playwright Shopify-mode journeys (port 3001). |
+| `pnpm mcp:openinterior` | Start the localhost MCP companion for Claude Desktop, Claude Code, or Codex CLI. |
 | `pnpm cf-typegen` | Generate Cloudflare Worker types. |
 | `pnpm dev:vinext` | Start vinext locally on port 3001. |
 | `pnpm build:vinext` | Build the vinext Cloudflare Workers target. |
