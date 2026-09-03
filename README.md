@@ -1,10 +1,13 @@
 # OpenInterior
 
+[![CI](https://github.com/Taehun/OpenInterior/actions/workflows/ci.yml/badge.svg)](https://github.com/Taehun/OpenInterior/actions/workflows/ci.yml)
+
 OpenInterior is a browser-based photo compositor for exploring and furnishing
 a room with deterministic catalog products.
 
 Repository: <https://github.com/Taehun/OpenInterior> (MIT, contributions
-welcome).
+welcome). Live demo: <https://openinterior.taehun.workers.dev> (deployed from
+`main` by CI).
 
 ## Status
 
@@ -239,6 +242,30 @@ Setup:
    a placeholder store; it stubs the store domain and makes no real request.
 
 Demo mode remains the default and is byte-for-byte unchanged.
+
+## CI and deployment
+
+`.github/workflows/ci.yml` runs on every push and pull request to `main`:
+typecheck, lint, unit and integration tests, the Playwright smoke suites
+(demo and Shopify-mode journeys), and both builds (`next build` and
+`vinext build`). Playwright traces are uploaded when a smoke test fails.
+
+On a push to `main` that passes CI, the `deploy` job builds with vinext and
+deploys the Worker `openinterior` (static assets included) to Cloudflare with
+`pnpm run deploy:vinext`, using the existing `wrangler.jsonc`. The live URL is
+<https://openinterior.taehun.workers.dev>.
+
+Deployment needs two repository secrets; the job is skipped with a notice until
+both exist:
+
+| Secret | Value |
+| --- | --- |
+| `CLOUDFLARE_ACCOUNT_ID` | The Cloudflare account id (`pnpm exec wrangler whoami`). |
+| `CLOUDFLARE_API_TOKEN` | An API token created from the **Edit Cloudflare Workers** template in the Cloudflare dashboard. |
+
+Set them with `gh secret set CLOUDFLARE_API_TOKEN -R Taehun/OpenInterior` (paste
+the token when prompted). A first deploy can also be run locally with
+`pnpm run build && pnpm run deploy:vinext` after `pnpm exec wrangler login`.
 
 ## Contributing
 
