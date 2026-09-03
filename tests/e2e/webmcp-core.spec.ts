@@ -336,45 +336,62 @@ test("completes WebMCP Core 6 against the shared demo Scene", async ({
   // Spec §5: a lamp moved onto a table stands on it. The Scene reports the
   // supporter, and the lamp's Y is the table height plus half the lamp height,
   // well above the 0.42 m coffee-table top it now rests on.
-  const beforeStack = await page.evaluate(() =>
-    window.__webMcpTools.get_scene?.execute(
-      {},
-      { signal: new AbortController().signal },
-    ),
-  );
-  const stackScene = beforeStack?.structuredContent.data as
-    | {
-        objects: Array<{
-          id: string;
-          position: [number, number, number];
-          supportedBy: string | null;
-        }>;
-      }
-    | undefined;
-  const tableBefore = stackScene?.objects.find(
-    (object) => object.id === "table_01",
-  );
-  expect(
-    stackScene?.objects.find((object) => object.id === "lamp_01")?.supportedBy,
-  ).toBeNull();
-  const stackMove = await page.evaluate(
-    (state) =>
-      window.__webMcpTools.move_object?.execute(
-        {
-          objectId: "lamp_01",
-          position: { x: state.x, z: state.z },
-          expectedRevision: state.sceneRevision,
-          expectedStateVersion: state.stateVersion,
-        },
+  // The workspace remounts once after the facing move settles, and a remount
+  // replaces the store, so the revision read a moment earlier can be stale.
+  // Read the tokens and move in one attempt, and retry with fresh tokens on a
+  // revision conflict — never against a guessed revision.
+  type StackScene = {
+    sceneRevision: number;
+    stateVersion: number;
+    data: {
+      objects: Array<{
+        id: string;
+        position: [number, number, number];
+        supportedBy: string | null;
+      }>;
+    };
+  };
+  let stackMove: { structuredContent: Record<string, unknown> } | undefined;
+  let tableBefore: StackScene["data"]["objects"][number] | undefined;
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const beforeStack = (await page.evaluate(() =>
+      window.__webMcpTools.get_scene?.execute(
+        {},
         { signal: new AbortController().signal },
       ),
-    {
-      x: tableBefore?.position[0] ?? 0,
-      z: tableBefore?.position[2] ?? 0,
-      sceneRevision: beforeStack?.structuredContent.sceneRevision ?? 0,
-      stateVersion: beforeStack?.structuredContent.stateVersion ?? 0,
-    },
-  );
+    ))?.structuredContent as StackScene | undefined;
+    tableBefore = beforeStack?.data.objects.find(
+      (object) => object.id === "table_01",
+    );
+    expect(
+      beforeStack?.data.objects.find((object) => object.id === "lamp_01")
+        ?.supportedBy,
+    ).toBeNull();
+    stackMove = (await page.evaluate(
+      (state) =>
+        window.__webMcpTools.move_object?.execute(
+          {
+            objectId: "lamp_01",
+            position: { x: state.x, z: state.z },
+            expectedRevision: state.sceneRevision,
+            expectedStateVersion: state.stateVersion,
+          },
+          { signal: new AbortController().signal },
+        ),
+      {
+        x: tableBefore?.position[0] ?? 0,
+        z: tableBefore?.position[2] ?? 0,
+        sceneRevision: beforeStack?.sceneRevision ?? 0,
+        stateVersion: beforeStack?.stateVersion ?? 0,
+      },
+    )) as typeof stackMove;
+    if (stackMove?.structuredContent.ok === true) break;
+    const error = stackMove?.structuredContent.error as
+      | { code?: string }
+      | undefined;
+    if (error?.code !== "SCENE_REVISION_CONFLICT") break;
+    await page.waitForTimeout(250);
+  }
   expect(stackMove?.structuredContent.ok).toBe(true);
   const stackedLamp = (
     stackMove?.structuredContent.data as
