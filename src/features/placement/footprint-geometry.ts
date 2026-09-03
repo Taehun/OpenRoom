@@ -7,6 +7,9 @@ import type { Footprint2D, OpeningClearanceZone, PointXZ } from "./placement-typ
 
 const OPENING_SIDE_CLEARANCE_METRES = 0.2;
 const OPENING_DEPTH_METRES = 0.75;
+// A corner slid onto the inset boundary by clampPositionToRoom can land a rounding
+// error (~2e-16) past it; the room check tolerates that so a clamped move is inside.
+const ROOM_BOUND_EPSILON = 1e-9;
 
 // Math.cos(0) and Math.sin(0) are exactly 1 and 0; skipping the call for the axis-aligned
 // case (the overwhelming majority) keeps every result bit-for-bit the same.
@@ -214,10 +217,10 @@ export function footprintInsideRoom(
   room: DimensionsM,
   insetM = 0,
 ): boolean {
-  const minimumX = -room.width / 2 + insetM;
-  const maximumX = room.width / 2 - insetM;
-  const minimumZ = -room.depth / 2 + insetM;
-  const maximumZ = room.depth / 2 - insetM;
+  const minimumX = -room.width / 2 + insetM - ROOM_BOUND_EPSILON;
+  const maximumX = room.width / 2 - insetM + ROOM_BOUND_EPSILON;
+  const minimumZ = -room.depth / 2 + insetM - ROOM_BOUND_EPSILON;
+  const maximumZ = room.depth / 2 - insetM + ROOM_BOUND_EPSILON;
   const cosine = cosineOf(footprint.rotationY);
   const sine = sineOf(footprint.rotationY);
   const corners = firstScratch;

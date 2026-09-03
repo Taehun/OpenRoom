@@ -853,6 +853,9 @@ describe("facing vectors", () => {
     const { context } = createContext(store);
     const applyCommand = vi.spyOn(context, "applyCommand");
     const tools = createCoreTools(context);
+    const seedRotation = store
+      .getState()
+      .scene.objects.find(({ id }) => id === "chair_01")!.rotation[1];
 
     const zero = await execute(tools, "move_object", {
       objectId: "chair_01",
@@ -881,7 +884,7 @@ describe("facing vectors", () => {
     expect(
       store.getState().scene.objects.find(({ id }) => id === "chair_01")
         ?.rotation[1],
-    ).toBe(0);
+    ).toBe(seedRotation);
   });
 
   // A non-finite component is caught by the field contract before the refine

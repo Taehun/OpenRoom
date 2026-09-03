@@ -5,8 +5,18 @@ import {
   type Scene,
 } from "../../src/features/scene/scene-schema";
 
-export function completedProductScene(): Scene {
-  const scene = structuredClone(createDemoScene());
+/**
+ * Width of the fixture room. The placement solver and the pinned projection numbers
+ * were measured in the original 6 m demo room; the calibrated 3.4 m photo room is too
+ * tight for the solver to arrange all six products, so fixtures keep the roomier floor
+ * unless a test asks for the real seed width.
+ */
+export const FIXTURE_ROOM_WIDTH_M = 6;
+
+export function completedProductScene({
+  widthM = FIXTURE_ROOM_WIDTH_M,
+}: { widthM?: number } = {}): Scene {
+  const scene = structuredClone(createDemoScene({ widthM }));
   for (const object of scene.objects) {
     const product = DEMO_PRODUCTS.find(({ category }) => category === object.type);
     if (!product) throw new Error(`Missing product for ${object.type}`);

@@ -6,6 +6,7 @@ import {
   footprintCorners,
   footprintInsideRoom,
   objectFootprint,
+  openingClearanceZones,
 } from "../../src/features/placement/footprint-geometry";
 import { proposeNaturalPlacement } from "../../src/features/placement/natural-placement";
 import type {
@@ -204,8 +205,12 @@ describe("applySceneCommand", () => {
     const lamp = result.scene.objects.find(({ id }) => id === "lamp_01")!;
     expect(result.adjustedToFit).toBe(true);
     expect(result.appliedPosition).toEqual(lamp.position);
-    expect(lamp.position[0]).toBeLessThan(3);
-    expect(lamp.position[2]).toBeGreaterThan(-2.5);
+    expect(lamp.position[0]).toBeLessThanOrEqual(
+      result.scene.room.width / 2 - 0.1 - lamp.dimensionsM.width / 2,
+    );
+    expect(lamp.position[2]).toBeGreaterThanOrEqual(
+      -result.scene.room.depth / 2 + 0.1 + lamp.dimensionsM.depth / 2,
+    );
     expect(lamp.rotation[1]).toBeCloseTo(Math.PI / 2);
     expect(result.scene.revision).toBe(2);
   });
@@ -467,8 +472,9 @@ describe("validateAndApplyPlacement", () => {
       (proposal: ReturnType<typeof changedProposal>) =>
         withPlacements(proposal, (placements) => {
           const lamp = placements.find(({ objectId }) => objectId === "lamp_01")!;
-          lamp.position[0] = 0.72;
-          lamp.position[2] = -2.7;
+          const zone = openingClearanceZones(VALID_PLACEMENT_SCENE)[0]!;
+          lamp.position[0] = zone.center.x;
+          lamp.position[2] = zone.center.z;
         }),
     ],
   ])("rejects %s atomically", (_name, mutate) => {

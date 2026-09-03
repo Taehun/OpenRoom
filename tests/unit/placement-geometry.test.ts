@@ -34,12 +34,17 @@ describe("placement footprint geometry", () => {
     const chair = structuredClone(
       scene.objects.find(({ id }) => id === "chair_01")!,
     );
-    chair.position = [2.5, chair.position[1], 0];
     chair.rotation[1] = Math.PI / 4;
+    // A 45-degree square reaches half its diagonal past its centre, further than the
+    // axis-aligned half width the centre clamp alone would allow.
+    const reach =
+      (chair.dimensionsM.width + chair.dimensionsM.depth) / 2 / Math.SQRT2;
+    const limit = scene.room.width / 2 - 0.1 - reach;
+    chair.position = [limit + 0.05, chair.position[1], 0];
     expect(footprintInsideRoom(objectFootprint(chair), scene.room, 0.1)).toBe(
       false,
     );
-    chair.position = [1.8, chair.position[1], 0];
+    chair.position = [limit - 0.05, chair.position[1], 0];
     expect(footprintInsideRoom(objectFootprint(chair), scene.room, 0.1)).toBe(
       true,
     );

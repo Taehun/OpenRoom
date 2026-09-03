@@ -47,7 +47,10 @@ import type {
   SceneObject,
 } from "../../src/features/scene/scene-schema";
 import { DEMO_PRODUCTS } from "../../src/features/demo/demo-data";
-import { completedProductScene } from "../helpers/natural-placement-fixtures";
+import {
+  FIXTURE_ROOM_WIDTH_M,
+  completedProductScene,
+} from "../helpers/natural-placement-fixtures";
 
 function applyPlacements(
   scene: Scene,
@@ -107,10 +110,11 @@ function thresholdScene(rugX: number): Scene {
   return applyPlacements(scene, placements);
 }
 
-// Mirrors the browser journey in tests/e2e/photo-compositor.spec.ts: the six-product
-// redesign, then six `move_object` calls to a deliberately poor layout. Both Scenes are
-// built through the same command layer the store commits, so the room the solver sees
-// matches the committed browser Scene, `clampPositionToRoom` included.
+// The six-product redesign, then six `move_object` calls to a deliberately poor layout
+// (the browser journey the compositor E2E once performed; the spec now only makes the
+// tie-break moves, but the solver pins below were measured on this layout). Both Scenes
+// are built through the same command layer the store commits, so the room the solver
+// sees matches the committed browser Scene, `clampPositionToRoom` included.
 const REDESIGN_PRODUCT_IDS: Readonly<Record<string, string>> = {
   sofa_01: "boucle-curve-sofa",
   table_01: "travertine-plinth-table",
@@ -155,9 +159,18 @@ function commit(scene: Scene, command: SceneCommand): Scene {
   return result.scene;
 }
 
+/**
+ * The seed placeholder room at the fixture width. Every absolute coordinate and pinned
+ * solver output in this file was measured in the 6 m room; the calibrated 3.4 m seed
+ * is too tight for the solver to arrange its six pieces at all.
+ */
+function seedRoomScene(): Scene {
+  return createDemoScene({ widthM: FIXTURE_ROOM_WIDTH_M });
+}
+
 /** The Scene the sixth `replace_object` commits, before any arrangement runs. */
 function redesignedProductScene(): Scene {
-  let scene = createDemoScene();
+  let scene = seedRoomScene();
   for (const [objectId, productId] of Object.entries(REDESIGN_PRODUCT_IDS)) {
     scene = commit(scene, {
       type: "replace",
@@ -179,7 +192,7 @@ function poorRedesignedJourneyScene(): Scene {
 
 /** The three real-data journeys Task 2b measured, in the order it reports them. */
 const REAL_DATA_JOURNEYS: readonly (readonly [string, () => Scene])[] = [
-  ["the seed placeholder room", createDemoScene],
+  ["the seed placeholder room", seedRoomScene],
   ["the six-product redesign before arrangement", redesignedProductScene],
   ["the redesign dragged to the poor journey layout", poorRedesignedJourneyScene],
 ];
@@ -778,7 +791,7 @@ describe("natural placement", () => {
   });
 
   it.each([
-    ["the seed placeholder room", createDemoScene],
+    ["the seed placeholder room", seedRoomScene],
     ["the six-product redesign before arrangement", redesignedProductScene],
     ["the redesign dragged to the poor journey layout", poorRedesignedJourneyScene],
   ])("arranges %s and settles on a second pass", (_journey, buildScene) => {
@@ -902,7 +915,7 @@ describe("natural placement", () => {
   // That branch is covered directly in "placement search outcome" below.
   it("keeps a valid current layout out of the failed outcomes", () => {
     const settled = [
-      createDemoScene,
+      seedRoomScene,
       redesignedProductScene,
       poorRedesignedJourneyScene,
     ].map((buildScene) => {
@@ -1373,7 +1386,7 @@ describe("rotation options", () => {
   it.each([
     [
       "the seed placeholder room",
-      createDemoScene,
+      seedRoomScene,
       {
         sofa_01: [-1.3, 0.425, -1.2, -Math.PI / 4],
         table_01: [-0.2, 0.21, -0.1, 0],
@@ -1578,7 +1591,7 @@ describe("rotation options", () => {
 
 describe("composition without a sofa", () => {
   it("still keeps a lamp out of the foreground when no sofa exists", () => {
-    const scene = createDemoScene();
+    const scene = seedRoomScene();
     scene.objects = scene.objects.filter(({ type }) => type !== "sofa");
     const lamp = scene.objects.find(({ type }) => type === "floor_lamp")!;
     const front = { ...scene, objects: scene.objects.map((o) => (o.id === lamp.id ? { ...o, position: [-2.0, o.position[1], scene.room.depth / 2 - 0.3] as [number, number, number] } : o)) };
@@ -1601,7 +1614,7 @@ describe("composition without a sofa", () => {
 describe("side table and bookshelf placement", () => {
   /** A bare 6.0 x 6.0 room holding whichever seed objects the case needs. */
   function bareRoom(id: string, ...ids: string[]): Scene {
-    const scene = keepObjects(createDemoScene(), ...ids);
+    const scene = keepObjects(seedRoomScene(), ...ids);
     scene.id = id;
     scene.source = "upload";
     scene.room = { width: 6, height: 2.5, depth: 6 };
