@@ -372,12 +372,38 @@ against `rotationOptionsFor` and rejects the whole proposal as
 
 ### 8.5 Expected demo outcome
 
-For the seed scene with photographed views only, the arranged layout has the
-sofa on the back wall facing the camera, table and rug in front, the chair
-flanking the sofa's right end turned 45° toward the table (mirrored
-front-quarter view), the lamp beside the sofa's left end, and the plant in the
-back-right corner clear of the window clearance. Exact coordinates are pinned
-by the unit tests once the implementation lands; the plan records them.
+The demo room's back window (offset 0.62) casts an opening clearance zone of
+x ∈ [-0.18, 1.62], z ∈ [-2.4, -1.65]. A sofa square on the back wall must
+therefore sit at x ≤ -1.2, which leaves no valid position for a chair flanking
+either sofa end (verified by exhaustive enumeration over the flank family), and
+the weight table itself prefers the corner composition below (9431 vs 9212 with
+the sofa pinned to rotation 0). The accepted staged composition is:
+
+- sofa quarter-turned into the back-left corner, facing the room centre
+  (the native front-quarter cutout is 10° from a -45° facing, so the picture
+  matches the geometry);
+- table and rug in front of the sofa along its forward axis;
+- chair flanking the sofa's right end, turned 45° toward the table (mirrored
+  front-quarter view);
+- lamp beside the sofa's left end; plant in the back-left corner behind the
+  sofa; nothing colliding, the window clearance and the circulation path free.
+
+Pinned coordinates (room metres, Y rotation in degrees) for the poor-journey
+scene the browser journey drives, with photographed views only:
+
+| object   | x    | z    | rotation |
+|----------|------|------|----------|
+| sofa_01  | -1.3 | -1.1 | -45      |
+| table_01 | -0.3 |  0.1 | 0        |
+| rug_01   | -0.3 |  0.2 | -45      |
+| chair_01 |  0.8 | -1.0 | +45      |
+| lamp_01  | -2.6 |  0.0 | 0        |
+| plant_01 | -2.4 | -1.7 | 0        |
+
+The seed demo scene arranges to the same composition (table and rug at
+(-0.2, 0.0), plant at (-2.4, -1.8)); both tables are pinned by the unit tests.
+The flank family therefore offers forward offsets {0.2, 0.5, 0.8} m: the first
+two land inside the 0.75 m opening clearance on the sofa's own wall.
 
 ## 9. Generation Pipeline
 
