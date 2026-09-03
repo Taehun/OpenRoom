@@ -141,19 +141,22 @@ export interface PhotoAssetSet {
 `PHOTO_ASSETS` (24 photographed base assets, the existing `PhotoAsset` shape)
 stays as is so the asset inventory tests keep their meaning. A new
 `PHOTO_ASSET_SETS: Record<string, PhotoAssetSet>` is built from `PHOTO_ASSETS`
-plus `src/features/photo/photo-views.generated.json`, the manifest the pipeline
+plus `src/features/photo/photo-views.generated.ts`, the manifest the pipeline
 writes. `getPhotoAssetSet(object)` replaces `getPhotoAsset` in the compositor;
 `getPhotoAsset` remains for existing callers and returns the front-quarter view.
 
 ### 5.2 Generated manifest
 
-`src/features/photo/photo-views.generated.json` is checked in and has this
-shape (empty array until the pipeline runs):
+`src/features/photo/photo-views.generated.ts` is checked in and exports one
+constant, `GENERATED_VIEW_MANIFEST: GeneratedViewManifest`, as a plain object
+literal with this shape (empty array until the pipeline runs). It is a TypeScript
+module rather than JSON so every loader in the project (Next, Vitest, Playwright's
+ESM runner, `tsx`) imports it without import attributes:
 
-```json
-{
-  "version": 1,
-  "views": [
+```ts
+export const GENERATED_VIEW_MANIFEST: GeneratedViewManifest = {
+  version: 1,
+  views: [
     {
       "assetId": "hinoki-low-sofa",
       "view": "side",
@@ -166,7 +169,7 @@ shape (empty array until the pipeline runs):
       "generatedAt": "2026-09-03T13:00:00.000Z"
     }
   ]
-}
+};
 ```
 
 Loading validates the manifest with Zod (`strict`), rejects a view whose
@@ -199,11 +202,12 @@ Rules, in order:
    whichever gives the smaller angle.
 3. Score each candidate by the angle between `facingOf(rotation[1])` and the
    candidate front vector. Pick the smallest angle.
-4. Ties within `1e-9` radians (a `yaw = 0` object against the front-quarter pair
-   is the common case) resolve toward the room centre: when `position[0] < 0`
-   prefer the candidate whose `frontVector.x > 0`, otherwise prefer
-   `frontVector.x <= 0`. Remaining ties prefer `photographed` over `generated`,
-   then not-mirrored, then source order.
+4. Ties within `1e-7` degrees (a `yaw = 0` object against the front-quarter pair
+   is the common case) resolve toward the room centre: when `position[0] <= 0`
+   prefer the candidate whose `frontVector.x > 0` (the photographed
+   orientation, so an object on the centre line keeps its native cutout),
+   otherwise prefer `frontVector.x <= 0`. Remaining ties prefer `photographed`
+   over `generated`, then not-mirrored, then source order.
 5. `exact` is `angleDegrees <= 45`.
 
 The seed sofa (`x = -1.7`, `yaw = 0`) therefore keeps today's un-mirrored
@@ -402,7 +406,9 @@ runs `scripts/openinterior-assets/generate-views.ts` with `tsx`.
   `anchorX = (left + right + 1) / 2 / width`, `anchorY = (bottom + 1) / height`,
   rounded to 4 decimals; an image with no such pixel fails the job.
 - Manifest entries are merged by `(assetId, view)`, sorted by `assetId` then
-  view order, and written pretty-printed.
+  view order, and written as the TypeScript module described in section 5.2
+  (a header comment naming the generator, then the exported constant,
+  pretty-printed with two-space indentation).
 
 ### 9.2 Prompt
 
