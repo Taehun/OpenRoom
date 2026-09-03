@@ -661,6 +661,11 @@ function chairRelationScore(objects: readonly SceneObject[]): number {
 /**
  * Spec 8.3: how truthfully a registered view can show the rotation this object was given.
  * An object with no options entry is unconstrained and counts as fully truthful.
+ *
+ * The rotation is matched as an angle, not as a number: the options are folded into
+ * (-pi, pi] while a layout carries whatever the stage accumulated, so a sofa at 2pi is
+ * facing the way the option at 0 describes and is scored as truthfully as one at 0.
+ * Options are a quarter turn apart at the closest, so no fold can confuse two of them.
  */
 function fidelityContribution(
   objectId: string,
@@ -670,7 +675,9 @@ function fidelityContribution(
   const table = options?.rotationOptions?.[objectId];
   if (table === undefined || table.length === 0) return 1000;
   for (const option of table) {
-    if (Math.abs(option.rotationY - rotationY) <= ROTATION_OPTION_EPSILON) {
+    if (
+      Math.abs(foldAngle(option.rotationY - rotationY)) <= ROTATION_OPTION_EPSILON
+    ) {
       return clamp(Math.round(option.fidelity * 1000), 0, 1000);
     }
   }

@@ -1465,6 +1465,37 @@ describe("rotation options", () => {
     ).toMatchObject({ ok: true, changed: true });
   });
 
+  it("scores a folded rotation as truthfully as the option it stands for", () => {
+    // The stage accumulates rotations without bounds while the view registry lists the
+    // folded angles, so the fidelity term has to match orientations, not numbers.
+    const rotationOptions = {
+      sofa_01: [
+        { rotationY: 0, fidelity: 1 },
+        { rotationY: Math.PI, fidelity: 0.6 },
+      ],
+    };
+    const currentScoreAt = (rotationY: number) => {
+      const result = proposeNaturalPlacement(singleSofaScene(rotationY, -1.2, -2.4), {
+        rotationOptions,
+      });
+      if (result.kind === "failed") throw new Error(`failed: ${result.reason}`);
+      expect(result.diagnostics.currentScore).not.toBeNull();
+      return result.diagnostics.currentScore!;
+    };
+
+    // A full turn past an option, and the other end of the fold, are the same orientation.
+    expect(currentScoreAt(2 * Math.PI)).toBe(currentScoreAt(0));
+    expect(currentScoreAt(-Math.PI)).toBe(currentScoreAt(Math.PI));
+
+    // Folding compares angles; it does not make every rotation an option. The same
+    // incumbent layout scored against a table that omits its orientation loses the term.
+    const offTable = proposeNaturalPlacement(singleSofaScene(0, -1.2, -2.4), {
+      rotationOptions: { sofa_01: [{ rotationY: Math.PI / 2, fidelity: 1 }] },
+    });
+    if (offTable.kind === "failed") throw new Error(`failed: ${offTable.reason}`);
+    expect(offTable.diagnostics.currentScore).toBeLessThan(currentScoreAt(0));
+  });
+
   it("rejects a proposal whose rotation is outside the object's options", () => {
     const scene = poorRedesignedJourneyScene();
     const rotationOptions = buildRotationOptions(scene);
