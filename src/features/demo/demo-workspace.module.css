@@ -572,8 +572,8 @@
 }
 
 /*
- * Two chips and one button, all `.md-*`; what lives here is where the bar sits
- * and how wide it may run before the inspector's photo panel starts.
+ * Two `.md-*` mode captions; what lives here is where the bar sits and how wide
+ * it may run before the inspector's photo panel starts.
  */
 .canvasTopbar {
   position: absolute;
@@ -590,53 +590,11 @@
 }
 
 /*
- * The bar floats over the room photo, so the two transparent-by-default items
- * carry an opaque surface behind them; the selected chip already has one.
+ * The bar floats over the room photo, so the transparent-by-default caption
+ * carries an opaque surface behind it; the selected chip already has one.
  */
 .canvasTopbarGround {
   background: var(--paper);
-}
-
-/*
- * Shares the 44px band the canvas topbar reserves above the photo, so the notice never
- * covers the stage. The Undo affordance is a 44px target and is the tallest thing the
- * status can hold, so the band only stays 44px while nothing adds height around it: the
- * frame is drawn as an inset shadow rather than a border, and the block padding is left
- * to the button.
- */
-.placementStatus {
-  position: absolute;
-  z-index: 4;
-  top: 16px;
-  right: 18px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  width: min(320px, calc(100% - 36px));
-  min-height: 44px;
-  padding: 0 7px 0 12px;
-  border-radius: var(--md-sys-shape-corner-small);
-  box-sizing: border-box;
-  background: var(--paper);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--md-sys-color-on-surface) 16%, transparent);
-  color: var(--ink);
-  font-size: 0.72rem;
-  font-weight: 500;
-  line-height: 1.25;
-}
-
-.placementStatus button {
-  min-height: 44px;
-  padding-inline: 10px;
-  border: 0;
-  border-left: 1px solid var(--warm-divider);
-  background: transparent;
-  color: var(--moss);
-  cursor: pointer;
-  font: inherit;
-  font-weight: 500;
-  white-space: nowrap;
 }
 
 .sceneSelectionLabel {
@@ -734,8 +692,8 @@
 /*
  * Three stacked rows: the prompt, the style chips, and the status row. The
  * photo stage is centred in whatever height this section leaves, so a row
- * saved here is two pixels of clearance won back under the placement status
- * band; that budget is why every control in it is an `.md-*--dense` variant.
+ * saved here is two pixels of clearance won back for the photo; that budget is
+ * why every control in it is an `.md-*--dense` variant.
  */
 .promptGuidance {
   display: grid;

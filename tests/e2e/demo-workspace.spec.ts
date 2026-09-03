@@ -16,48 +16,6 @@ function expectStableBounds(
   expect(Math.abs(after.height - before.height)).toBeLessThanOrEqual(1);
 }
 
-test("keeps the stage and composer stable while arranging naturally", async ({
-  page,
-}) => {
-  for (const viewport of [
-    { width: 1440, height: 900 },
-    { width: 1280, height: 800 },
-  ]) {
-    await page.setViewportSize(viewport);
-    await page.goto("/demo");
-
-    const stage = page.getByRole("region", { name: "Editable room photo" });
-    const composer = page.getByRole("region", { name: "Agent prompt guidance" });
-    const beforeStage = await stage.boundingBox();
-    const beforeComposer = await composer.boundingBox();
-    if (!beforeStage || !beforeComposer) throw new Error("Missing initial bounds");
-
-    await page.getByRole("button", { name: "Arrange naturally" }).click();
-    const status = page.getByRole("status", { name: "Placement status" });
-    await expect(status).toContainText("Placement improved");
-    await expect(status).toBeVisible();
-    const undoPlacement = page.getByRole("button", {
-      name: "Undo placement",
-    });
-    const undoBounds = await undoPlacement.boundingBox();
-    if (!undoBounds) throw new Error("Missing Undo placement bounds");
-    expect(undoBounds.height).toBeGreaterThanOrEqual(44);
-    const statusBounds = await status.boundingBox();
-    if (!statusBounds) throw new Error("Missing Placement status bounds");
-
-    const afterStage = await stage.boundingBox();
-    const afterComposer = await composer.boundingBox();
-    if (!afterStage || !afterComposer) throw new Error("Missing arranged bounds");
-    // The status sits in the reserved band above the photo, Undo affordance included.
-    expect(statusBounds.y + statusBounds.height).toBeLessThanOrEqual(afterStage.y);
-    expect(statusBounds.y + statusBounds.height).toBeLessThanOrEqual(afterComposer.y);
-    for (const key of ["x", "y", "width", "height"] as const) {
-      expect(Math.abs(afterStage[key] - beforeStage[key])).toBeLessThanOrEqual(0.5);
-      expect(Math.abs(afterComposer[key] - beforeComposer[key])).toBeLessThanOrEqual(0.5);
-    }
-  }
-});
-
 test("keeps prompt feedback from reflowing the copy button or photo stage", async ({
   page,
 }) => {

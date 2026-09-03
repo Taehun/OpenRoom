@@ -167,7 +167,6 @@ export type CommandResult =
       message: string;
       adjustedToFit?: boolean;
       appliedPosition?: Vec3;
-      placementOutcome?: { kind: "auto-arranged" | "auto-retained" };
     }
   | {
       ok: false;

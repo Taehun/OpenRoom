@@ -1,12 +1,10 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
 
 import { PHOTO_ASSETS } from "../../src/features/photo/photo-assets";
-import { hasCirculationPath } from "../../src/features/placement/circulation";
 import {
-  footprintsOverlap,
-  objectFootprint,
-  openingClearanceZones,
-} from "../../src/features/placement/footprint-geometry";
+  getPhotoAssetSet,
+  selectPhotoView,
+} from "../../src/features/photo/photo-views";
 import type { Scene } from "../../src/features/scene/scene-schema";
 
 interface BrowserToolResult {
@@ -121,10 +119,6 @@ function committedSceneFrom(result: BrowserToolResult) {
   return (result.structuredContent.data as { scene: BrowserScene }).scene;
 }
 
-function selectedObjectId(result: BrowserToolResult) {
-  return (result.structuredContent.data as { id: string }).id;
-}
-
 // The chosen view replaces the old CSS rotation: a cutout is never tilted, so the
 // truthful part of its presentation is which registered view is drawn and whether
 // it is mirrored. Both live on the frame, which is the element itself or its ancestor.
@@ -234,17 +228,6 @@ async function expectLampVisibleBeyondChair(stage: Locator) {
   );
 }
 
-// The deliberately poor but schema-valid layout the explicit-arrangement and
-// performance journeys start from, applied through `move_object`.
-const POOR_TARGETS = {
-  sofa_01: { x: -1.8, z: 0.2 },
-  table_01: { x: 1.2, z: 0.8 },
-  rug_01: { x: 0.9, z: 0.9 },
-  lamp_01: { x: 0.2, z: 1.8 },
-  chair_01: { x: 2.2, z: -0.7 },
-  plant_01: { x: -2.3, z: -1.5 },
-} as const;
-
 // Every non-rug object, with the rail control that selects it so its floor marker renders.
 const VERTICAL_OBJECTS = [
   { objectId: "sofa_01", label: "Sofa" },
@@ -268,24 +251,6 @@ function changedObjectIds(before: BrowserScene, after: BrowserScene) {
           previous.position[2] !== object.position[2]);
     })
     .map(({ id }) => id);
-}
-
-function placementStatus(page: Page) {
-  return page.getByRole("status", { name: "Placement status" });
-}
-
-// The status region holds the message span next to an optional Undo control, so
-// the message itself is asserted on the span to keep an exact-text assertion.
-function placementMessage(page: Page) {
-  return placementStatus(page).locator("span");
-}
-
-function arrangeControl(page: Page) {
-  return page.getByRole("button", { name: "Arrange naturally" });
-}
-
-function undoPlacementControl(page: Page) {
-  return page.getByRole("button", { name: "Undo placement" });
 }
 
 async function captureModelContextTools(page: Page) {
@@ -333,10 +298,9 @@ async function expectCore6Registered(page: Page) {
 }
 
 /**
- * Runs the six-product redesign through the Core 6 tools and asserts the exact
- * automatic-arrangement trigger: replacements one through five leave every X/Z
- * untouched, and only the sixth — the completion transition — arranges the room
- * inside the same replace revision.
+ * Runs the six-product redesign through the Core 6 tools. The natural-placement
+ * solver is an unwired library, so a replacement only swaps the product: every
+ * X/Z in the room, the completed sixth included, stays exactly where it was.
  */
 async function redesignRoomThroughCore6(page: Page): Promise<SceneTokens> {
   const initial = await callTool(page, "get_scene", {});
@@ -345,7 +309,7 @@ async function redesignRoomThroughCore6(page: Page): Promise<SceneTokens> {
   let stateVersion = initial.structuredContent.stateVersion;
   let scene = sceneFrom(initial);
 
-  for (const [index, replacement] of REPLACEMENTS.entries()) {
+  for (const replacement of REPLACEMENTS) {
     const search = await callTool(page, "search_products", {
       category: replacement.category,
       limit: 3,
@@ -371,13 +335,7 @@ async function redesignRoomThroughCore6(page: Page): Promise<SceneTokens> {
     expect(replaced.structuredContent.stateVersion).toBe(stateVersion + 1);
 
     const replacedScene = committedSceneFrom(replaced);
-    if (index < REPLACEMENTS.length - 1) {
-      expect(changedObjectIds(scene, replacedScene)).toEqual([]);
-      await expect(placementStatus(page)).toHaveCount(0);
-    } else {
-      await expect(placementStatus(page)).toHaveText("Redesign arranged");
-      expect(changedObjectIds(scene, replacedScene).length).toBeGreaterThan(1);
-    }
+    expect(changedObjectIds(scene, replacedScene)).toEqual([]);
 
     revision = replaced.structuredContent.sceneRevision;
     stateVersion = replaced.structuredContent.stateVersion;
@@ -417,67 +375,6 @@ async function moveObject(
     revision: moved.structuredContent.sceneRevision,
     stateVersion: moved.structuredContent.stateVersion,
   };
-}
-
-async function applyPoorLayout(
-  page: Page,
-  tokens: SceneTokens,
-): Promise<SceneTokens> {
-  let current = tokens;
-  for (const [objectId, position] of Object.entries(POOR_TARGETS)) {
-    current = await moveObject(page, current, objectId, position);
-  }
-
-  return current;
-}
-
-function nonRugFootprints(scene: BrowserScene) {
-  return scene.objects
-    .filter(({ type }) => type !== "rug")
-    .map((object) => objectFootprint(object));
-}
-
-function collidingObjectIds(scene: BrowserScene) {
-  const footprints = nonRugFootprints(scene);
-  const collisions: string[] = [];
-
-  for (let first = 0; first < footprints.length; first += 1) {
-    for (let second = first + 1; second < footprints.length; second += 1) {
-      if (footprintsOverlap(footprints[first]!, footprints[second]!)) {
-        collisions.push(
-          `${footprints[first]!.objectId}/${footprints[second]!.objectId}`,
-        );
-      }
-    }
-  }
-
-  return collisions;
-}
-
-function openingBlockingObjectIds(scene: BrowserScene) {
-  const zones = openingClearanceZones(scene);
-  return scene.objects
-    .filter((object) =>
-      zones.some((zone) => footprintsOverlap(objectFootprint(object), zone)),
-    )
-    .map(({ id }) => id);
-}
-
-function reachesOpening(scene: BrowserScene) {
-  return hasCirculationPath(
-    scene,
-    scene.objects.map((object) => objectFootprint(object)),
-    scene.objects.filter(({ type }) => type === "rug"),
-  );
-}
-
-function placementSignature(scene: BrowserScene) {
-  return scene.objects.map(({ id, position, rotation }) => ({
-    id,
-    rotationY: rotation[1],
-    x: position[0],
-    z: position[2],
-  }));
 }
 
 async function computedLayer(locator: Locator) {
@@ -781,104 +678,6 @@ test("redesigns the whole photo room through Core 6 and preserves human transfor
   expect(consoleErrors).toEqual([]);
 });
 
-test("arranges the room explicitly, settles, and restores it with one undo", async ({
-  page,
-}) => {
-  const consoleErrors: string[] = [];
-  page.on("console", (message) => {
-    if (message.type() === "error") consoleErrors.push(message.text());
-  });
-  await captureModelContextTools(page);
-  await page.setViewportSize({ width: 1440, height: 900 });
-  await page.goto("/demo");
-  await expectCore6Registered(page);
-
-  const poorTokens = await applyPoorLayout(
-    page,
-    await redesignRoomThroughCore6(page),
-  );
-  const poor = await callTool(page, "get_scene", {});
-  const poorScene = sceneFrom(poor);
-  const poorSelection = await callTool(page, "get_selection", {});
-  expect(poor.structuredContent.sceneRevision).toBe(poorTokens.revision);
-  expect(poor.structuredContent.stateVersion).toBe(poorTokens.stateVersion);
-  // `move_object` clamps X into the room inset, so the saved layout is whatever the tool
-  // committed rather than the requested literals.
-  const savedPlacement = placementSignature(poorScene);
-
-  await arrangeControl(page).click();
-  await expect(placementMessage(page)).toHaveText("Placement improved");
-  await expect(undoPlacementControl(page)).toBeVisible();
-
-  const arranged = await callTool(page, "get_scene", {});
-  const arrangedScene = sceneFrom(arranged);
-  expect(arranged.structuredContent.sceneRevision).toBe(
-    poorTokens.revision + 1,
-  );
-  expect(arranged.structuredContent.stateVersion).toBe(
-    poorTokens.stateVersion + 1,
-  );
-  const arrangedSelection = await callTool(page, "get_selection", {});
-  // The selected object's own transform is expected to move; only the selection itself
-  // has to survive the arrangement.
-  expect(selectedObjectId(arrangedSelection)).toBe(
-    selectedObjectId(poorSelection),
-  );
-  expect(arrangedScene.selectedObjectId).toBe(poorScene.selectedObjectId);
-  expect(collidingObjectIds(arrangedScene)).toEqual([]);
-  expect(openingBlockingObjectIds(arrangedScene)).toEqual([]);
-  expect(reachesOpening(arrangedScene)).toBe(true);
-  expect(placementSignature(arrangedScene)).not.toEqual(savedPlacement);
-
-  // The solver turns the chair a quarter turn to flank the sofa's right end and face the
-  // table (spec 8.5). Only the photographed front-quarter pair is registered, whose
-  // native front is turned to the viewer's right, so a chair facing the other way is
-  // shown by that same cutout mirrored - never by a CSS rotation.
-  const arrangedChair = arrangedScene.objects.find(
-    (object) => object.id === "chair_01",
-  );
-  const arrangedSofa = arrangedScene.objects.find(
-    (object) => object.id === "sofa_01",
-  );
-  if (!arrangedChair || !arrangedSofa) {
-    throw new Error("Missing chair_01 or sofa_01 after arranging");
-  }
-  expect(arrangedChair.rotation[1]).toBeCloseTo(Math.PI / 4, 9);
-  expect(arrangedChair.position[0]).toBeGreaterThan(arrangedSofa.position[0] + 1.2);
-  const chairFrame = page.getByTestId("photo-object-frame-chair_01");
-  await expect(chairFrame).toHaveAttribute("data-photo-mirrored", "true");
-  await expect(chairFrame).toHaveAttribute("data-photo-view", "front-quarter");
-  const arrangedTransforms = await objectFrameTransforms(page);
-  expect(arrangedTransforms).toHaveLength(5);
-  for (const transform of arrangedTransforms) {
-    expect(transform).not.toContain("rotate(");
-  }
-
-  await arrangeControl(page).click();
-  await expect(placementStatus(page)).toHaveText(
-    "Current placement is already the safest option",
-  );
-  await expect(undoPlacementControl(page)).toHaveCount(0);
-  const settled = await callTool(page, "get_scene", {});
-  expect(settled.structuredContent.sceneRevision).toBe(
-    arranged.structuredContent.sceneRevision,
-  );
-  expect(settled.structuredContent.stateVersion).toBe(
-    arranged.structuredContent.stateVersion,
-  );
-  expect(sceneFrom(settled)).toEqual(arrangedScene);
-
-  await page.getByRole("button", { name: "Undo", exact: true }).click();
-  const restored = await callTool(page, "get_scene", {});
-  expect(placementSignature(sceneFrom(restored))).toEqual(savedPlacement);
-  expect(restored.structuredContent.sceneRevision).toBe(poorTokens.revision);
-  expect(restored.structuredContent.stateVersion).toBe(
-    settled.structuredContent.stateVersion + 1,
-  );
-  await expect(placementStatus(page)).toHaveCount(0);
-  expect(consoleErrors).toEqual([]);
-});
-
 test("grounds the redesigned room on the photo floor plane", async ({
   page,
 }) => {
@@ -933,13 +732,41 @@ test("grounds the redesigned room on the photo floor plane", async ({
     );
   }
 
+  // Only the photographed front-quarter pair is registered for the chair, whose native
+  // front is turned to the viewer's right, so a chair that should face the other way is
+  // shown by that same cutout mirrored - never by a CSS rotation. Which of the two the
+  // renderer owes depends on the chair's current X, so the rule is asserted against the
+  // view the registry picks for the placement the room actually has.
+  const chair = stage.locator('[data-testid="photo-object-frame-chair_01"]');
+  const redesignedChair = redesignedScene.objects.find(
+    ({ id }) => id === "chair_01",
+  );
+  if (!redesignedChair) throw new Error("Missing chair_01 after the redesign");
+  const chairSet = getPhotoAssetSet(redesignedChair);
+  if (!chairSet) throw new Error("Missing chair_01 photo asset set");
+  const chairView = selectPhotoView(redesignedChair, chairSet);
+  expect(chairView.view.view).toBe("front-quarter");
+  // A right-of-centre chair is turned inward, which this pair can only show mirrored.
+  expect(redesignedChair.position[0]).toBeGreaterThan(0);
+  expect(chairView.mirrored).toBe(true);
+  await expect(chair).toHaveAttribute("data-photo-view", chairView.view.view);
+  await expect(chair).toHaveAttribute(
+    "data-photo-mirrored",
+    String(chairView.mirrored),
+  );
+  for (const transform of await objectFrameTransforms(page)) {
+    expect(transform).not.toContain("rotate(");
+  }
+
   // Two verticals at one depth tie on projected depth, so only the sorted object ids can
   // separate them; swapping their X must not reorder the rendered layers.
-  const chair = stage.locator('[data-testid="photo-object-frame-chair_01"]');
   const lamp = stage.locator('[data-testid="photo-object-frame-lamp_01"]');
   // Selecting each object bumped the state version, so the tie moves need fresh tokens.
   let tokens = await currentTokens(page);
   tokens = await moveObject(page, tokens, "chair_01", { x: -1.2, z: 0.4 });
+  // Left of centre the chair turns inward the other way, so the unmirrored cutout wins.
+  await expect(chair).toHaveAttribute("data-photo-mirrored", "false");
+  await expect(chair).toHaveAttribute("data-photo-view", "front-quarter");
   tokens = await moveObject(page, tokens, "lamp_01", { x: 1.2, z: 0.4 });
   const tiedChairPlacement = await visualPlacement(chair);
   expect((await visualPlacement(lamp)).top).toBe(tiedChairPlacement.top);
@@ -953,48 +780,4 @@ test("grounds the redesigned room on the photo floor plane", async ({
   expect(await computedLayer(chair)).toBe(tiedChairLayer);
   expect(await computedLayer(lamp)).toBe(tiedLampLayer);
   expect(consoleErrors).toEqual([]);
-});
-
-test("keeps natural placement below 16ms p95 in the browser", async ({
-  page,
-}) => {
-  // The 16ms p95 target is a production-build measurement on the project's
-  // reference machine (see the natural-placement spec §6.2 and the Task 8
-  // gate). Shared CI runners serve the dev build on slower CPUs, so the gate
-  // is skipped there and stays authoritative locally.
-  test.skip(
-    Boolean(process.env.CI),
-    "performance gate runs on the reference machine against a production build",
-  );
-  await captureModelContextTools(page);
-  await page.setViewportSize({ width: 1440, height: 900 });
-  await page.goto("/demo");
-  await expectCore6Registered(page);
-
-  await applyPoorLayout(page, await redesignRoomThroughCore6(page));
-
-  // The completion transition already measured one proposal; only the 30 explicit
-  // requests below are sampled.
-  await page.evaluate(() => performance.clearMeasures("openroom-natural-placement"));
-  const arrange = arrangeControl(page);
-  const message = placementMessage(page);
-  for (let index = 0; index < 30; index += 1) {
-    await arrange.click();
-    await expect(message).toHaveText(
-      index === 0
-        ? "Placement improved"
-        : "Current placement is already the safest option",
-    );
-  }
-
-  const durations = await page.evaluate(() =>
-    performance
-      .getEntriesByName("openroom-natural-placement")
-      .map(({ duration }) => duration)
-      .sort((first, second) => first - second),
-  );
-  const p95 = durations[Math.ceil(durations.length * 0.95) - 1]!;
-
-  expect(durations).toHaveLength(30);
-  expect(p95).toBeLessThan(16);
 });

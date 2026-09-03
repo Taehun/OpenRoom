@@ -9,11 +9,8 @@ import {
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, expect, test, vi } from "vitest";
-import { createDemoScene } from "../../src/demo/demo-scene";
 import { DemoWorkspace } from "../../src/features/demo/demo-workspace";
-import { createSceneStore } from "../../src/features/scene/scene-store";
 import type { ModelContextTool } from "../../src/webmcp/tool-handlers";
-import { completedProductScene } from "../helpers/natural-placement-fixtures";
 import {
   FakeRelayServer,
   RELAY_SESSION_TOKEN,
@@ -163,6 +160,11 @@ test("exposes six photo controls and six object-rail controls", () => {
   expect(
     screen.queryByRole("button", { name: /run agent move/i }),
   ).not.toBeInTheDocument();
+  // The natural-placement solver is an unwired library: no control invokes it and
+  // the canvas top bar carries captions only.
+  expect(
+    screen.queryByRole("status", { name: "Placement status" }),
+  ).not.toBeInTheDocument();
   expect(
     screen.getByRole("button", { name: "Copy redesign prompt" }),
   ).toBeVisible();
@@ -181,118 +183,7 @@ test("links the workspace header to the public repository", () => {
   expect(repoLink.getAttribute("rel")).toContain("noopener");
 });
 
-test("arranges through Human UI and one Undo restores the Scene", async () => {
-  const user = userEvent.setup();
-  render(<DemoWorkspace />);
-  const before = screen.getByRole("status", { name: "Scene diagnostics" }).textContent;
-
-  await user.click(screen.getByRole("button", { name: "Arrange naturally" }));
-  expect(screen.getByRole("status", { name: "Placement status" }))
-    .toHaveTextContent("Placement improved");
-  expect(screen.getByRole("button", { name: "Undo placement" })).toBeVisible();
-  expect(screen.getByRole("status", { name: "Scene diagnostics" }).textContent)
-    .not.toBe(before);
-
-  await user.click(screen.getByRole("button", { name: "Undo placement" }));
-  expect(screen.getByRole("status", { name: "Scene diagnostics" }).textContent)
-    .toBe(before);
-});
-
-// A later commit owns the top of the history stack, so `Undo placement` would pop that
-// command rather than the arrangement (spec §4.2/§5.3). The affordance must disappear
-// with the notice it belongs to.
-test("drops the Undo placement affordance after a later keyboard move", async () => {
-  const user = userEvent.setup();
-  const store = createSceneStore();
-  render(<DemoWorkspace store={store} />);
-  const stage = screen.getByRole("region", { name: "Editable room photo" });
-
-  await user.click(screen.getByRole("button", { name: "Arrange naturally" }));
-  expect(screen.getByRole("button", { name: "Undo placement" })).toBeVisible();
-
-  act(() => {
-    store.getState().selectObject("table_01");
-    store.getState().setToolMode("move");
-  });
-  const table = within(stage).getByRole("button", { name: "Coffee table" });
-  const revision = store.getState().scene.revision;
-  fireEvent.keyDown(table, { key: "ArrowRight" });
-
-  expect(store.getState().scene.revision).toBe(revision + 1);
-  expect(
-    screen.queryByRole("button", { name: "Undo placement" }),
-  ).not.toBeInTheDocument();
-  expect(
-    screen.queryByRole("status", { name: "Placement status" }),
-  ).not.toBeInTheDocument();
-});
-
-test("disables natural arrangement while a pointer transform is active", () => {
-  render(<DemoWorkspace />);
-  const stage = screen.getByRole("region", { name: "Editable room photo" });
-  vi.spyOn(stage, "getBoundingClientRect").mockReturnValue({
-    bottom: 550,
-    height: 450,
-    left: 100,
-    right: 900,
-    top: 100,
-    width: 800,
-    x: 100,
-    y: 100,
-    toJSON: () => ({}),
-  });
-
-  fireEvent.pointerDown(within(stage).getByRole("button", { name: "Coffee table" }), {
-    pointerId: 1,
-    clientX: 500,
-    clientY: 300,
-  });
-
-  expect(screen.getByRole("button", { name: "Arrange naturally" })).toBeDisabled();
-});
-
-test("disables natural arrangement when every scene object is locked", () => {
-  const scene = createDemoScene();
-  for (const object of scene.objects) object.locked = true;
-  const store = createSceneStore(scene);
-  render(<DemoWorkspace store={store} />);
-
-  expect(screen.getByRole("button", { name: "Arrange naturally" })).toBeDisabled();
-});
-
-test.each([
-  {
-    name: "an unchanged proposal",
-    proposePlacement: () => ({
-      kind: "unchanged" as const,
-      reason: "already-safe" as const,
-      diagnostics: { currentScore: 10, proposedScore: 10, evaluatedLayouts: 1 },
-    }),
-    message: "Current placement is already the safest option",
-  },
-  {
-    name: "a failed proposal",
-    proposePlacement: () => ({
-      kind: "failed" as const,
-      reason: "no-valid-layout" as const,
-    }),
-    message: "Could not improve placement; the room was left unchanged",
-  },
-])("shows the exact status and no Undo for $name", async ({ proposePlacement, message }) => {
-  const user = userEvent.setup();
-  const store = createSceneStore(completedProductScene(), { proposePlacement });
-  const revision = store.getState().scene.revision;
-  render(<DemoWorkspace store={store} />);
-
-  await user.click(screen.getByRole("button", { name: "Arrange naturally" }));
-
-  expect(screen.getByRole("status", { name: "Placement status" }))
-    .toHaveTextContent(message);
-  expect(screen.queryByRole("button", { name: "Undo placement" })).not.toBeInTheDocument();
-  expect(store.getState().scene.revision).toBe(revision);
-});
-
-test("shows every alternative for the selected chair category", async () => {
+test("shows three alternatives for the selected chair category", async () => {
   const user = userEvent.setup();
   render(<DemoWorkspace />);
 
