@@ -44,8 +44,15 @@ pnpm mcp:openinterior ──── HTTP on 127.0.0.1 only ────► OpenIn
    openinterior-mcp: enter it in OpenInterior's "Pairing code" field, then press "Connect Claude"
    ```
 
-   In Claude Desktop this text is in the MCP server log; in Claude Code use
-   `claude --debug` or run `pnpm mcp:openinterior` yourself in a terminal.
+   Where that text lands depends on the client, because the client owns the
+   process: Claude Desktop writes it to its MCP server log, while Claude Code
+   and Codex CLI keep it out of the way. For those two, register the companion
+   behind the one-line stderr log wrapper under [Client
+   configuration](#client-configuration) and read the code from the log file it
+   appends to (`tail -f ~/openinterior-mcp.log`). Starting a second companion in
+   a terminal is not a way to read the code: it either fails with `EADDRINUSE`
+   on 43110 or, on another port, prints a code for a relay no MCP client is
+   attached to.
 4. In the page, type the six digits into **Pairing code** and press **Connect
    Claude**. The status line changes to `Claude: Connected`. Leave the port field
    at `43110` unless you changed `OPENINTERIOR_MCP_PORT`.
@@ -97,11 +104,30 @@ Every example below uses this repository's absolute path,
 OpenInterior.** `pnpm --dir <path>` is what lets the client start the companion
 from any working directory.
 
+**Reading the pair code.** The client starts the companion, so its stderr is the
+client's to keep. Wrapping the command in `sh -c` with `2>>` appends that stderr
+to a file you can watch, and nothing else changes: only file descriptor 2 is
+redirected, so stdout stays the pipe the client reads MCP framing from, and
+`exec` replaces the shell with the companion itself, so the client still owns
+one process and closing the transport still stops it.
+
 ### Claude Code
 
 ```bash
-claude mcp add --transport stdio openinterior -- pnpm --silent --dir /Users/taehun/Projects/WebMCP mcp:openinterior
+claude mcp add --transport stdio openinterior -- sh -c 'exec pnpm --silent --dir /Users/taehun/Projects/WebMCP mcp:openinterior 2>>"$HOME/openinterior-mcp.log"'
 ```
+
+Then read the code — the port, the pair code, and every session diagnostic land
+there, and nothing else ever does:
+
+```bash
+tail -f ~/openinterior-mcp.log
+```
+
+The file only grows by appending; delete it whenever you like. If you would
+rather not keep a log file, register the bare command
+(`-- pnpm --silent --dir /Users/taehun/Projects/WebMCP mcp:openinterior`) and
+read the same lines from `claude --debug` output instead.
 
 ### Claude Desktop
 
@@ -128,16 +154,23 @@ Add this to `claude_desktop_config.json` (Settings → Developer → Edit Config
 Either run:
 
 ```bash
-codex mcp add openinterior -- pnpm --silent --dir /Users/taehun/Projects/WebMCP mcp:openinterior
+codex mcp add openinterior -- sh -c 'exec pnpm --silent --dir /Users/taehun/Projects/WebMCP mcp:openinterior 2>>"$HOME/openinterior-mcp.log"'
 ```
 
 or write the equivalent block into `~/.codex/config.toml`:
 
 ```toml
 [mcp_servers.openinterior]
-command = "pnpm"
-args = ["--silent", "--dir", "/Users/taehun/Projects/WebMCP", "mcp:openinterior"]
+command = "sh"
+args = [
+  "-c",
+  "exec pnpm --silent --dir /Users/taehun/Projects/WebMCP mcp:openinterior 2>>\"$HOME/openinterior-mcp.log\"",
+]
 ```
+
+Read the pair code with `tail -f ~/openinterior-mcp.log`, exactly as for Claude
+Code. Drop the `sh -c` wrapper if your Codex version already surfaces MCP server
+stderr somewhere you can watch.
 
 Verified against `openai/codex` on 2026-09-03; if your Codex version disagrees,
 prefer `codex mcp add`, which writes the block in whatever shape that version
@@ -177,6 +210,7 @@ on both paths, and `tests/e2e/webmcp-core.spec.ts` asserts that.
 | Symptom | Cause and fix |
 | --- | --- |
 | A tool call returns `PAGE_UNAVAILABLE` | No page is paired. Open OpenInterior, enter the code from the companion's stderr, press **Connect Claude**, then retry. |
+| You cannot find the pair code | Your client is keeping the companion's stderr. Register it behind the `sh -c … 2>>"$HOME/openinterior-mcp.log"` wrapper above and `tail -f ~/openinterior-mcp.log`. Starting a second companion in a terminal does not help: it fails with `EADDRINUSE`, or prints a code for a relay no client is attached to. |
 | A tool call returns `SESSION_DISCONNECTED` | The page went away mid-call. The companion has already printed a fresh code on stderr — enter it in the page and retry. |
 | Pairing returns 403 | The code, the page origin, or the manifest hash did not match. Retype the code; if the page is not on `http://localhost:3000`, add its exact origin to `OPENINTERIOR_ALLOWED_ORIGINS`; if you are running a different build in the tab than in the terminal, rebuild so both share one manifest. |
 | Pairing keeps failing after several tries | Five wrong attempts retire the code. The companion prints a replacement after a short delay that doubles with each lockout (1 s, 2 s, 4 s … up to 60 s) — wait for the `pairing code` line and use that one. |
