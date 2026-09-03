@@ -1,42 +1,64 @@
 import Image from "next/image";
 import Link from "next/link";
-import { useEffect, useState } from "react";
-import type { CoreToolName } from "../../webmcp/tool-contracts";
+import { useEffect, useId, useState } from "react";
 import {
   WEBMCP_FLAG_URL,
   WEBMCP_MIN_CHROMIUM,
-  WEBMCP_ORIGIN_TRIAL_CHROME,
   type BrowserInfo,
   type CompatibilityStatus,
 } from "../../webmcp/browser-compatibility";
+import { CORE_TOOL_MANIFEST } from "../../webmcp/core-tool-manifest";
 import styles from "./home.module.css";
 
-/** Copied from `src/webmcp/core-tool-manifest.ts`; keep both in step. */
-const CORE_TOOLS: ReadonlyArray<{
-  name: CoreToolName;
-  description: string;
-}> = [
-  { name: "get_scene", description: "Return the current validated Scene." },
+/** Same-route query switch; it must load a new document, so never a `Link`. */
+const DASHBOARD_HREF = "/?view=dashboard";
+const CONNECT_SECTION_ID = "connect-an-ai-app";
+const REPO_URL = "https://github.com/Taehun/OpenRoom";
+
+/**
+ * The commands a reader copies to reach the local companion. `<repo>` is
+ * literal text the reader replaces with their checkout path, and the copy
+ * buttons write these strings verbatim.
+ */
+export const CONNECT_COMMANDS = {
+  start: "pnpm mcp:openroom",
+  claude: "claude mcp add openroom -- pnpm --silent --dir <repo> mcp:openroom",
+  codex: "codex mcp add openroom -- pnpm --silent --dir <repo> mcp:openroom",
+} as const;
+
+const PAIR_STEP = "Type the six-digit code into the dashboard.";
+
+type ConnectStep = { command: string } | { note: string };
+
+interface ConnectCardContent {
+  title: string;
+  body: string | null;
+  steps: ReadonlyArray<ConnectStep>;
+}
+
+const CONNECT_CARDS: ReadonlyArray<ConnectCardContent> = [
   {
-    name: "get_selection",
-    description: "Return the currently selected Scene object.",
+    title: "ChatGPT & Codex app",
+    body: "Open OpenRoom in the ChatGPT desktop app's browser. Nothing else to install.",
+    steps: [],
   },
   {
-    name: "search_products",
-    description: "Search the local product catalog in deterministic order.",
+    title: "Claude Code & Claude Desktop",
+    body: null,
+    steps: [
+      { command: CONNECT_COMMANDS.start },
+      { command: CONNECT_COMMANDS.claude },
+      { note: PAIR_STEP },
+    ],
   },
   {
-    name: "replace_object",
-    description:
-      "Replace an explicit or selected Scene object with a catalog product.",
-  },
-  {
-    name: "move_object",
-    description: "Move an explicit or selected Scene object.",
-  },
-  {
-    name: "add_scene_to_cart",
-    description: "Open a local approval draft for product-backed Scene objects.",
+    title: "Codex CLI",
+    body: null,
+    steps: [
+      { command: CONNECT_COMMANDS.start },
+      { command: CONNECT_COMMANDS.codex },
+      { note: PAIR_STEP },
+    ],
   },
 ];
 
@@ -44,24 +66,82 @@ function describeBrowser(browser: BrowserInfo): string {
   return `${browser.brand} ${browser.version ?? "an unknown version"}`;
 }
 
-function statusMessage(status: CompatibilityStatus | null): string {
-  if (status === null) return "Checking your browser…";
+interface BannerContent {
+  title: string;
+  body: string | null;
+}
+
+function bannerContent(status: CompatibilityStatus | null): BannerContent {
+  if (status === null) return { title: "Checking your browser…", body: null };
 
   switch (status.kind) {
     case "ready":
-      return "WebMCP detected. Opening the dashboard.";
+      return { title: "Ready — WebMCP detected", body: null };
     case "flag-required":
-      return `WebMCP is available in ${describeBrowser(status.browser)} once the flag is enabled.`;
+      return {
+        title: `Needs a flag in ${describeBrowser(status.browser)}`,
+        body: "Enable WebMCP for testing, relaunch, then check again.",
+      };
     case "update-required":
-      return `WebMCP needs Chromium ${WEBMCP_MIN_CHROMIUM} or newer; you are on ${describeBrowser(status.browser)}.`;
+      return {
+        title: `Update Chrome to ${WEBMCP_MIN_CHROMIUM} or newer`,
+        body: `You are on ${describeBrowser(status.browser)}.`,
+      };
     case "unsupported-browser":
-      return `WebMCP is not available in ${status.browser.brand}; use Google Chrome ${WEBMCP_MIN_CHROMIUM} or newer.`;
+      return {
+        title: `Not available in ${status.browser.brand}`,
+        body: `Use Google Chrome ${WEBMCP_MIN_CHROMIUM} or newer.`,
+      };
     case "insecure-context":
-      return "WebMCP is only exposed on secure pages; open OpenRoom over HTTPS or on localhost.";
+      return {
+        title: "Needs HTTPS or localhost",
+        body: "Open this page over HTTPS or on http://localhost.",
+      };
   }
 }
 
-function CopyFlagAddress() {
+/** One body-small line of facts, never a table. */
+function bannerFacts(status: CompatibilityStatus): string {
+  const context =
+    status.kind === "insecure-context" ? "insecure context" : "secure context";
+  return `${describeBrowser(status.browser)} · ${context}`;
+}
+
+/** Outlined 24px glyphs in the same stroke language as the workspace icons. */
+function BannerIcon({ ready }: { ready: boolean }) {
+  return (
+    <svg
+      aria-hidden="true"
+      fill="none"
+      height={24}
+      stroke="currentColor"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth={1.7}
+      viewBox="0 0 24 24"
+      width={24}
+    >
+      <circle cx="12" cy="12" r="9" />
+      {ready ? (
+        <path d="m8.2 12.4 2.6 2.6 5-5.4" />
+      ) : (
+        <>
+          <path d="M12 11.2v4.6" />
+          <circle cx="12" cy="8.2" fill="currentColor" r="0.9" stroke="none" />
+        </>
+      )}
+    </svg>
+  );
+}
+
+interface CopyButtonProps {
+  className: string;
+  describedBy?: string | undefined;
+  label: string;
+  text: string;
+}
+
+function CopyButton({ className, describedBy, label, text }: CopyButtonProps) {
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
@@ -72,79 +152,132 @@ function CopyFlagAddress() {
 
   return (
     <button
-      className={styles.copyButton}
+      aria-describedby={describedBy}
+      className={className}
       onClick={() => {
         // Clipboard access is absent on insecure origins and can be denied.
         try {
-          const written = navigator.clipboard?.writeText(WEBMCP_FLAG_URL);
+          const written = navigator.clipboard?.writeText(text);
           if (!written) return;
           written.then(
             () => setCopied(true),
             () => undefined,
           );
         } catch {
-          // Leave the label untouched; the address stays selectable.
+          // Leave the label untouched; the command stays selectable.
         }
       }}
       type="button"
     >
-      {copied ? "Copied" : "Copy flag address"}
+      {copied ? "Copied" : label}
     </button>
   );
 }
 
-function FlagInstructions({ browser }: { browser: BrowserInfo }) {
+function StatusBanner({
+  onCheckAgain,
+  status,
+}: {
+  onCheckAgain: () => void;
+  status: CompatibilityStatus | null;
+}) {
+  const { title, body } = bannerContent(status);
+
   return (
-    <>
-      <ol className={styles.steps}>
-        <li>
-          <span>Open the flag address in a new tab:</span>
-          <span className={styles.flagRow}>
-            <code className={styles.code}>{WEBMCP_FLAG_URL}</code>
-            <CopyFlagAddress />
-          </span>
-        </li>
-        <li>Set WebMCP for testing to Enabled.</li>
-        <li>Relaunch the browser. Refreshing this tab is not enough.</li>
-        <li>Come back here and choose Check again.</li>
-      </ol>
-      <p className={styles.note}>
-        {`From Chrome ${WEBMCP_ORIGIN_TRIAL_CHROME} the origin trial removes the flag requirement.`}
+    <section aria-label="WebMCP in this browser" className="md-banner">
+      <span className="md-banner-icon">
+        <BannerIcon ready={status?.kind === "ready"} />
+      </span>
+      <p className="md-banner-title" role="status">
+        {title}
       </p>
-      {browser.verified ? null : (
-        <p className={styles.note}>
-          Verified on Google Chrome; other Chromium browsers may differ.
-        </p>
+      {status === null ? null : (
+        <p className={styles.bannerFacts}>{bannerFacts(status)}</p>
       )}
-    </>
+      {body === null ? null : <p className="md-banner-body">{body}</p>}
+      {status?.kind === "flag-required" ? (
+        <p className={styles.bannerCode}>
+          <code className="md-code">{WEBMCP_FLAG_URL}</code>
+        </p>
+      ) : null}
+      {status === null ? null : (
+        <div className="md-banner-actions">
+          {status.kind === "ready" ? (
+            <a className="md-button md-button--filled" href={DASHBOARD_HREF}>
+              Open the dashboard
+            </a>
+          ) : (
+            <>
+              {status.kind === "flag-required" ? (
+                <CopyButton
+                  className="md-button md-button--tonal"
+                  label="Copy flag address"
+                  text={WEBMCP_FLAG_URL}
+                />
+              ) : null}
+              <button
+                className="md-button md-button--text"
+                onClick={onCheckAgain}
+                type="button"
+              >
+                Check again
+              </button>
+            </>
+          )}
+        </div>
+      )}
+    </section>
   );
 }
 
-function Instructions({ status }: { status: CompatibilityStatus }) {
-  switch (status.kind) {
-    case "ready":
-      return null;
-    case "flag-required":
-      return <FlagInstructions browser={status.browser} />;
-    case "update-required":
-      return (
-        <p className={styles.instruction}>
-          {`Update Google Chrome, or install Chrome Canary, Dev, or Beta (${WEBMCP_MIN_CHROMIUM} or newer), then return here.`}
-        </p>
-      );
-    case "unsupported-browser":
-      return (
-        <p className={styles.instruction}>
-          {`Install Google Chrome ${WEBMCP_MIN_CHROMIUM} or newer. Firefox and Safari do not expose WebMCP today.`}
-        </p>
-      );
-    case "insecure-context":
-      return (
-        <p className={styles.instruction}>
-          {"Open this page over HTTPS or on http://localhost, then choose Check again."}
-        </p>
-      );
-  }
+function ConnectCard({ card }: { card: ConnectCardContent }) {
+  const baseId = useId();
+  const titleId = `${baseId}-title`;
+
+  return (
+    <article
+      aria-labelledby={titleId}
+      className={`md-card md-card--outlined ${styles.connectCard}`}
+    >
+      <h3 className={styles.connectTitle} id={titleId}>
+        {card.title}
+      </h3>
+      {card.body === null ? null : (
+        <p className={styles.connectBody}>{card.body}</p>
+      )}
+      {card.steps.length === 0 ? null : (
+        <ol className={styles.steps}>
+          {card.steps.map((step, index) =>
+            "command" in step ? (
+              // The row is a span so the `li` keeps its `list-item` display
+              // and its ordinal marker.
+              <li key={step.command}>
+                <span className={styles.commandRow}>
+                  <code className="md-code" id={`${baseId}-${index}`}>
+                    {step.command}
+                  </code>
+                  <CopyButton
+                    className={`md-button md-button--text md-button--dense ${styles.stepCopy}`}
+                    describedBy={`${baseId}-${index}`}
+                    label="Copy"
+                    text={step.command}
+                  />
+                </span>
+              </li>
+            ) : (
+              <li key={step.note}>{step.note}</li>
+            ),
+          )}
+        </ol>
+      )}
+      <a
+        className={`md-button md-button--text ${styles.connectLink}`}
+        href={DASHBOARD_HREF}
+      >
+        Open the dashboard
+      </a>
+    </article>
+  );
 }
 
 interface WebMcpGuideProps {
@@ -153,108 +286,122 @@ interface WebMcpGuideProps {
 }
 
 export function WebMcpGuide({ onCheckAgain, status }: WebMcpGuideProps) {
+  const [scrolled, setScrolled] = useState(false);
+
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 0);
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
   return (
-    <main className={styles.guide}>
-      <section className={styles.hero} aria-labelledby="openroom-heading">
-        <div className={styles.heroCopy}>
-          <p className={styles.eyebrow}>
-            Open-source spatial commerce for WebMCP agents
-          </p>
-          <h1 id="openroom-heading">The room becomes the storefront.</h1>
-          <p className={styles.intro}>
-            {"OpenRoom turns a room photo into a storefront that both people and AI agents can edit. This browser has not exposed WebMCP yet, so here is how to get it running, and how to try the demo without it."}
-          </p>
+    <div className={styles.page}>
+      <header
+        className={`md-top-app-bar ${styles.appBar}`}
+        data-scrolled={scrolled ? "true" : "false"}
+      >
+        <div className={styles.appBarInner}>
+          <span className={styles.wordmark}>OpenRoom</span>
+          <a
+            className="md-button md-button--text"
+            href={`#${CONNECT_SECTION_ID}`}
+          >
+            Connect an AI app
+          </a>
         </div>
+      </header>
 
-        <figure className={styles.heroRoom}>
-          <Image
-            alt="Approximate living room visualization with a cream sofa, oak coffee table, woven rug, floor lamp, chair, and potted plant."
-            fill
-            priority
-            sizes="(min-width: 900px) 46vw, 100vw"
-            src="/demo/openroom-room.png"
-          />
-        </figure>
-      </section>
-
-      <section className={styles.card} aria-labelledby="webmcp-compat-heading">
-        <h2 id="webmcp-compat-heading">WebMCP compatibility</h2>
-        <p className={styles.status} role="status">
-          {statusMessage(status)}
-        </p>
-
-        {status === null ? null : (
-          <>
-            <dl className={styles.facts}>
-              <div>
-                <dt>Detected browser</dt>
-                <dd>{describeBrowser(status.browser)}</dd>
-              </div>
-              <div>
-                <dt>Secure context</dt>
-                <dd>{status.kind === "insecure-context" ? "no" : "yes"}</dd>
-              </div>
-            </dl>
-            <Instructions status={status} />
-            <button
-              className={styles.checkButton}
-              onClick={onCheckAgain}
-              type="button"
-            >
-              Check again
-            </button>
-            <p className={styles.companionNote}>
-              Using Claude Desktop or Claude Code?{" "}
-              {/* eslint-disable-next-line @next/next/no-html-link-for-pages --
-                  same-route query switch must reload: a soft navigation leaves
-                  this guide on screen without the Chromium Navigation API. */}
-              <a className={styles.inlineLink} href="/?view=dashboard">
-                Open the dashboard
-              </a>{" "}
-              and pair with the local companion.
+      <main className={styles.guide}>
+        <section className={styles.hero}>
+          <div className={styles.heroCopy}>
+            <h1 className={styles.heroTitle}>OpenRoom</h1>
+            <p className={styles.heroTagline}>
+              AI Room Planner &amp; Furniture Shopping
             </p>
-          </>
-        )}
-      </section>
+            <p className={styles.heroLede}>
+              {"Furnish a real room photo with catalog products — by hand, or through the AI app you already use."}
+            </p>
+            <Link
+              className={`md-button md-button--filled ${styles.heroAction}`}
+              href="/demo"
+            >
+              Open the demo
+            </Link>
+          </div>
 
-      <section className={styles.panel} aria-labelledby="webmcp-tools-heading">
-        <h2 id="webmcp-tools-heading">What an agent can do here</h2>
-        <ul className={styles.toolList}>
-          {CORE_TOOLS.map((tool) => (
-            <li key={tool.name}>
-              <code className={styles.code}>{tool.name}</code>
-              <span>{tool.description}</span>
-            </li>
-          ))}
-        </ul>
-      </section>
+          <figure className={styles.heroRoom}>
+            <Image
+              alt="Approximate living room visualization with a cream sofa, oak coffee table, woven rug, floor lamp, chair, and potted plant."
+              fill
+              priority
+              sizes="(min-width: 900px) 46vw, 100vw"
+              src="/demo/openroom-room.png"
+            />
+          </figure>
+        </section>
 
-      <section className={styles.panel} aria-labelledby="webmcp-demo-heading">
-        <h2 id="webmcp-demo-heading">Try it without an agent</h2>
-        <p>
-          {"The human editor works in any modern browser; WebMCP only adds the agent tools."}
-        </p>
-        <Link className={styles.demoLink} href="/demo">
-          Open the demo
-        </Link>
-      </section>
+        <StatusBanner onCheckAgain={onCheckAgain} status={status} />
 
-      <section className={styles.panel} aria-labelledby="webmcp-shop-heading">
-        <h2 id="webmcp-shop-heading">Shop with your agent</h2>
-        <p>
-          {"In Shopify mode, add_scene_to_cart returns Shopify merchandise lines and the store's Storefront MCP endpoint (https://your-store.myshopify.com/api/mcp), which needs no token. Connect Claude, ChatGPT, or any MCP client to that endpoint and let it call update_cart and get_cart."}
-        </p>
-        <p className={styles.note}>
-          {'See README.md, section "Commerce integration".'}
-        </p>
-      </section>
+        <section
+          aria-labelledby={CONNECT_SECTION_ID}
+          className={styles.connect}
+        >
+          <h2 className={styles.sectionTitle} id={CONNECT_SECTION_ID}>
+            Connect an AI app
+          </h2>
+          <div className={styles.connectGrid}>
+            {CONNECT_CARDS.map((card) => (
+              <ConnectCard card={card} key={card.title} />
+            ))}
+          </div>
+        </section>
 
-      <section className={styles.panel} aria-labelledby="webmcp-source-heading">
-        <h2 id="webmcp-source-heading">Open source</h2>
-        <p>
-          {"OpenRoom is MIT-licensed. The source in this repository includes the deterministic solver, the photo compositor, and the WebMCP tools."}
-        </p>
-      </section>
-    </main>
+        <div className={styles.moreInfo}>
+          <details className={styles.disclosure}>
+            <summary className={styles.summary}>What an agent can do</summary>
+            <ul className={styles.toolList}>
+              {CORE_TOOL_MANIFEST.map((tool) => (
+                <li key={tool.name}>
+                  <code className="md-code">{tool.name}</code>
+                  <span>{`— ${tool.description}`}</span>
+                </li>
+              ))}
+            </ul>
+          </details>
+
+          <details className={styles.disclosure}>
+            <summary className={styles.summary}>
+              Shopping with your agent
+            </summary>
+            <p className={styles.disclosureBody}>
+              {"In Shopify mode, add_scene_to_cart returns Shopify merchandise lines and the store's token-free Storefront MCP endpoint, so the agent you already use can finish the cart."}
+            </p>
+            <a
+              className={styles.textLink}
+              href={`${REPO_URL}#commerce-integration`}
+              rel="noreferrer"
+              target="_blank"
+            >
+              Commerce integration in the README
+            </a>
+          </details>
+
+          <details className={styles.disclosure}>
+            <summary className={styles.summary}>Open source</summary>
+            <p className={styles.disclosureBody}>
+              {"OpenRoom is MIT-licensed: the deterministic solver, the photo compositor, and the WebMCP tools are all in the repository."}
+            </p>
+            <a
+              className={styles.textLink}
+              href={REPO_URL}
+              rel="noreferrer"
+              target="_blank"
+            >
+              Taehun/OpenRoom on GitHub
+            </a>
+          </details>
+        </div>
+      </main>
+    </div>
   );
 }

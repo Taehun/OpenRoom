@@ -39,20 +39,18 @@ test("guides a browser without WebMCP to the flag and the demo", async ({
   await page.goto("/");
 
   await expect(
-    page.getByRole("heading", {
-      level: 1,
-      name: "The room becomes the storefront.",
-    }),
+    page.getByRole("heading", { level: 1, name: "OpenRoom" }),
   ).toBeVisible();
 
-  const card = page.getByRole("region", { name: "WebMCP compatibility" });
-  await expect(card).toBeVisible();
+  const banner = page.getByRole("region", { name: "WebMCP in this browser" });
+  await expect(banner).toBeVisible();
   // Playwright drives a Chromium new enough for WebMCP, but without the flag.
-  await expect(card.getByRole("status")).toHaveText(
-    /once the flag is enabled\.$/,
-  );
+  await expect(banner.getByRole("status")).toHaveText(/^Needs a flag in /);
   await expect(
-    card.getByText("chrome://flags/#enable-webmcp-testing"),
+    banner.getByText("chrome://flags/#enable-webmcp-testing"),
+  ).toBeVisible();
+  await expect(
+    banner.getByRole("button", { name: "Copy flag address" }),
   ).toBeVisible();
   await expect(
     page.getByRole("link", { name: "Open the demo" }),
@@ -60,8 +58,14 @@ test("guides a browser without WebMCP to the flag and the demo", async ({
 
   // Claude Desktop and Claude Code reach the Scene through the local
   // companion, so this browser must still be able to open the dashboard.
-  const dashboard = card.getByRole("link", { name: "Open the dashboard" });
-  await expect(dashboard).toBeVisible();
+  const connect = page.getByRole("region", { name: "Connect an AI app" });
+  await expect(connect).toBeVisible();
+  await expect(
+    connect.getByText("claude mcp add openroom -- pnpm --silent --dir <repo> mcp:openroom"),
+  ).toBeVisible();
+  const dashboard = connect
+    .getByRole("link", { name: "Open the dashboard" })
+    .first();
   await expect(dashboard).toHaveAttribute("href", "/?view=dashboard");
   await dashboard.click();
 
@@ -80,13 +84,10 @@ test("guides a browser without WebMCP to the flag and the demo", async ({
 
   await page.getByRole("link", { name: "Guide" }).click();
   await expect(
-    page.getByRole("region", { name: "WebMCP compatibility" }),
+    page.getByRole("region", { name: "WebMCP in this browser" }),
   ).toBeVisible();
   await expect(
-    page.getByRole("heading", {
-      level: 1,
-      name: "The room becomes the storefront.",
-    }),
+    page.getByRole("heading", { level: 1, name: "OpenRoom" }),
   ).toBeVisible();
 });
 
@@ -105,10 +106,13 @@ test("renders the workspace as the dashboard when WebMCP is present", async ({
   await expect(guide).toHaveAttribute("href", "/?view=guide");
   await guide.click();
 
-  const card = page.getByRole("region", { name: "WebMCP compatibility" });
-  await expect(card.getByRole("status")).toHaveText(
-    "WebMCP detected. Opening the dashboard.",
+  const banner = page.getByRole("region", { name: "WebMCP in this browser" });
+  await expect(banner.getByRole("status")).toHaveText(
+    "Ready — WebMCP detected",
   );
+  await expect(
+    banner.getByRole("link", { name: "Open the dashboard" }),
+  ).toHaveAttribute("href", "/?view=dashboard");
   await expect(
     page.getByRole("link", { name: "Open the demo" }),
   ).toHaveAttribute("href", "/demo");

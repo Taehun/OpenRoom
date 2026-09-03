@@ -81,6 +81,12 @@ reached. `tests/e2e/webmcp-core.spec.ts` asserts that parity.
 | Claude for Chrome | Not supported as a WebMCP site-tool surface | Anthropic documents it as browser automation, not WebMCP site-tool discovery. Use the companion. |
 | Browsers with no `document.modelContext` | No agent path | The complete human editor still works. |
 
+Chromium exposes `document.modelContext` from version 146, but until Chrome 149
+it sits behind `chrome://flags/#enable-webmcp-testing`, which needs a browser
+relaunch to take effect; from Chrome 149 an origin trial removes that flag
+requirement. WebMCP has only been verified on Google Chrome, so other Chromium
+browsers may differ. The guide at `/` detects all of this and says what to do.
+
 Cart semantics do not change with the surface. `add_scene_to_cart` always opens
 the local approval sheet in the page, and in the default `demo` mode it makes no
 external request at all — the companion relays the call, it does not perform one.
