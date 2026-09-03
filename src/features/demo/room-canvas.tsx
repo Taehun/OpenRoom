@@ -210,7 +210,7 @@ export function RoomCanvas({
         </figure>
 
         <section
-          aria-label="Agent prompt guidance"
+          aria-label="AI app prompt"
           className={styles.composer}
         >
           <span className={styles.composerIcon} aria-hidden="true">

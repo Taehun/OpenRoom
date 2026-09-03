@@ -7,7 +7,7 @@ import {
   type BrowserInfo,
   type CompatibilityStatus,
 } from "../../webmcp/browser-compatibility";
-import { CORE_TOOL_MANIFEST } from "../../webmcp/core-tool-manifest";
+import type { CoreToolName } from "../../webmcp/tool-contracts";
 import { GitHubMark } from "./github-mark";
 import { REPOSITORY_URL } from "./repository";
 import styles from "./home.module.css";
@@ -40,7 +40,7 @@ export const CONNECT_COMMANDS = {
 const REPO_PLACEHOLDER_NOTE = "Replace <repo> with your OpenRoom checkout path.";
 
 const PAIR_STEP =
-  "Start a chat; your app launches the companion, which writes a six-digit code to the log. Type it into the dashboard.";
+  "Start a chat; your app launches the companion, which writes a six-digit code to the log. Type it into the demo.";
 
 type ConnectStep = { command: string } | { note: string };
 
@@ -75,6 +75,29 @@ const CONNECT_CARDS: ReadonlyArray<ConnectCardContent> = [
     ],
   },
 ];
+
+/**
+ * The six Core tools, in the words a shopper reads. The manifest's technical
+ * descriptions stay in the tool contracts for the AI app; people get a verb.
+ */
+const TOOL_SUMMARIES: ReadonlyArray<{ name: CoreToolName; summary: string }> =
+  [
+    { name: "get_scene", summary: "See the room and every piece in it" },
+    { name: "get_selection", summary: "Know which piece you have selected" },
+    {
+      name: "search_products",
+      summary: "Search the catalog by style, colour, or material",
+    },
+    { name: "replace_object", summary: "Swap any piece for a catalog product" },
+    {
+      name: "move_object",
+      summary: "Move or turn a piece (lamps can sit on tables)",
+    },
+    {
+      name: "add_scene_to_cart",
+      summary: "Prepare the room's products for your approval",
+    },
+  ];
 
 function describeBrowser(browser: BrowserInfo): string {
   return `${browser.brand} ${browser.version ?? "an unknown version"}`;
@@ -219,7 +242,7 @@ function StatusBanner({
           {status.kind === "ready" ? (
             // eslint-disable-next-line @next/next/no-html-link-for-pages -- same-route query switch must reload: a soft navigation leaves this guide on screen without the Chromium Navigation API.
             <a className="md-button md-button--filled" href="/?view=dashboard">
-              Open the dashboard
+              Open the demo
             </a>
           ) : (
             <>
@@ -290,7 +313,7 @@ function ConnectCard({ card }: { card: ConnectCardContent }) {
         className={`md-button md-button--text ${styles.connectLink}`}
         href="/?view=dashboard"
       >
-        Open the dashboard
+        Open the demo
       </a>
     </article>
   );
@@ -392,12 +415,12 @@ export function WebMcpGuide({ onCheckAgain, status }: WebMcpGuideProps) {
 
         <div className={styles.moreInfo}>
           <details className={styles.disclosure}>
-            <summary className={styles.summary}>What an agent can do</summary>
+            <summary className={styles.summary}>What your AI app can do</summary>
             <ul className={styles.toolList}>
-              {CORE_TOOL_MANIFEST.map((tool) => (
-                <li key={tool.name}>
-                  <code className="md-code">{tool.name}</code>
-                  <span>{`— ${tool.description}`}</span>
+              {TOOL_SUMMARIES.map(({ name, summary }) => (
+                <li key={name}>
+                  <span>{summary}</span>
+                  <code className="md-code">{name}</code>
                 </li>
               ))}
             </ul>
@@ -405,10 +428,10 @@ export function WebMcpGuide({ onCheckAgain, status }: WebMcpGuideProps) {
 
           <details className={styles.disclosure}>
             <summary className={styles.summary}>
-              Shopping with your agent
+              Shopping with your AI app
             </summary>
             <p className={styles.disclosureBody}>
-              {"In Shopify mode, add_scene_to_cart returns Shopify merchandise lines and the store's token-free Storefront MCP endpoint, so the agent you already use can finish the cart."}
+              {"In Shopify mode your AI app receives the cart lines and the store's token-free Storefront MCP endpoint, so it can finish the order for you."}
             </p>
             <a
               className={styles.textLink}

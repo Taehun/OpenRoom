@@ -71,15 +71,15 @@ test("guides a browser without WebMCP to the flag and the demo", async ({
     connect.getByText("tail -f ~/openroom-mcp.log").first(),
   ).toBeVisible();
   const dashboard = connect
-    .getByRole("link", { name: "Open the dashboard" })
+    .getByRole("link", { name: "Open the demo" })
     .first();
   await expect(dashboard).toHaveAttribute("href", "/?view=dashboard");
   await dashboard.click();
 
   await expect(page.getByRole("main", { name: "Room canvas" })).toBeVisible();
   await expect(
-    page.getByRole("status", { name: "Local agent connection status" }),
-  ).toHaveText("Local agent: Not connected");
+    page.getByRole("status", { name: "Desktop AI app status" }),
+  ).toHaveText("Desktop AI app: Not connected");
 
   // The fields moved into a modal dialog; the composer keeps one button.
   await page.getByRole("button", { name: "Connect an AI app" }).click();
@@ -118,7 +118,7 @@ test("renders the workspace as the dashboard when WebMCP is present", async ({
     "Ready — WebMCP detected",
   );
   await expect(
-    banner.getByRole("link", { name: "Open the dashboard" }),
+    banner.getByRole("link", { name: "Open the demo" }),
   ).toHaveAttribute("href", "/?view=dashboard");
   await expect(
     page.getByRole("link", { name: "Open the demo" }),

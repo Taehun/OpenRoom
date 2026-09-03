@@ -118,7 +118,7 @@ describe("the one-screen guide", () => {
 
     const connect = screen.getByRole("region", { name: "Connect an AI app" });
     expect(
-      within(connect).getAllByRole("link", { name: "Open the dashboard" }),
+      within(connect).getAllByRole("link", { name: "Open the demo" }),
     ).toHaveLength(3);
     expect(within(connect).getByText(CONNECT_COMMANDS.claude)).toBeVisible();
     expect(within(connect).getByText(CONNECT_COMMANDS.codex)).toBeVisible();
@@ -128,7 +128,7 @@ describe("the one-screen guide", () => {
     // run a second one: that fails with EADDRINUSE or pairs nothing.
     expect(within(connect).queryByText("pnpm mcp:openroom")).toBeNull();
 
-    expect(screen.getByRole("link", { name: "Open the demo" })).toHaveAttribute(
+    expect(screen.getAllByRole("link", { name: "Open the demo" })[0]).toHaveAttribute(
       "href",
       "/demo",
     );
@@ -181,7 +181,7 @@ describe("the one-screen guide", () => {
     ).toBeVisible();
     expect(within(banner).getAllByRole("button")).toHaveLength(1);
     expect(
-      within(banner).queryByRole("link", { name: "Open the dashboard" }),
+      within(banner).queryByRole("link", { name: "Open the demo" }),
     ).toBeNull();
   });
 
@@ -195,7 +195,7 @@ describe("the one-screen guide", () => {
       "Ready — WebMCP detected",
     );
     expect(
-      within(banner).getByRole("link", { name: "Open the dashboard" }),
+      within(banner).getByRole("link", { name: "Open the demo" }),
     ).toHaveAttribute("href", "/?view=dashboard");
     expect(within(banner).queryByRole("button")).toBeNull();
   });
@@ -244,14 +244,17 @@ describe("the one-screen guide", () => {
   it("lists the six agent tools from the core manifest", () => {
     renderGuide({ kind: "flag-required" });
 
-    const tools = screen.getByText("What an agent can do").closest("details");
+    const tools = screen.getByText("What your AI app can do").closest("details");
     if (tools === null) throw new Error("Missing the tool disclosure");
     expect(within(tools).getAllByRole("listitem")).toHaveLength(6);
     // The disclosure is closed, so the entries are present but not visible.
-    const getScene = CORE_TOOL_MANIFEST.find(({ name }) => name === "get_scene");
-    if (!getScene) throw new Error("Missing get_scene in the manifest");
+    // Every manifest tool is named, but described in a shopper's words.
+    for (const { name, description } of CORE_TOOL_MANIFEST) {
+      expect(within(tools).getByText(name)).toBeInTheDocument();
+      expect(within(tools).queryByText(description)).toBeNull();
+    }
     expect(
-      within(tools).getByText(`— ${getScene.description}`),
+      within(tools).getByText("See the room and every piece in it"),
     ).toBeInTheDocument();
   });
 
@@ -295,7 +298,7 @@ test("guides a supported Chromium browser through the testing flag", async () =>
     screen.getByRole("button", { name: "Copy flag address" }),
   ).toBeVisible();
   expect(screen.getByRole("button", { name: "Check again" })).toBeVisible();
-  expect(screen.getByRole("link", { name: "Open the demo" })).toHaveAttribute(
+  expect(screen.getAllByRole("link", { name: "Open the demo" })[0]).toHaveAttribute(
     "href",
     "/demo",
   );
@@ -349,7 +352,7 @@ test("keeps the guide reachable at ?view=guide while WebMCP is present", async (
     "Ready — WebMCP detected",
   );
   expect(screen.queryByRole("main", { name: "Room canvas" })).toBeNull();
-  expect(screen.getByRole("link", { name: "Open the demo" })).toHaveAttribute(
+  expect(screen.getAllByRole("link", { name: "Open the demo" })[0]).toHaveAttribute(
     "href",
     "/demo",
   );
@@ -365,9 +368,9 @@ test("opens the dashboard for a Claude-only browser at ?view=dashboard", async (
     await screen.findByRole("main", { name: "Room canvas" }),
   ).toBeVisible();
   expect(
-    screen.getByRole("status", { name: "Local agent connection status" })
+    screen.getByRole("status", { name: "Desktop AI app status" })
       .textContent,
-  ).toBe("Local agent: Not connected");
+  ).toBe("Desktop AI app: Not connected");
   expect(
     screen.getByRole("button", { name: "Connect an AI app" }),
   ).toBeVisible();
@@ -387,7 +390,7 @@ test("points a browser without WebMCP at the local companion dashboard", async (
     name: "Connect an AI app",
   });
   for (const dashboard of within(connect).getAllByRole("link", {
-    name: "Open the dashboard",
+    name: "Open the demo",
   }))
     expect(dashboard).toHaveAttribute("href", "/?view=dashboard");
   expect(

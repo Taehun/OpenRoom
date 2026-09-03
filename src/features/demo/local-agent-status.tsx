@@ -19,10 +19,10 @@ import styles from "./demo-workspace.module.css";
  */
 
 const STATUS_LABELS: Record<LocalMcpStatus, string> = {
-  "not-connected": "Local agent: Not connected",
-  pairing: "Local agent: Pairing…",
-  connected: "Local agent: Connected",
-  "connection-lost": "Local agent: Connection lost",
+  "not-connected": "Desktop AI app: Not connected",
+  pairing: "Desktop AI app: Pairing…",
+  connected: "Desktop AI app: Connected",
+  "connection-lost": "Desktop AI app: Connection lost",
 };
 
 const PAIR_CODE_PATTERN = /^[0-9]{6}$/;
@@ -78,7 +78,7 @@ export function LocalAgentStatus({ relay }: { relay: LocalMcpRelay }) {
   return (
     <div className={styles.localAgent}>
       <span
-        aria-label="Local agent connection status"
+        aria-label="Desktop AI app status"
         className={`md-chip md-chip--dense${
           relay.status === "connected" ? " md-chip--selected" : ""
         }`}

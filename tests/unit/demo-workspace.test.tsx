@@ -503,9 +503,9 @@ test("shows the local agent status as a chip beside the native WebMCP status", (
     screen.getByRole("status", { name: "In-browser AI status" }),
   ).toHaveTextContent("In-browser AI: Not available");
   const chip = screen.getByRole("status", {
-    name: "Local agent connection status",
+    name: "Desktop AI app status",
   });
-  expect(chip.textContent).toBe("Local agent: Not connected");
+  expect(chip.textContent).toBe("Desktop AI app: Not connected");
 
   // The composer row itself carries no fields any more.
   expect(openPairingDialog()).toBeVisible();
@@ -606,9 +606,9 @@ test("pairs with the local relay from the dialog without exposing the session to
 
   await waitFor(() =>
     expect(
-      screen.getByRole("status", { name: "Local agent connection status" })
+      screen.getByRole("status", { name: "Desktop AI app status" })
         .textContent,
-    ).toBe("Local agent: Connected"),
+    ).toBe("Desktop AI app: Connected"),
   );
   // A successful pair closes the dialog and hands the composer back.
   expect(
@@ -623,9 +623,9 @@ test("pairs with the local relay from the dialog without exposing the session to
 
   await user.click(screen.getByRole("button", { name: "Disconnect" }));
   expect(
-    screen.getByRole("status", { name: "Local agent connection status" })
+    screen.getByRole("status", { name: "Desktop AI app status" })
       .textContent,
-  ).toBe("Local agent: Not connected");
+  ).toBe("Desktop AI app: Not connected");
   expect(server.deletes).toHaveLength(1);
 });
 
@@ -653,9 +653,9 @@ test("keeps a rejected pairing inside the dialog", async () => {
   );
   expect(dialog).toBeVisible();
   expect(
-    screen.getByRole("status", { name: "Local agent connection status" })
+    screen.getByRole("status", { name: "Desktop AI app status" })
       .textContent,
-  ).toBe("Local agent: Not connected");
+  ).toBe("Desktop AI app: Not connected");
 });
 
 test("clears a stale failure and the code when the dialog is reopened", async () => {
@@ -714,9 +714,9 @@ test("explains an insecure context instead of pairing", async () => {
     within(dialog).getByText("Pairing needs HTTPS or localhost."),
   ).toBeVisible();
   expect(
-    screen.getByRole("status", { name: "Local agent connection status" })
+    screen.getByRole("status", { name: "Desktop AI app status" })
       .textContent,
-  ).toBe("Local agent: Not connected");
+  ).toBe("Desktop AI app: Not connected");
   expect(server.requests).toHaveLength(0);
 });
 
