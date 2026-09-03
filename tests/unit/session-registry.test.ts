@@ -10,7 +10,14 @@ import {
   RelayError,
   RelayToolCallSchema,
 } from "../../src/local-mcp/relay-protocol";
-import { SessionRegistry } from "../../scripts/openinterior-mcp/session-registry";
+import {
+  EXPIRY_SWEEP_INTERVAL_MS,
+  REPAIRABLE_SESSION_CLOSURES,
+  SESSION_CLOSED_BY_PAGE,
+  SESSION_CLOSED_HEARTBEAT_EXPIRED,
+  SessionRegistry,
+  startExpirySweep,
+} from "../../scripts/openinterior-mcp/session-registry";
 import type { ToolResult } from "../../src/webmcp/tool-result";
 
 const MANIFEST_HASH = "0123456789abcdef".repeat(4);
@@ -393,6 +400,40 @@ describe("heartbeat expiry", () => {
     await expect(drainPoll(token)).rejects.toThrowError("UNAUTHORIZED");
   });
 
+  it("pins the exact heartbeat diagnostic the companion reissues a code on", () => {
+    // The owning process decides whether to mint a replacement code by matching
+    // this line. Both sides now share one constant, and this pins its text so a
+    // reworded diagnostic fails here rather than silently stranding an operator
+    // with no way back in.
+    pairPage();
+    advance(HEARTBEAT_TIMEOUT_MS);
+    registry.sweepExpired();
+
+    expect(SESSION_CLOSED_HEARTBEAT_EXPIRED).toBe("session closed: heartbeat expired");
+    expect(diagnostics).toContain(SESSION_CLOSED_HEARTBEAT_EXPIRED);
+    expect(REPAIRABLE_SESSION_CLOSURES.has(SESSION_CLOSED_HEARTBEAT_EXPIRED)).toBe(true);
+  });
+
+  it("pins the exact page disconnect diagnostic", () => {
+    const { token } = pairPage();
+    registry.disconnect(token);
+
+    expect(SESSION_CLOSED_BY_PAGE).toBe("session closed: disconnected by the paired page");
+    expect(diagnostics).toContain(SESSION_CLOSED_BY_PAGE);
+    expect(REPAIRABLE_SESSION_CLOSURES.has(SESSION_CLOSED_BY_PAGE)).toBe(true);
+  });
+
+  it("leaves a replaced session and a shutdown out of the repairable set", () => {
+    // A replaced session already has a page attached and a shut down process is
+    // going away; minting a code for either would leave a live code where none
+    // belongs, so only the two closures above may trigger a reissue.
+    for (const closure of REPAIRABLE_SESSION_CLOSURES) {
+      expect([SESSION_CLOSED_BY_PAGE, SESSION_CLOSED_HEARTBEAT_EXPIRED]).toContain(closure);
+    }
+    expect(REPAIRABLE_SESSION_CLOSURES.has("session closed: replaced by a new pairing")).toBe(false);
+    expect(REPAIRABLE_SESSION_CLOSURES.has("session closed: relay shutting down")).toBe(false);
+  });
+
   it("drops expired pair codes during a sweep", () => {
     const issued = registry.issuePairCode();
     advance(PAIR_CODE_TTL_MS - 1);
@@ -402,6 +443,60 @@ describe("heartbeat expiry", () => {
     expect(() =>
       registry.pair({ code: issued.code, origin: ORIGIN, manifestHash: MANIFEST_HASH, pageNonce: PAGE_NONCE }),
     ).toThrowError("PAIR_REJECTED");
+  });
+});
+
+describe("periodic expiry sweep", () => {
+  it("closes a lapsed session without any other registry call", () => {
+    // A page killed with its tab - no DELETE, no further poll - leaves nobody
+    // to touch the registry, so without this timer the closure diagnostic, and
+    // with it the replacement pair code, would never be emitted.
+    const stop = startExpirySweep(registry);
+    try {
+      pairPage();
+      advance(HEARTBEAT_TIMEOUT_MS - EXPIRY_SWEEP_INTERVAL_MS);
+      expect(diagnostics).not.toContain(SESSION_CLOSED_HEARTBEAT_EXPIRED);
+
+      advance(EXPIRY_SWEEP_INTERVAL_MS);
+      expect(diagnostics).toContain(SESSION_CLOSED_HEARTBEAT_EXPIRED);
+    } finally {
+      stop();
+    }
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it("sweeps on an unref'd interval and stops on demand", () => {
+    const unref = vi.fn();
+    const handle = { unref };
+    const scheduled: Array<{ handler: () => void; ms: number }> = [];
+    const cleared: unknown[] = [];
+
+    const stop = startExpirySweep(registry, {
+      setTimer: (handler, ms) => {
+        scheduled.push({ handler, ms });
+        return handle;
+      },
+      clearTimer: (cancelled) => cleared.push(cancelled),
+    });
+
+    expect(scheduled).toHaveLength(1);
+    expect(scheduled[0].ms).toBe(EXPIRY_SWEEP_INTERVAL_MS);
+    // Unref'd, so the sweep alone never keeps the companion process alive.
+    expect(unref).toHaveBeenCalledTimes(1);
+
+    stop();
+    stop();
+    expect(cleared).toEqual([handle]);
+  });
+
+  it("survives a sweep on a shut down registry", () => {
+    const stop = startExpirySweep(registry);
+    try {
+      registry.shutdown();
+      expect(() => advance(EXPIRY_SWEEP_INTERVAL_MS * 2)).not.toThrow();
+    } finally {
+      stop();
+    }
   });
 });
 

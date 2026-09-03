@@ -4,7 +4,7 @@ import { DEFAULT_RELAY_PORT } from "../../src/local-mcp/relay-protocol";
 import { getCoreToolManifestHash } from "../../src/webmcp/core-tool-manifest";
 import { createOpenInteriorMcpServer } from "./mcp-server";
 import { allowedOriginsFromEnv, startRelayHttpServer, type RelayHttpServer } from "./relay-http";
-import { SessionRegistry } from "./session-registry";
+import { REPAIRABLE_SESSION_CLOSURES, SessionRegistry, startExpirySweep } from "./session-registry";
 
 /**
  * Process entry point for the localhost MCP companion.
@@ -17,18 +17,6 @@ import { SessionRegistry } from "./session-registry";
  */
 
 const LOG_PREFIX = "openinterior-mcp:";
-
-/**
- * Registry diagnostics that leave nobody attached and no way back in, so the
- * operator needs a replacement code. Deliberately exact rather than a prefix
- * match on `session closed:`: a session replaced by a new pairing already has a
- * page attached, and one closed by `shutdown()` belongs to a process that is
- * going away - minting in either case would put a live code where none belongs.
- */
-const REPAIRABLE_SESSION_CLOSURES: ReadonlySet<string> = new Set([
-  "session closed: disconnected by the paired page",
-  "session closed: heartbeat expired",
-]);
 
 /** Ports below 1024 need privileges the companion must never ask for. */
 const MIN_USER_PORT = 1024;
@@ -74,6 +62,7 @@ async function main(): Promise<void> {
   let registry: SessionRegistry | undefined = undefined;
   let relay: RelayHttpServer | undefined = undefined;
   let stdio: StdioServerHandle | undefined = undefined;
+  let stopSweep: (() => void) | undefined = undefined;
   let stopping: Promise<void> | undefined = undefined;
 
   /**
@@ -81,6 +70,7 @@ async function main(): Promise<void> {
    * is safe to run again for anything that was created after a signal raced it.
    */
   const teardown = async (): Promise<void> => {
+    stopSweep?.();
     registry?.shutdown();
     await relay?.close().catch((error: unknown) => {
       log(`relay close failed: ${error instanceof Error ? error.message : String(error)}`);
@@ -146,6 +136,12 @@ async function main(): Promise<void> {
       if (REPAIRABLE_SESSION_CLOSURES.has(message)) announcePairCode();
     },
   });
+
+  // Heartbeat expiry is otherwise only noticed when a client next touches the
+  // registry, so a page lost with its tab would leave the process believing it
+  // is still paired and the replacement code unprinted. Unref'd, and stopped in
+  // teardown.
+  stopSweep = startExpirySweep(registry);
 
   relay = await startRelayHttpServer({
     registry,

@@ -84,6 +84,37 @@ function safeEqual(left: string, right: string): boolean {
   return difference === 0;
 }
 
+/** Every session closure diagnostic shares this prefix. */
+const SESSION_CLOSED_PREFIX = "session closed: ";
+
+/**
+ * The paired page hung up on purpose: `DELETE /v1/session`, the Disconnect
+ * button, or a closed tab that got its unload handler in.
+ */
+export const SESSION_CLOSED_BY_PAGE = `${SESSION_CLOSED_PREFIX}disconnected by the paired page`;
+
+/** No poll for `HEARTBEAT_TIMEOUT_MS`: the page died, slept, or lost the relay. */
+export const SESSION_CLOSED_HEARTBEAT_EXPIRED = `${SESSION_CLOSED_PREFIX}heartbeat expired`;
+
+/** A second page paired, which invalidates the first session and its calls. */
+const SESSION_CLOSED_REPLACED = `${SESSION_CLOSED_PREFIX}replaced by a new pairing`;
+
+/** Process teardown; nothing may pair afterwards. */
+const SESSION_CLOSED_SHUTDOWN = `${SESSION_CLOSED_PREFIX}relay shutting down`;
+
+/**
+ * Closures that leave nobody attached and no way back in, so the owning process
+ * must mint a replacement pair code. Deliberately an exact set rather than a
+ * prefix match on the shared prefix: a session replaced by a new pairing
+ * already has a page attached, and one closed by `shutdown()` belongs to a
+ * process that is going away - minting in either case would put a live code
+ * where none belongs.
+ */
+export const REPAIRABLE_SESSION_CLOSURES: ReadonlySet<string> = new Set([
+  SESSION_CLOSED_BY_PAGE,
+  SESSION_CLOSED_HEARTBEAT_EXPIRED,
+]);
+
 /**
  * In-memory state machine behind the loopback relay. It holds exactly one pair
  * code and at most one paired session, and it stores only routing data: request
@@ -154,7 +185,7 @@ export class SessionRegistry {
 
     this.pairCode = null;
     const previous = this.session;
-    if (previous) this.destroySession(previous, "replaced by a new pairing");
+    if (previous) this.destroySession(previous, SESSION_CLOSED_REPLACED);
 
     const lastSeenAt = this.now();
     this.session = {
@@ -302,7 +333,7 @@ export class SessionRegistry {
   disconnect(sessionToken: string): void {
     this.ensureRunning();
     const session = this.authenticate(sessionToken);
-    this.destroySession(session, "disconnected by the paired page");
+    this.destroySession(session, SESSION_CLOSED_BY_PAGE);
   }
 
   /**
@@ -316,7 +347,7 @@ export class SessionRegistry {
     this.stopped = true;
     this.pairCode = null;
     const session = this.session;
-    if (session) this.destroySession(session, "relay shutting down");
+    if (session) this.destroySession(session, SESSION_CLOSED_SHUTDOWN);
     this.onDiagnostic("relay shut down");
   }
 
@@ -332,7 +363,7 @@ export class SessionRegistry {
     // A held poll is itself proof of life, so the heartbeat clock only runs
     // between polls; the HTTP layer aborts the poll when the socket closes.
     if (session && !session.waiter && session.lastSeenAt + HEARTBEAT_TIMEOUT_MS <= now) {
-      this.destroySession(session, "heartbeat expired");
+      this.destroySession(session, SESSION_CLOSED_HEARTBEAT_EXPIRED);
     }
   }
 
@@ -386,7 +417,7 @@ export class SessionRegistry {
     if (queued !== -1) session.queue.splice(queued, 1);
   }
 
-  private destroySession(session: Session, reason: string): void {
+  private destroySession(session: Session, diagnostic: string): void {
     if (this.session === session) this.session = null;
     const waiter = session.waiter;
     session.waiter = null;
@@ -395,6 +426,53 @@ export class SessionRegistry {
     session.queue.length = 0;
     for (const call of abandoned) call.reject(new RelayError("SESSION_DISCONNECTED"));
     waiter?.reject(new RelayError("SESSION_DISCONNECTED"));
-    this.onDiagnostic(`session closed: ${reason}`);
+    this.onDiagnostic(diagnostic);
   }
+}
+
+/**
+ * How often the companion sweeps for expiry. Well under `HEARTBEAT_TIMEOUT_MS`,
+ * so a lost page is noticed - and its replacement code printed - within a few
+ * seconds of the deadline rather than whenever something next touches the
+ * registry.
+ */
+export const EXPIRY_SWEEP_INTERVAL_MS = 5_000;
+
+export interface ExpirySweepOptions {
+  /** Sweep period; overridden only by tests. */
+  intervalMs?: number;
+  /** Injected timer, so the schedule can be driven without real time. */
+  setTimer?: (handler: () => void, ms: number) => unknown;
+  clearTimer?: (handle: unknown) => void;
+}
+
+/**
+ * Runs `sweepExpired()` on a timer. Without it, heartbeat expiry is only
+ * noticed when a client next touches the registry, so a page lost with its tab
+ * - no `DELETE`, no further poll - would leave the process believing a page is
+ * still paired and the promised replacement code unprinted.
+ *
+ * The interval is unref'd, so it never keeps the process alive by itself, and
+ * `sweepExpired()` is a no-op once the registry has shut down. Returns an
+ * idempotent stop function for teardown.
+ */
+export function startExpirySweep(
+  registry: Pick<SessionRegistry, "sweepExpired">,
+  options: ExpirySweepOptions = {},
+): () => void {
+  const intervalMs = options.intervalMs ?? EXPIRY_SWEEP_INTERVAL_MS;
+  const setTimer =
+    options.setTimer ?? ((handler: () => void, ms: number): unknown => setInterval(handler, ms));
+  const clearTimer =
+    options.clearTimer ?? ((handle: unknown): void => clearInterval(handle as NodeJS.Timeout));
+
+  let handle: unknown = setTimer(() => registry.sweepExpired(), intervalMs);
+  // Guarded because a stubbed or browser timer handle has no `unref`.
+  (handle as { unref?: () => void } | null)?.unref?.();
+
+  return (): void => {
+    if (handle === null) return;
+    clearTimer(handle);
+    handle = null;
+  };
 }
