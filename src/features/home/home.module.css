@@ -1,0 +1,228 @@
+.guide {
+  display: grid;
+  gap: 28px;
+  min-height: 100svh;
+  padding: clamp(28px, 5vw, 72px) clamp(20px, 6vw, 96px)
+    clamp(48px, 8vw, 104px);
+  background: var(--limestone);
+  color: var(--ink);
+  font-size: 0.92rem;
+  line-height: 1.6;
+}
+
+.hero {
+  display: grid;
+  align-items: center;
+  gap: clamp(24px, 4vw, 56px);
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.heroCopy p {
+  margin: 0;
+}
+
+.eyebrow {
+  color: var(--moss);
+  font-size: 0.67rem;
+  font-weight: 750;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.heroCopy h1 {
+  max-width: 12ch;
+  margin: 18px 0 0;
+  font-family: var(--font-editorial), Georgia, serif;
+  font-size: clamp(2.6rem, 5.4vw, 4.6rem);
+  font-weight: 450;
+  letter-spacing: -0.05em;
+  line-height: 0.95;
+}
+
+.intro {
+  max-width: 34rem;
+  margin-top: 22px;
+  color: var(--muted-text);
+  font-size: clamp(0.98rem, 1.2vw, 1.1rem);
+}
+
+.heroRoom {
+  position: relative;
+  aspect-ratio: 16 / 10;
+  margin: 0;
+  overflow: hidden;
+  border-radius: 10px;
+  background: #d5d0c6;
+}
+
+.heroRoom img {
+  object-fit: cover;
+  object-position: center;
+}
+
+.card,
+.panel {
+  padding: clamp(20px, 2.4vw, 30px);
+  border: 1px solid var(--warm-divider);
+  border-radius: 10px;
+  background: var(--paper);
+}
+
+.card h2,
+.panel h2 {
+  margin: 0 0 12px;
+  font-family: var(--font-editorial), Georgia, serif;
+  font-size: 1.32rem;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+}
+
+.card p,
+.panel p {
+  margin: 0 0 12px;
+  max-width: 62ch;
+}
+
+.status {
+  font-size: 1.02rem;
+  font-weight: 650;
+}
+
+.facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 28px;
+  margin: 0 0 18px;
+  padding: 14px 0 0;
+  border-top: 1px solid var(--warm-divider);
+}
+
+.facts div {
+  display: flex;
+  gap: 8px;
+}
+
+.facts dt {
+  color: var(--muted-text);
+  font-size: 0.78rem;
+  font-weight: 650;
+}
+
+.facts dt::after {
+  content: ":";
+}
+
+.facts dd {
+  margin: 0;
+  font-size: 0.78rem;
+}
+
+.steps {
+  /* Tailwind preflight clears list markers; the steps are ordered on purpose. */
+  margin: 0 0 14px;
+  padding-left: 22px;
+  list-style: decimal;
+}
+
+.steps li {
+  margin-bottom: 10px;
+}
+
+.flagRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.code {
+  padding: 3px 7px;
+  border: 1px solid var(--warm-divider);
+  border-radius: 5px;
+  background: var(--limestone);
+  font-size: 0.8rem;
+  word-break: break-all;
+}
+
+.instruction {
+  margin-bottom: 14px;
+}
+
+.note {
+  color: var(--muted-text);
+  font-size: 0.78rem;
+}
+
+.copyButton,
+.checkButton,
+.demoLink {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 38px;
+  padding: 0 14px;
+  border: 1px solid var(--warm-divider);
+  border-radius: 7px;
+  background: var(--paper);
+  color: var(--ink);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 650;
+  text-decoration: none;
+}
+
+.copyButton:hover,
+.checkButton:hover,
+.demoLink:hover {
+  background: var(--limestone);
+}
+
+.demoLink {
+  border-color: var(--ink);
+  background: var(--ink);
+  color: var(--paper);
+}
+
+.demoLink:hover {
+  background: var(--terracotta);
+  border-color: var(--terracotta);
+}
+
+.copyButton:focus-visible,
+.checkButton:focus-visible,
+.demoLink:focus-visible {
+  outline: 3px solid var(--moss);
+  outline-offset: 3px;
+}
+
+.toolList {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.toolList li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.toolList span {
+  color: var(--muted-text);
+  font-size: 0.85rem;
+}
+
+@media (min-width: 900px) {
+  .hero {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 0.9fr);
+  }
+
+  .heroCopy h1 {
+    max-width: 10ch;
+  }
+}

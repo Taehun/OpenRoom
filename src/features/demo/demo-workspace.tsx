@@ -30,20 +30,29 @@ import type { CommerceContext } from "../commerce/commerce-types";
 interface DemoWorkspaceProps {
   store?: SceneStore;
   commerce?: CommerceContext;
+  /** Renders a header link back to the WebMCP guide when provided. */
+  guideHref?: string;
 }
 
 export function DemoWorkspace({
   store,
   commerce = ACTIVE_COMMERCE,
+  guideHref,
 }: DemoWorkspaceProps = {}) {
   return (
     <SceneStoreProvider store={store}>
-      <DemoWorkspaceContent commerce={commerce} />
+      <DemoWorkspaceContent commerce={commerce} guideHref={guideHref} />
     </SceneStoreProvider>
   );
 }
 
-function DemoWorkspaceContent({ commerce }: { commerce: CommerceContext }) {
+function DemoWorkspaceContent({
+  commerce,
+  guideHref,
+}: {
+  commerce: CommerceContext;
+  guideHref?: string | undefined;
+}) {
   const [state, dispatch] = useReducer(
     demoReducer,
     undefined,
@@ -199,6 +208,7 @@ function DemoWorkspaceContent({ commerce }: { commerce: CommerceContext }) {
           cartButtonRef={cartButtonRef}
           canUndo={historyLength > 0}
           dispatch={routeAction}
+          guideHref={guideHref}
           provider={provider}
           roomTotalMinor={roomTotalMinor}
           scene={scene}

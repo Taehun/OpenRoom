@@ -24,6 +24,9 @@ interface BrowserTool {
 
 declare global {
   interface Window {
+    // Names collapse when two workspaces register the same tool; the counter
+    // is what distinguishes a live leak from a clean re-registration.
+    __webMcpActiveRegistrations: number;
     __webMcpActiveToolNames: Set<string>;
     __webMcpFetchCount: number;
     __webMcpTools: Record<string, BrowserTool>;
@@ -59,6 +62,7 @@ test("completes WebMCP Core 6 against the shared demo Scene", async ({
     }
   });
   await page.addInitScript(() => {
+    window.__webMcpActiveRegistrations = 0;
     window.__webMcpActiveToolNames = new Set();
     window.__webMcpFetchCount = 0;
     window.__webMcpTools = {};
@@ -71,9 +75,13 @@ test("completes WebMCP Core 6 against the shared demo Scene", async ({
         ) {
           window.__webMcpTools[tool.name] = tool;
           window.__webMcpActiveToolNames.add(tool.name);
+          window.__webMcpActiveRegistrations += 1;
           options?.signal?.addEventListener(
             "abort",
-            () => window.__webMcpActiveToolNames.delete(tool.name),
+            () => {
+              window.__webMcpActiveToolNames.delete(tool.name);
+              window.__webMcpActiveRegistrations -= 1;
+            },
             { once: true },
           );
         },
@@ -239,10 +247,22 @@ test("completes WebMCP Core 6 against the shared demo Scene", async ({
   await page.keyboard.press("Escape");
   await page.getByRole("link", { name: "Nook home" }).click();
   await expect(page).toHaveURL("/");
+  // `/` is the dashboard whenever WebMCP is present, so it remounts the
+  // workspace: exactly six registrations stay live. A `/demo` unmount that
+  // stopped aborting would leave twelve behind the same six names.
+  await expect
+    .poll(() => page.evaluate(() => window.__webMcpActiveRegistrations))
+    .toBe(6);
+  // The guide is the workspace-free view that proves teardown.
+  await page.getByRole("link", { name: "Guide" }).click();
+  await expect(page).toHaveURL("/?view=guide");
   await expect
     .poll(() =>
       page.evaluate(() => window.__webMcpActiveToolNames.size),
     )
+    .toBe(0);
+  await expect
+    .poll(() => page.evaluate(() => window.__webMcpActiveRegistrations))
     .toBe(0);
   expect(consoleErrors).toEqual([]);
 });
