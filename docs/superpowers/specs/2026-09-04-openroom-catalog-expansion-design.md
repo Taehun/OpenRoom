@@ -93,18 +93,20 @@ every catalog product that has no registered asset:
 
 - Provider adapter interface `ImageProvider { name; generate(request):
   Promise<Uint8Array> }` with two implementations: `openai` (the existing
-  images/edits path, reused for views) and `gemini` — the Interactions API:
-  `POST https://generativelanguage.googleapis.com/v1beta/interactions` with
-  headers `x-goog-api-key: <GEMINI_API_KEY>` and `Content-Type:
-  application/json`, body `{ model, input: [ {type:"text", text}, …optional
-  {type:"image", mime_type, data(base64)} ], response_format: { type:"image",
-  mime_type:"image/png", aspect_ratio: "3:2" | "2:3" } }`; the response's first
-  image output (`output_image.data`, base64 PNG — the shell reads the first
-  output item whose type is `image`) is the result. Default model
-  `gemini-3.1-flash-image` (env `OPENROOM_IMAGE_MODEL_GEMINI`); provider chosen
-  by `OPENROOM_IMAGE_PROVIDER` (`gemini` | `openai`; default `gemini` when
+  images/edits path, reused for views) and `gemini` — verified live on
+  2026-09-04 with one probe: `POST https://generativelanguage.googleapis.com/
+  v1beta/models/{model}:generateContent`, headers `x-goog-api-key` and
+  `Content-Type: application/json`, body `{ contents: [{ parts: [{ text },
+  …optional { inlineData: { mimeType, data(base64) } }] }], generationConfig:
+  { responseModalities: ["IMAGE"], imageConfig: { aspectRatio: "3:2" | "2:3" } }
+  }`; the response is `candidates[0].content.parts[]` and the image is the first
+  part carrying `inlineData` — its `mimeType` was `image/jpeg` in the probe, so
+  the shell decodes by content (sharp) and never assumes PNG. Default model
+  `gemini-3.1-flash-image` (env `OPENROOM_IMAGE_MODEL_GEMINI`; the model list
+  confirms `generateContent` support); provider chosen by
+  `OPENROOM_IMAGE_PROVIDER` (`gemini` | `openai`; default `gemini` when
   `GEMINI_API_KEY` is set and `OPENAI_API_KEY` is not). 429/5xx retried three
-  times (2 s, 4 s, 8 s) like the OpenAI path; the key is never logged.
+  times (2 s, 4 s, 8 s); the key is never logged.
 - Gemini returns an opaque image, so the shell removes the background: pixels
   within a tolerance of the corner colour (sampled from the four corners,
   tolerance 18/255 per channel, flood-filled from the borders so interior
@@ -113,8 +115,9 @@ every catalog product that has no registered asset:
   view turned to the viewer's right, whole product visible with margin,
   standing on an invisible floor, no props, no text, no shadow. Aspect
   ratio 3:2 for wide categories (sofa, coffee_table, rug, bookshelf, chair),
-  2:3 for tall/narrow ones (floor_lamp, plant, side_table); the returned PNG's
-  own pixel size is recorded as the intrinsic size.
+  2:3 for tall/narrow ones (floor_lamp, plant, side_table); the returned image's
+  own pixel size (after background removal, unchanged) is recorded as the
+  intrinsic size.
 - Anchor measured exactly as for views; rugs additionally need a `floorQuad`
   — rugs generated here get a default quad from the alpha bounding box
   (bottom-left/right and top-left/right of the opaque region), recorded in the
