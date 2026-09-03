@@ -90,6 +90,57 @@
   padding-inline: 16px;
 }
 
+/*
+ * Icon button: a 40px square standard icon button, sized to sit on the same
+ * 40px row as `.md-button` so the two align in a bar. The focus ring is the
+ * app-wide `:focus-visible` rule, as it is for every other component here.
+ */
+.md-icon-button {
+  position: relative;
+  display: inline-flex;
+  box-sizing: border-box;
+  width: 40px;
+  height: 40px;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  overflow: hidden;
+  border: 0;
+  border-radius: var(--md-sys-shape-corner-full);
+  background: transparent;
+  color: var(--md-sys-color-on-surface-variant);
+  cursor: pointer;
+}
+
+.md-icon-button::before {
+  position: absolute;
+  border-radius: inherit;
+  background: currentColor;
+  content: "";
+  inset: 0;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 120ms ease;
+}
+
+.md-icon-button:hover:not(:disabled)::before {
+  opacity: var(--md-sys-state-hover-opacity);
+}
+
+.md-icon-button:focus-visible:not(:disabled)::before {
+  opacity: var(--md-sys-state-focus-opacity);
+}
+
+.md-icon-button:active:not(:disabled)::before {
+  opacity: var(--md-sys-state-pressed-opacity);
+}
+
+.md-icon-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.38;
+}
+
 /* ------------------------------------------------------------------ cards */
 
 .md-card {

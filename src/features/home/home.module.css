@@ -34,8 +34,16 @@
   align-items: center;
   justify-content: space-between;
   margin-inline: auto;
-  /* The text button carries 16px of its own padding on the right. */
-  padding-inline: var(--guide-gutter) calc(var(--guide-gutter) - 16px);
+  /* The trailing icon button centres a 20px mark in 40px, so it carries 10px
+     of its own optical inset on the right. */
+  padding-inline: var(--guide-gutter) calc(var(--guide-gutter) - 10px);
+}
+
+/* The bar's trailing cluster: the jump link, then the repository link. */
+.appBarActions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
 }
 
 .guide {
