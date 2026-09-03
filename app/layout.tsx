@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import { Roboto, Roboto_Mono } from "next/font/google";
+import { SceneStoreProvider } from "../src/features/scene/scene-context";
 import "./globals.css";
 
 const ui = Roboto({
@@ -25,7 +26,14 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en" className={`${ui.variable} ${mono.variable}`}>
-      <body>{children}</body>
+      <body>
+        {/*
+          One Scene store per browser tab. The layout outlives every route, so
+          a soft navigation between `/` and `/demo` remounts the workspace
+          against the same store instead of handing the reader a fresh room.
+        */}
+        <SceneStoreProvider>{children}</SceneStoreProvider>
+      </body>
     </html>
   );
 }
