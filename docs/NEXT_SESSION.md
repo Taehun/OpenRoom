@@ -411,6 +411,6 @@ the relay down once on `SIGINT`, `SIGTERM`, or stdin close.
   include).
 - Setup for Claude Desktop, Claude Code, and Codex CLI is in
   `docs/local-mcp.md`; the surface matrix is in the README.
-- Known gap: the pair code is single use and only reissued at startup or after
-  five failed attempts, so re-pairing after a disconnect means restarting the
-  companion. Reissuing on session close is the obvious follow-up.
+- The pair code is single use, but exactly one is always live: the companion
+  mints a replacement after five failed attempts and whenever a paired page
+  disconnects or misses its heartbeat, so re-pairing never needs a restart.

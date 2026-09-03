@@ -21,6 +21,18 @@ const LOG_PREFIX = "openinterior-mcp:";
 /** The relay emits this once a code has absorbed its allowance of wrong guesses. */
 const PAIR_LOCKOUT_DIAGNOSTIC = "pair code invalidated after too many failed attempts";
 
+/**
+ * Registry diagnostics that leave nobody attached and no way back in, so the
+ * operator needs a replacement code. Deliberately exact rather than a prefix
+ * match on `session closed:`: a session replaced by a new pairing already has a
+ * page attached, and one closed by `shutdown()` belongs to a process that is
+ * going away - minting in either case would put a live code where none belongs.
+ */
+const REPAIRABLE_SESSION_CLOSURES: ReadonlySet<string> = new Set([
+  "session closed: disconnected by the paired page",
+  "session closed: heartbeat expired",
+]);
+
 /** Ports below 1024 need privileges the companion must never ask for. */
 const MIN_USER_PORT = 1024;
 const MAX_PORT = 65_535;
@@ -100,14 +112,34 @@ async function main(): Promise<void> {
   // of the Core 6 manifest, so a page from a different build cannot attach.
   const manifestHash = await getCoreToolManifestHash();
 
-  registry = new SessionRegistry({ manifestHash, allowedOrigins, onDiagnostic: log });
-
+  /**
+   * Mints the single active code through the relay, which is also what clears
+   * the failed-attempt lockout. Minting replaces any unused previous code, so
+   * there is never more than one live at a time. A failure here must not break
+   * whatever request produced the diagnostic, so it is reported and swallowed.
+   */
   const announcePairCode = (): void => {
     if (!relay) return;
-    const { code, expiresAt } = relay.issuePairCode();
-    log(`pairing code ${code} expires ${new Date(expiresAt).toISOString()}`);
-    log('enter it in OpenInterior\'s "Pairing code" field, then press "Connect Claude"');
+    try {
+      const { code, expiresAt } = relay.issuePairCode();
+      log(`pairing code ${code} expires ${new Date(expiresAt).toISOString()}`);
+      log('enter it in OpenInterior\'s "Pairing code" field, then press "Connect Claude"');
+    } catch (error) {
+      log(`could not issue a pair code: ${error instanceof Error ? error.message : String(error)}`);
+    }
   };
+
+  registry = new SessionRegistry({
+    manifestHash,
+    allowedOrigins,
+    onDiagnostic: (message) => {
+      log(message);
+      // A code is single use, so a page that disconnects or times out spends the
+      // only way back in. Replacing it here is what lets an operator re-pair
+      // without restarting the companion and its MCP client.
+      if (REPAIRABLE_SESSION_CLOSURES.has(message)) announcePairCode();
+    },
+  });
 
   relay = await startRelayHttpServer({
     registry,

@@ -39,7 +39,7 @@ function relayFailureText(error: RelayError): string {
     case "PAGE_UNAVAILABLE":
       return "PAGE_UNAVAILABLE: no OpenInterior page is paired with this companion. Open the app, type the pairing code printed on the companion's stderr into the Pairing code field, press Connect Claude, then retry.";
     case "SESSION_DISCONNECTED":
-      return "SESSION_DISCONNECTED: the paired page went away. Restart the companion for a fresh pairing code and pair again.";
+      return "SESSION_DISCONNECTED: the paired page went away mid-call. The companion prints a fresh pairing code on stderr when that happens; enter it in the page and retry.";
     case "TOO_MANY_PENDING_CALLS":
       return "TOO_MANY_PENDING_CALLS: the paired page is already running the maximum number of concurrent calls. Retry in a moment.";
     case "CALL_TIMEOUT":

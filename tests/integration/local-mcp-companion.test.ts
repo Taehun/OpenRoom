@@ -211,6 +211,21 @@ function sceneResult(revision: number) {
   };
 }
 
+/** Every pair code the companion has announced, oldest first. */
+function pairCodes(log: string[]): string[] {
+  return [...log.join("").matchAll(/pairing code (\d{6})\b/g)].map((match) => match[1]);
+}
+
+/** Waits for the nth code to be printed; stderr arrives asynchronously. */
+async function waitForPairCode(log: string[], index: number): Promise<string> {
+  for (let attempt = 0; attempt < 60; attempt += 1) {
+    const codes = pairCodes(log);
+    if (codes.length >= index) return codes[index - 1];
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+  throw new Error(`only ${pairCodes(log).length} pair codes were printed:\n${log.join("")}`);
+}
+
 function textOf(result: { content?: unknown }): string {
   const blocks = Array.isArray(result.content) ? result.content : [];
   return blocks
@@ -222,6 +237,7 @@ describe("local MCP companion", () => {
   let transport: StdioClientTransport;
   let client: Client;
   let page: FakePage;
+  let rePaired: FakePage | undefined;
   let startup: Startup;
   let manifestHash: string;
   let baseUrl: string;
@@ -255,6 +271,7 @@ describe("local MCP companion", () => {
 
   afterAll(async () => {
     await page?.stop();
+    await rePaired?.stop();
     await client?.close();
   }, 20_000);
 
@@ -448,6 +465,31 @@ describe("local MCP companion", () => {
     expect(page.delivered).toHaveLength(executedBeforeFailure);
     expect(await page.pollOnce(staleToken)).toBe(401);
   });
+
+  it("issues a fresh code when the page disconnects, so a new page can pair", async () => {
+    expect(pairCodes(stderrLog)[0]).toBe(startup.code);
+    // Losing a page must not mean restarting the companion: the disconnect the
+    // previous test performed has to leave a usable code behind.
+    const reissued = await waitForPairCode(stderrLog, 2);
+
+    rePaired = new FakePage(baseUrl);
+    // The startup code was spent by the first pairing and stays refused.
+    expect((await rePaired.pair({
+      code: startup.code,
+      origin: PAGE_ORIGIN,
+      manifestHash,
+      pageNonce: pageNonce(),
+    })).status).toBe(403);
+
+    await rePaired.connect(reissued, manifestHash);
+    const expected = sceneResult(4);
+    rePaired.respond = () => expected;
+
+    const result = await client.callTool({ name: "get_scene", arguments: {} });
+    expect(result.isError).toBeUndefined();
+    expect(result.structuredContent).toEqual(expected.structuredContent);
+    expect(rePaired.delivered.at(-1)?.toolName).toBe("get_scene");
+  }, 15_000);
 
   it("exits when the client closes the transport", async () => {
     const pid = transport.pid;

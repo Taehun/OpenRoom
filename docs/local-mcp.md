@@ -53,10 +53,12 @@ pnpm mcp:openinterior ──── HTTP on 127.0.0.1 only ────► OpenIn
    room" is enough. The call runs in the page you are looking at.
 
 The pair code is **single use** and expires **ten minutes** after it is printed.
-Five wrong attempts retire it, and the companion immediately prints a
-replacement. Once a page has paired, the code is spent: if the page disconnects
-or the session times out, restart the companion (or restart the MCP server from
-your client) to get a fresh code.
+Exactly one code is live at a time, and the companion prints a replacement
+whenever the current one becomes useless: after five wrong attempts retire it,
+and when a paired page goes away — you press **Disconnect Claude**, you close the
+tab, or the session misses its heartbeat. So re-pairing after a disconnect is
+just "read the new code off stderr and type it in"; the companion and your MCP
+client keep running. Minting a new code invalidates any unused previous one.
 
 ## Security boundary
 
@@ -64,7 +66,7 @@ your client) to get a fresh code.
 | --- | --- |
 | Listening interface | `127.0.0.1` only; never `0.0.0.0`, never a public port. |
 | Allowed page origins | An exact set. No wildcard, no suffix match, no credentials, no path. |
-| Pair code | Six digits, single use, 10 minute expiry, retired after 5 failed attempts. |
+| Pair code | Six digits, single use, 10 minute expiry, retired after 5 failed attempts. Exactly one is live at a time; a replacement is minted when the current one is spent or the paired page goes away, and it invalidates any unused predecessor. |
 | Session credential | A bearer token held in memory in the page and the process; never logged, never in a URL. |
 | Paired pages | One at a time. A new pairing invalidates the previous token and its pending calls. |
 | Concurrent calls | 8 in flight; the ninth is refused rather than queued indefinitely. |
@@ -170,11 +172,11 @@ on both paths, and `tests/e2e/webmcp-core.spec.ts` asserts that.
 | Symptom | Cause and fix |
 | --- | --- |
 | A tool call returns `PAGE_UNAVAILABLE` | No page is paired. Open OpenInterior, enter the code from the companion's stderr, press **Connect Claude**, then retry. |
-| A tool call returns `SESSION_DISCONNECTED` | The page went away mid-call. Restart the companion for a fresh code and pair again. |
+| A tool call returns `SESSION_DISCONNECTED` | The page went away mid-call. The companion has already printed a fresh code on stderr — enter it in the page and retry. |
 | Pairing returns 403 | The code, the page origin, or the manifest hash did not match. Retype the code; if the page is not on `http://localhost:3000`, add its exact origin to `OPENINTERIOR_ALLOWED_ORIGINS`; if you are running a different build in the tab than in the terminal, rebuild so both share one manifest. |
 | Pairing keeps failing after several tries | Five wrong attempts retire the code. The companion prints a new one straight away — use that. |
 | The page shows `Pairing needs HTTPS or localhost.` | The page is in an insecure context, so it cannot hash the manifest. Use `http://localhost:3000` or an HTTPS origin. |
-| The status flips to `Claude: Connection lost` | The long poll stopped reaching the relay (the companion exited, the machine slept, or the port changed). Restart the companion and pair again. |
+| The status flips to `Claude: Connection lost` | The long poll stopped reaching the relay (the machine slept, the port changed, or the companion exited). If the companion is still running it has printed a fresh code on stderr; enter that and press **Connect Claude** again. |
 | The companion exits with `EADDRINUSE` | Port 43110 is taken. Set `OPENINTERIOR_MCP_PORT` and update the page's **Relay port** field. |
 | `Invalid OPENINTERIOR_ALLOWED_ORIGINS entry` | An entry is not a bare origin. Use `scheme://host[:port]` with no trailing slash, path, or wildcard. |
 | The client reports a protocol parse error | Something other than the companion wrote to stdout. Keep `--silent` in the `pnpm` invocation; the companion itself only writes to stderr. |
@@ -191,4 +193,5 @@ loopback HTTP, and checks the whole path: exact Core 6 in `tools/list`,
 `PAGE_UNAVAILABLE` before pairing, refusal of a wrong origin, code, or manifest
 hash, unchanged round-trip of `content`/`structuredContent`/`isError`, one MCP
 call producing exactly one page execution, failure without replay after a
-disconnect, and a clean exit on both stdin close and `SIGINT`.
+disconnect, a fresh code printed after that disconnect so a second page can
+pair and call, and a clean exit on both stdin close and `SIGINT`.
