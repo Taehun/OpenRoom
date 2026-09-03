@@ -227,7 +227,7 @@ test("uses Scene selection without incrementing revision", async () => {
 async function previewOakFrameTable(user: ReturnType<typeof userEvent.setup>) {
   await user.click(screen.getByRole("button", { name: "Find alternatives" }));
   await user.click(
-    screen.getByRole("button", { name: "Preview Oak Frame Table" }),
+    screen.getByRole("button", { name: "Place Oak Frame Table in room" }),
   );
 }
 

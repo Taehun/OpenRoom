@@ -159,7 +159,7 @@ test("completes the deterministic spatial commerce UI journey", async ({
 
   // Put one catalog product in the room and the cart follows it.
   await page.getByRole("button", { name: "Find alternatives" }).click();
-  await page.getByRole("button", { name: "Preview Oak Frame Table" }).click();
+  await page.getByRole("button", { name: "Place Oak Frame Table in room" }).click();
   await expect(viewCart).toHaveText("View cart1");
   await viewCart.click();
   await expect(dialog.getByRole("listitem")).toHaveCount(1);
