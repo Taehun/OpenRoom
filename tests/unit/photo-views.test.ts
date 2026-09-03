@@ -276,3 +276,25 @@ describe("viewFidelity and rotation options", () => {
     expect(options.chair_01).toHaveLength(3);
   });
 });
+
+describe("straight-on hysteresis", () => {
+  const set = () => PHOTO_ASSET_SETS["hinoki-low-sofa"]!;
+  const at = (x: number, yaw: number) => ({ position: [x, 0.4, 0] as [number, number, number], rotation: [0, yaw, 0] as [number, number, number], type: "sofa" as const });
+  it("keeps the room-centre twin within 22.5° of straight-on", () => {
+    for (const yaw of [-0.2, -0.1, 0, 0.1, 0.2]) {
+      expect(selectPhotoView(at(-1, yaw), set()).mirrored, `x<0 yaw ${yaw}`).toBe(false);
+      expect(selectPhotoView(at(1, yaw), set()).mirrored, `x>0 yaw ${yaw}`).toBe(true);
+    }
+  });
+  it("still follows the yaw beyond the straight-on band", () => {
+    expect(selectPhotoView(at(-1, Math.PI / 4), set()).mirrored).toBe(true);
+    expect(selectPhotoView(at(1, -Math.PI / 4), set()).mirrored).toBe(false);
+  });
+  it("attaches the measured content box to every photographed view", () => {
+    for (const s of Object.values(PHOTO_ASSET_SETS)) {
+      const box = s.views[0]!.contentBox;
+      expect(box, s.id).toBeDefined();
+      expect(box!.right - box!.left, s.id).toBeGreaterThan(0.2);
+    }
+  });
+});

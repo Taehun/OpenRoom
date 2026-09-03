@@ -13,6 +13,7 @@ import {
   stableLayerOrder,
   unprojectStagePoint,
   verticalScaleAt,
+  silhouetteExtentM,
 } from "../../src/features/photo/photo-projection";
 import {
   applyProjectiveTransform,
@@ -469,5 +470,43 @@ describe("photo projection", () => {
     expect(projectiveTransformCss([1, 2, 3, 4, 5, 6, 7, 8, 1])).toBe(
       "matrix3d(1, 4, 0, 7, 2, 5, 0, 8, 0, 0, 1, 0, 3, 6, 0, 1)",
     );
+  });
+});
+
+describe("silhouette-aware visual width", () => {
+  const room = { width: 3.4, depth: 2.72 };
+  const sofa = {
+    id: "sofa_01", type: "sofa" as const, source: "placeholder" as const,
+    position: [0, 0.425, -0.55] as [number, number, number], rotation: [0, 0, 0] as [number, number, number],
+    scale: [1, 1, 1] as [number, number, number], dimensionsM: { width: 2, height: 0.85, depth: 0.9 },
+    locked: false, styleTags: [], addedBy: "seed" as const,
+  };
+
+  it("measures a front-quarter silhouette as width·cos35° + depth·sin35°", () => {
+    const extent = silhouetteExtentM({ width: 2, depth: 0.9 }, { view: "front-quarter", symmetry: "none" });
+    expect(extent).toBeCloseTo(2 * Math.cos((35 * Math.PI) / 180) + 0.9 * Math.sin((35 * Math.PI) / 180), 6);
+    expect(silhouetteExtentM({ width: 0.35, depth: 0.35 }, { symmetry: "radial" })).toBe(0.35);
+    expect(silhouetteExtentM({ width: 2, depth: 0.9 }, { view: "side", symmetry: "none" })).toBe(0.9);
+    expect(silhouetteExtentM({ width: 2, depth: 0.9 }, { view: "back", symmetry: "none" })).toBe(2);
+  });
+
+  it("scales the image up by the inverse of its content fill", () => {
+    const full = objectVisualWidth(sofa, room, { view: "front-quarter", symmetry: "none" });
+    const half = objectVisualWidth(sofa, room, {
+      view: "front-quarter", symmetry: "none", contentBox: { left: 0.25, right: 0.75, top: 0, bottom: 1 },
+    });
+    expect(half).toBeCloseTo(full * 2, 9);
+  });
+
+  it("keeps the picture the same width whatever the yaw", () => {
+    const turned = { ...sofa, rotation: [0, Math.PI / 2, 0] as [number, number, number] };
+    const presentation = { view: "front-quarter" as const, symmetry: "none" as const };
+    expect(objectVisualWidth(turned, room, presentation)).toBeCloseTo(objectVisualWidth(sofa, room, presentation), 9);
+  });
+
+  it("falls back to the projected footprint extent without a presentation", () => {
+    const depth = (sofa.position[2] + room.depth / 2) / room.depth;
+    const expected = (2 / room.width) * floorWidthAt(depth) * 100;
+    expect(objectVisualWidth(sofa, room)).toBeCloseTo(expected, 9);
   });
 });

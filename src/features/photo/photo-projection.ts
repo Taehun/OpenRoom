@@ -1,4 +1,5 @@
 import type {
+  DimensionsM,
   ProductCategory,
   Scene,
   SceneObject,
@@ -8,7 +9,13 @@ import {
   objectFootprint,
 } from "../placement/footprint-geometry";
 import type { PointXZ } from "../placement/placement-types";
-import type { NormalizedQuad, PhotoAsset } from "./photo-assets";
+import type { PhotoViewName } from "./photo-facing";
+import type { PhotoViewSymmetry } from "./photo-views";
+import type {
+  CutoutContentBox,
+  NormalizedQuad,
+  PhotoAsset,
+} from "./photo-assets";
 import {
   OPENROOM_PHOTO_CALIBRATION,
   type NormalizedPoint,
@@ -249,22 +256,75 @@ export function verticalScaleAt(
  * object's own depth, the same depth `verticalScaleAt` uses, so the cutout is scaled
  * once and stays square with the room.
  */
+const QUARTER_TURN_RADIANS = (35 * Math.PI) / 180;
+
+/** What the compositor knows about the picture it is about to draw. */
+export interface CutoutPresentation {
+  view?: PhotoViewName;
+  symmetry?: PhotoViewSymmetry;
+  contentBox?: CutoutContentBox;
+}
+
+/**
+ * The lateral extent, in metres, of the silhouette a registered view shows.
+ * A front- or back-quarter view turns the product 35°, so its picture spans
+ * `width·cos35° + depth·sin35°`; a side view spans the depth; a back view the
+ * width; a radially symmetric product always spans its width. The extent does
+ * not depend on the object's yaw — the picture never rotates, only the choice
+ * of view and mirroring does.
+ */
+export function silhouetteExtentM(
+  dimensions: Pick<DimensionsM, "width" | "depth">,
+  presentation: Pick<CutoutPresentation, "view" | "symmetry"> = {},
+): number {
+  if (presentation.symmetry === "radial") return dimensions.width;
+  switch (presentation.view) {
+    case "side":
+      return dimensions.depth;
+    case "back":
+      return dimensions.width;
+    case "front-quarter":
+    case "back-quarter":
+    default:
+      return (
+        dimensions.width * Math.cos(QUARTER_TURN_RADIANS) +
+        dimensions.depth * Math.sin(QUARTER_TURN_RADIANS)
+      );
+  }
+}
+
+/**
+ * The image width, in percent of the stage, that draws the object at true
+ * scale. With a presentation the silhouette extent of the chosen view is
+ * divided by the image's measured content fill, so a lamp that fills a third
+ * of its frame is scaled up to the same metres-per-pixel as a sofa; without
+ * one the projected footprint extent is used (legacy behaviour).
+ */
 export function objectVisualWidth(
   object: SceneObject,
   room: SceneRoom,
+  presentation?: CutoutPresentation,
   calibration: PhotoCalibration = OPENROOM_PHOTO_CALIBRATION,
 ): number {
   const z = object.position[2];
-  let minimum = Number.POSITIVE_INFINITY;
-  let maximum = Number.NEGATIVE_INFINITY;
-
-  for (const corner of footprintCorners(objectFootprint(object))) {
-    const projected = projectRoomPoint({ x: corner.x, z }, room, calibration);
-    minimum = Math.min(minimum, projected.x);
-    maximum = Math.max(maximum, projected.x);
+  let width: number;
+  if (presentation) {
+    const depth = clamp((z + room.depth / 2) / room.depth, 0, 1);
+    const extent = silhouetteExtentM(object.dimensionsM, presentation);
+    const fill = presentation.contentBox
+      ? Math.max(presentation.contentBox.right - presentation.contentBox.left, 0.05)
+      : 1;
+    width = ((extent / room.width) * floorWidthAt(depth, calibration) * 100) / fill;
+  } else {
+    let minimum = Number.POSITIVE_INFINITY;
+    let maximum = Number.NEGATIVE_INFINITY;
+    for (const corner of footprintCorners(objectFootprint(object))) {
+      const projected = projectRoomPoint({ x: corner.x, z }, room, calibration);
+      minimum = Math.min(minimum, projected.x);
+      maximum = Math.max(maximum, projected.x);
+    }
+    width = (maximum - minimum) * 100;
   }
-
-  const width = (maximum - minimum) * 100;
   return Number.isFinite(width)
     ? Math.max(width, MINIMUM_VISUAL_WIDTH_PERCENT)
     : MINIMUM_VISUAL_WIDTH_PERCENT;

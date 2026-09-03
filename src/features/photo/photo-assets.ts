@@ -3,6 +3,7 @@ import { z } from "zod";
 import type { SceneObject } from "../scene/scene-schema";
 import type { NormalizedPoint } from "./photo-calibration";
 import { GENERATED_PRODUCT_ASSETS } from "./photo-products.generated";
+import { CUTOUT_SILHOUETTES } from "./photo-silhouettes.generated";
 
 export type NormalizedQuad = readonly [
   NormalizedPoint,
@@ -10,6 +11,14 @@ export type NormalizedQuad = readonly [
   NormalizedPoint,
   NormalizedPoint,
 ];
+
+/** The alpha content of a cutout as fractions of its image (left/top inclusive). */
+export interface CutoutContentBox {
+  left: number;
+  right: number;
+  top: number;
+  bottom: number;
+}
 
 export interface PhotoAsset {
   id: string;
@@ -19,6 +28,11 @@ export interface PhotoAsset {
   anchorX: number;
   anchorY: number;
   floorQuad?: NormalizedQuad;
+  /**
+   * Measured by `pnpm assets:measure`. The compositor sizes the cutout so this
+   * box, not the whole image, spans the product's silhouette width.
+   */
+  contentBox?: CutoutContentBox;
 }
 
 /**
@@ -163,7 +177,7 @@ function toPhotoAsset(entry: GeneratedProductAsset): PhotoAsset {
  * generated. A hand-registered entry always wins: the pinned catalog assets,
  * anchors, and quads never change.
  */
-export const PHOTO_ASSETS: Record<string, PhotoAsset> = {
+const REGISTERED_PHOTO_ASSETS: Record<string, PhotoAsset> = {
   ...Object.fromEntries(
     GENERATED_ASSETS.map((entry) => [entry.id, toPhotoAsset(entry)]),
   ),
@@ -185,3 +199,12 @@ export function productsWithoutAssets<T extends { id: string }>(
 export function getPhotoAsset(object: SceneObject): PhotoAsset | null {
   return object.assetId ? PHOTO_ASSETS[object.assetId] ?? null : null;
 }
+
+/** Registered cutouts with their measured content boxes attached. */
+export const PHOTO_ASSETS: Record<string, PhotoAsset> = Object.fromEntries(
+  Object.entries(REGISTERED_PHOTO_ASSETS).map(([id, asset]) => {
+    const key = asset.src.replace(/^.*\//, "").replace(/\.webp$/, "");
+    const contentBox = CUTOUT_SILHOUETTES[key];
+    return [id, contentBox ? { ...asset, contentBox } : asset];
+  }),
+);

@@ -11,6 +11,7 @@ import {
   type NormalizedQuad,
   type PhotoAsset,
 } from "./photo-assets";
+import type { CutoutContentBox } from "./photo-assets";
 import {
   FRONT_VECTORS,
   PHOTO_VIEW_NAMES,
@@ -21,6 +22,7 @@ import {
   type PhotoViewName,
 } from "./photo-facing";
 import { GENERATED_VIEW_MANIFEST as manifest } from "./photo-views.generated";
+import { CUTOUT_SILHOUETTES } from "./photo-silhouettes.generated";
 
 export type { RotationOption };
 
@@ -28,6 +30,8 @@ export type PhotoViewOrigin = "photographed" | "generated";
 export type PhotoViewSymmetry = "none" | "front-back" | "radial";
 
 export interface PhotoAssetView {
+  /** Measured alpha box of this view's image; absent for unmeasured images. */
+  contentBox?: CutoutContentBox;
   view: PhotoViewName;
   frontVector: FacingVector;
   src: string;
@@ -91,6 +95,10 @@ const ORIGIN_WEIGHT: Readonly<Record<PhotoViewOrigin, number>> = Object.freeze({
 const MIRROR_WEIGHT = 0.95;
 /** Angles closer than this count as a tie and fall through to preferences. */
 const TIE_DEGREES = 1e-7;
+/** Facings this close to the camera axis keep the room-centre choice of twin. */
+const STRAIGHT_ON_DEGREES = 22.5;
+/** Wide enough for the native and mirrored front-quarter twins (2 × 35°). */
+const STRAIGHT_ON_TIE_DEGREES = 71;
 const ROTATION_STEP = Math.PI / 4;
 const ROTATION_EPSILON = 1e-9;
 /** Keeps an uncovered incumbent rotation scoreable but never preferred. */
@@ -145,6 +153,7 @@ function photographedView(asset: PhotoAsset): PhotoAssetView {
     anchorX: asset.anchorX,
     anchorY: asset.anchorY,
     origin: "photographed",
+    ...(asset.contentBox ? { contentBox: asset.contentBox } : {}),
   };
 }
 
@@ -175,6 +184,11 @@ export function buildPhotoAssetSets(
       anchorX: entry.anchorX,
       anchorY: entry.anchorY,
       origin: "generated",
+      ...(() => {
+        const key = entry.src.replace(/^.*\//, "").replace(/\.webp$/, "");
+        const contentBox = CUTOUT_SILHOUETTES[key];
+        return contentBox ? { contentBox } : {};
+      })(),
     });
     generated.set(entry.assetId, views);
   }
@@ -329,8 +343,19 @@ export function selectPhotoView(
   // A yaw-0 object matches the front-quarter pair equally; turn it inward, and
   // on the centre line keep the photographed orientation (spec 6 rule 4).
   const preferPositiveX = object.position[0] <= 0;
+  // Within a few degrees of straight-on the mirrored and native twins are
+  // interchangeable, so the room-centre rule decides instead of the sign of a
+  // tiny yaw — otherwise a 5° nudge would flip the whole cutout.
+  const straightOnDegrees = Math.min(
+    angleBetweenDegrees(facing, { x: 0, z: 1 }),
+    set.symmetry === "front-back"
+      ? angleBetweenDegrees(facing, { x: 0, z: -1 })
+      : 180,
+  );
+  const tieWindow =
+    straightOnDegrees <= STRAIGHT_ON_DEGREES ? STRAIGHT_ON_TIE_DEGREES : TIE_DEGREES;
   const best = scored
-    .filter((entry) => entry.angleDegrees <= closest + TIE_DEGREES)
+    .filter((entry) => entry.angleDegrees <= closest + tieWindow)
     .sort((left, right) =>
       compareTieRanks(
         tieRank(left.candidate, preferPositiveX),

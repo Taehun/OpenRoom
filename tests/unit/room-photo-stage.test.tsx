@@ -9,6 +9,9 @@ import {
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
+import { objectVisualWidth } from "../../src/features/photo/photo-projection";
+import { getPhotoAssetSet } from "../../src/features/photo/photo-views";
+import { selectPhotoView } from "../../src/features/photo/photo-views";
 import { createDemoScene } from "../../src/demo/demo-scene";
 import { DEMO_PRODUCTS } from "../../src/features/demo/demo-data";
 import { RoomPhotoStage } from "../../src/features/photo/room-photo-stage";
@@ -923,9 +926,23 @@ describe("RoomPhotoStage", () => {
     const chair = screen.getByTestId("photo-object-frame-chair_01");
     const table = screen.getByTestId("photo-object-frame-table_01");
 
-    expect(Number.parseFloat(sofa.style.width)).toBeCloseTo(24, 10);
-    expect(Number.parseFloat(chair.style.width)).toBeCloseTo(9.6, 10);
-    expect(Number.parseFloat(table.style.width)).toBeCloseTo(14.4, 10);
+    // The picture is sized from its chosen view's silhouette extent and the
+    // image's measured content fill, not from the raw footprint.
+    const scene = fixtureScene();
+    const expected = (id: string) => {
+      const object = scene.objects.find((entry) => entry.id === id)!;
+      const set = getPhotoAssetSet(object)!;
+      const view = selectPhotoView(object, set);
+      return objectVisualWidth(object, scene.room, {
+        view: view.view.view,
+        symmetry: set.symmetry,
+        contentBox: view.view.contentBox,
+      });
+    };
+    expect(Number.parseFloat(sofa.style.width)).toBeCloseTo(expected("sofa_01"), 6);
+    expect(Number.parseFloat(chair.style.width)).toBeCloseTo(expected("chair_01"), 6);
+    expect(Number.parseFloat(table.style.width)).toBeCloseTo(expected("table_01"), 6);
+    expect(expected("sofa_01")).toBeGreaterThan(24);
   });
 
   // Spec §3: a supported object is lifted by its elevation times the vertical scale at

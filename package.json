@@ -22,6 +22,7 @@
     "test:e2e": "playwright test --config=playwright.config.ts",
     "test:e2e:commerce": "playwright test --config=playwright.commerce.config.ts",
     "mcp:openroom": "tsx scripts/openroom-mcp/server.ts",
+    "assets:measure": "tsx scripts/openroom-assets/measure-silhouettes.ts",
     "assets:views": "tsx scripts/openroom-assets/generate-views.ts",
     "assets:products": "tsx scripts/openroom-assets/generate-products.ts",
     "cf-typegen": "wrangler types",

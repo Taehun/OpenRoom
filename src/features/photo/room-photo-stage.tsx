@@ -23,6 +23,7 @@ import {
   LAYER_DEPTH_STRIDE,
   objectElevationOffset,
   objectVisualWidth,
+  type CutoutPresentation,
   projectContactShadow,
   projectRoomPoint,
   projectRugPlacement,
@@ -437,6 +438,18 @@ export function RoomPhotoStage() {
     };
   }, [scene, stageSize, transformPreview]);
 
+  // Everything the width projection needs about the picture: the chosen view,
+  // the set's symmetry, and the image's measured content box.
+  const presentationFor = (object: SceneObject): CutoutPresentation => {
+    const selected = renderModel.views.get(object.id) ?? null;
+    return {
+      view: selected?.view.view,
+      symmetry: getPhotoAssetSet(object)?.symmetry,
+      contentBox: selected?.view.contentBox,
+    };
+  };
+
+
   return (
     <section
       aria-label="Editable room photo"
@@ -478,7 +491,7 @@ export function RoomPhotoStage() {
               !object.locked
             }
             transforming={renderModel.previewObjectId === object.id}
-            visualWidth={objectVisualWidth(object, scene.room)}
+            visualWidth={objectVisualWidth(object, scene.room, presentationFor(object))}
           />
         );
       })}
@@ -520,7 +533,7 @@ export function RoomPhotoStage() {
               selected && toolMode === "rotate" && !object.locked
             }
             view={renderModel.views.get(object.id) ?? null}
-            visualWidth={objectVisualWidth(object, scene.room)}
+            visualWidth={objectVisualWidth(object, scene.room, presentationFor(object))}
           />
         );
       })}
