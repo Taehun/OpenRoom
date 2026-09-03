@@ -130,7 +130,9 @@ describe("the one-screen guide", () => {
     expect(within(connect).getByText(commandText(CONNECT_COMMANDS.claude))).toBeVisible();
     expect(within(connect).getByText(commandText(CONNECT_COMMANDS.codex))).toBeVisible();
     // Each CLI card tails the log the registered command appends to.
-    expect(within(connect).getAllByText(CONNECT_COMMANDS.log)).toHaveLength(2);
+    expect(
+      within(connect).getAllByText(commandText(CONNECT_COMMANDS.log)),
+    ).toHaveLength(2);
     // The client starts the companion, so the guide never asks the reader to
     // run a second one: that fails with EADDRINUSE or pairs nothing.
     expect(within(connect).queryByText("pnpm mcp:openroom")).toBeNull();
