@@ -72,7 +72,7 @@ at build time, so changing them requires a rebuild; the README says so.
 
 `src/features/commerce/shopify-variants.ts` exports
 `SHOPIFY_VARIANTS: Readonly<Record<string, string | null>>` keyed by demo product
-id (all 24 catalog products plus the human fixture cart's product ids), with
+id (all 18 catalog products plus the human fixture cart's four item ids), with
 `null` meaning "not mapped yet". Operators may also supply or override entries
 without editing source through `NEXT_PUBLIC_SHOPIFY_VARIANTS`, a comma-separated
 list of `productId=gid://shopify/ProductVariant/<digits>` pairs merged over the
