@@ -231,8 +231,10 @@ describe("the one-screen guide", () => {
     if (tools === null) throw new Error("Missing the tool disclosure");
     expect(within(tools).getAllByRole("listitem")).toHaveLength(6);
     // The disclosure is closed, so the entries are present but not visible.
+    const getScene = CORE_TOOL_MANIFEST.find(({ name }) => name === "get_scene");
+    if (!getScene) throw new Error("Missing get_scene in the manifest");
     expect(
-      within(tools).getByText("— Return the current validated Scene."),
+      within(tools).getByText(`— ${getScene.description}`),
     ).toBeInTheDocument();
   });
 
