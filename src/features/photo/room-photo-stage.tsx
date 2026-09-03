@@ -136,7 +136,10 @@ export function RoomPhotoStage() {
   const selectedObjectId = scene.selectedObjectId;
   const sceneStore = useSceneStoreApi();
   const stageRef = useRef<HTMLElement>(null);
-  const hasTrackedSelectionRef = useRef(false);
+  // Initialised to the mounted values, so neither the mount nor Strict Mode's
+  // repeated mount effect counts as a change: pulling focus into the room on
+  // load would skip the header and the rail for keyboard users.
+  const lastFocusTargetRef = useRef({ id: selectedObjectId, tool: toolMode });
   const transformPreviewRef = useRef<TransformPreview | null>(null);
   const previewListenersRef = useRef(new Set<() => void>());
   const subscribeToTransformPreview = useCallback((listener: () => void) => {
@@ -187,12 +190,10 @@ export function RoomPhotoStage() {
   // be left pressing arrows at the rail. Focus follows the selection into the
   // room instead, and follows a tool change too, so the arrows work at once.
   useEffect(() => {
-    // The first run is the mount: nothing has changed for the user yet, and
-    // pulling focus into the room on load would skip the header and the rail.
-    if (!hasTrackedSelectionRef.current) {
-      hasTrackedSelectionRef.current = true;
-      return;
-    }
+    const last = lastFocusTargetRef.current;
+    const changed = last.id !== selectedObjectId || last.tool !== toolMode;
+    lastFocusTargetRef.current = { id: selectedObjectId, tool: toolMode };
+    if (!changed) return;
     if (!selectedObjectId) return;
 
     const selector = `[data-object-id="${CSS.escape(selectedObjectId)}"]`;
