@@ -59,7 +59,7 @@ export function renderSilhouettesModule(
     .sort()
     .map((id) => {
       const box = boxes[id]!;
-      return `  "${id}": { left: ${box.left}, right: ${box.right}, top: ${box.top}, bottom: ${box.bottom} },`;
+      return `  ${JSON.stringify(id)}: { left: ${box.left}, right: ${box.right}, top: ${box.top}, bottom: ${box.bottom} },`;
     });
   return [
     'import type { CutoutContentBox } from "./photo-assets";',
