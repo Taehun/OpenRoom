@@ -3,6 +3,9 @@
 OpenInterior is a browser-based photo compositor for exploring and furnishing
 a room with deterministic catalog products.
 
+Repository: <https://github.com/Taehun/OpenInterior> (MIT, contributions
+welcome).
+
 ## Status
 
 The project uses Next.js 16, React 19, TypeScript, pnpm, Vitest, Playwright, and
@@ -197,4 +200,5 @@ applicable and must keep secrets and room photos out of git.
 
 ## License
 
-MIT. See [LICENSE](LICENSE).
+MIT. See [LICENSE](LICENSE). Source and issues live at
+<https://github.com/Taehun/OpenInterior>.

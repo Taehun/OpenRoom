@@ -2,6 +2,11 @@
   "name": "openinterior",
   "version": "0.1.0",
   "private": true,
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Taehun/OpenInterior.git"
+  },
+  "homepage": "https://github.com/Taehun/OpenInterior#readme",
   "engines": {
     "node": "24.13.1"
   },
