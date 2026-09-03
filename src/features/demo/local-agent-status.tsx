@@ -37,15 +37,28 @@ const PAIRING_HINT =
 
 export function LocalAgentStatus({ relay }: { relay: LocalMcpRelay }) {
   const [code, setCode] = useState("");
+  /*
+   * `relay.pairError` records the last attempt and is cleared only by the next
+   * one, which is right for the relay but wrong for a dialog the operator can
+   * walk away from: reopening it would show a note about an attempt they have
+   * already abandoned. Closing the dialog dismisses the note here rather than
+   * reaching into the relay client, whose state stays the record of what the
+   * companion actually said.
+   */
+  const [noteDismissed, setNoteDismissed] = useState(false);
   const dialogRef = useRef<HTMLDialogElement | null>(null);
   const hintId = useId();
   const titleId = useId();
   const canConnect =
     PAIR_CODE_PATTERN.test(code) && relay.status !== "pairing";
-  const note = relay.pairError ? PAIR_ERROR_NOTES[relay.pairError] : null;
+  const note =
+    relay.pairError && !noteDismissed
+      ? PAIR_ERROR_NOTES[relay.pairError]
+      : null;
 
   async function connect() {
     if (!canConnect) return;
+    setNoteDismissed(false);
     try {
       await relay.pair(code);
       setCode("");
@@ -86,9 +99,18 @@ export function LocalAgentStatus({ relay }: { relay: LocalMcpRelay }) {
         </button>
       ) : null}
 
+      {/*
+        `close` covers every way out — the Cancel button, Escape, and the
+        successful pair that closes it from `connect` — so the next open always
+        starts from an empty field and no note.
+      */}
       <dialog
         aria-labelledby={titleId}
         className={`md-dialog ${styles.pairDialog}`}
+        onClose={() => {
+          setCode("");
+          setNoteDismissed(true);
+        }}
         ref={dialogRef}
       >
         <h2 className="md-dialog-title" id={titleId}>

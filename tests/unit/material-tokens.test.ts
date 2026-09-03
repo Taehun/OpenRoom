@@ -9,6 +9,11 @@ import { describe, expect, it } from "vitest";
  */
 const tokens = readFileSync("app/material-tokens.css", "utf8");
 
+const MODULE_STYLESHEETS = [
+  "src/features/demo/demo-workspace.module.css",
+  "src/features/home/home.module.css",
+];
+
 describe("material tokens", () => {
   it("defines the color roles and legacy aliases", () => {
     for (const line of [
@@ -29,11 +34,29 @@ describe("material tokens", () => {
   });
 
   it("leaves no hex color in the module stylesheets", () => {
-    for (const file of [
-      "src/features/demo/demo-workspace.module.css",
-      "src/features/home/home.module.css",
-    ]) {
+    for (const file of MODULE_STYLESHEETS) {
       expect(readFileSync(file, "utf8")).not.toMatch(/#[0-9a-fA-F]{3,8}\b/);
+    }
+  });
+
+  /*
+   * Every colour on these surfaces has to come from a token. `color-mix()`
+   * over a role is the way to express a translucent one, so the rule reads
+   * past it; a genuinely black or white scrim or photo shadow is the only
+   * other exception, and must say which it is on the same line.
+   */
+  it("keeps raw color literals out of the module stylesheets", () => {
+    for (const file of MODULE_STYLESHEETS) {
+      const offenders = readFileSync(file, "utf8")
+        .split("\n")
+        .map((line, index) => ({ line, number: index + 1 }))
+        .filter(
+          ({ line }) =>
+            /\b(?:rgba?|hsla?)\(/.test(line.replaceAll(/color-mix\([^;]*/g, "")) &&
+            !/\/\* (?:scrim|shadow) \*\//.test(line),
+        )
+        .map(({ line, number }) => `${file}:${number}: ${line.trim()}`);
+      expect(offenders).toEqual([]);
     }
   });
 

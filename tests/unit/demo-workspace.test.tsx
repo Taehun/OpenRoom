@@ -748,6 +748,43 @@ test("keeps a rejected pairing inside the dialog", async () => {
   ).toBe("Local agent: Not connected");
 });
 
+test("clears a stale failure and the code when the dialog is reopened", async () => {
+  const server = new FakeRelayServer();
+  server.pairStatus = 403;
+  vi.spyOn(globalThis, "fetch").mockImplementation(server.fetch);
+  const user = userEvent.setup();
+  render(<DemoWorkspace />);
+
+  await user.click(openPairingDialog());
+  const dialog = screen.getByRole("dialog", { name: "Connect an AI app" });
+  await user.type(
+    within(dialog).getByRole("textbox", { name: "Pairing code" }),
+    "123456",
+  );
+  await user.click(within(dialog).getByRole("button", { name: "Connect" }));
+  await waitFor(() =>
+    expect(
+      within(dialog).getByText(
+        "Pairing was rejected. Check the code and try again.",
+      ),
+    ).toBeVisible(),
+  );
+
+  await user.click(within(dialog).getByRole("button", { name: "Cancel" }));
+  await user.click(openPairingDialog());
+
+  const reopened = screen.getByRole("dialog", { name: "Connect an AI app" });
+  expect(
+    within(reopened).queryByText(
+      "Pairing was rejected. Check the code and try again.",
+    ),
+  ).not.toBeInTheDocument();
+  expect(
+    within(reopened).getByRole("textbox", { name: "Pairing code" }),
+  ).toHaveValue("");
+  expect(within(reopened).getByRole("button", { name: "Connect" })).toBeDisabled();
+});
+
 test("explains an insecure context instead of pairing", async () => {
   const server = new FakeRelayServer();
   vi.spyOn(globalThis, "fetch").mockImplementation(server.fetch);
