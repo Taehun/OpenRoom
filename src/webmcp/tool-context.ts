@@ -8,6 +8,10 @@ import {
   type SceneObject,
   type SceneProduct,
 } from "../features/scene/scene-schema";
+import type {
+  CommerceContext,
+  CommerceDraft,
+} from "../features/commerce/commerce-types";
 import type { SearchProductsInput } from "./tool-contracts";
 
 export const CatalogProductSchema = SceneProductSchema.extend({
@@ -31,6 +35,7 @@ export interface CartApprovalDraft {
   sceneRevision: number;
   items: readonly CartApprovalItem[];
   totalMinor: number;
+  commerce?: CommerceDraft;
 }
 
 export interface ToolContext {
@@ -41,4 +46,5 @@ export interface ToolContext {
   resolveProduct(productId: string): CatalogProduct | undefined;
   applyCommand(request: CommandRequest): CommandResult;
   openCartApproval(draft: CartApprovalDraft): void;
+  commerce: CommerceContext;
 }

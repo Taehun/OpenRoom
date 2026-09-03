@@ -90,4 +90,21 @@ describe("demoReducer", () => {
     ).toBeNull();
     expect(demoReducer(agentCart, { type: "reset" }).cartDraft).toBeNull();
   });
+
+  test("closes the cart and announces an external checkout", () => {
+    const opened = demoReducer(createInitialDemoState(), { type: "open-cart" });
+    const closed = demoReducer(opened, {
+      type: "open-external-checkout",
+      itemCount: 2,
+    });
+    expect(closed.isCartOpen).toBe(false);
+    expect(closed.cartDraft).toBeNull();
+    expect(closed.announcement).toBe(
+      "Opened Shopify checkout in a new tab (2 items)",
+    );
+    expect(
+      demoReducer(opened, { type: "open-external-checkout", itemCount: 1 })
+        .announcement,
+    ).toBe("Opened Shopify checkout in a new tab (1 item)");
+  });
 });

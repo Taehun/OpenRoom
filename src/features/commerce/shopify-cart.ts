@@ -1,0 +1,97 @@
+import type { CartApprovalDraft } from "../../webmcp/tool-context";
+import type {
+  CartLineInput,
+  CommerceContext,
+  CommerceDraft,
+  CommerceLine,
+  ShopifyVariantMap,
+  SkippedLine,
+} from "./commerce-types";
+import { validateShopifyVariants, variantNumericId } from "./shopify-variants";
+
+export interface ResolvedLine extends CommerceLine {
+  variantId: string;
+}
+
+export function resolveShopifyLines(
+  items: readonly CartLineInput[],
+  map: ShopifyVariantMap,
+): { lines: ResolvedLine[]; skipped: SkippedLine[] } {
+  const { variants, issues } = validateShopifyVariants(map);
+  const invalidProductIds = new Set(issues.map(({ productId }) => productId));
+  const lines: ResolvedLine[] = [];
+  const linesByGid = new Map<string, ResolvedLine>();
+  const skipped: SkippedLine[] = [];
+  const skippedProductIds = new Set<string>();
+
+  for (const item of items) {
+    if (!Number.isInteger(item.quantity) || item.quantity <= 0) continue;
+    const gid = variants[item.productId];
+    const variantId = gid === undefined ? null : variantNumericId(gid);
+    if (gid === undefined || variantId === null) {
+      if (!skippedProductIds.has(item.productId)) {
+        skippedProductIds.add(item.productId);
+        skipped.push({
+          productId: item.productId,
+          reason: invalidProductIds.has(item.productId) ? "invalid" : "unmapped",
+        });
+      }
+      continue;
+    }
+    const existing = linesByGid.get(gid);
+    if (existing) {
+      existing.quantity += item.quantity;
+      continue;
+    }
+    const line: ResolvedLine = {
+      productId: item.productId,
+      merchandiseId: gid,
+      variantId,
+      quantity: item.quantity,
+    };
+    linesByGid.set(gid, line);
+    lines.push(line);
+  }
+
+  return { lines, skipped };
+}
+
+export function buildCartPermalink(
+  storeDomain: string,
+  lines: readonly ResolvedLine[],
+): string | null {
+  if (lines.length === 0) return null;
+  const path = lines.map(({ variantId, quantity }) => `${variantId}:${quantity}`).join(",");
+  return `https://${storeDomain}/cart/${path}`;
+}
+
+export function buildCommerceDraft(
+  commerce: CommerceContext,
+  items: readonly CartLineInput[],
+): CommerceDraft | null {
+  if (commerce.config.provider !== "shopify") return null;
+  const { lines, skipped } = resolveShopifyLines(items, commerce.variants);
+  return {
+    provider: "shopify",
+    storeDomain: commerce.config.storeDomain,
+    mcpEndpoint: commerce.config.mcpEndpoint,
+    lines: lines.map(({ productId, merchandiseId, quantity }) => ({
+      productId,
+      merchandiseId,
+      quantity,
+    })),
+    skipped,
+    checkoutPermalink: buildCartPermalink(commerce.config.storeDomain, lines),
+  };
+}
+
+export function enrichCartDraft(
+  commerce: CommerceContext,
+  draft: CartApprovalDraft,
+): CartApprovalDraft {
+  const block = buildCommerceDraft(
+    commerce,
+    draft.items.map(({ productId, quantity }) => ({ productId, quantity })),
+  );
+  return block === null ? draft : { ...draft, commerce: block };
+}

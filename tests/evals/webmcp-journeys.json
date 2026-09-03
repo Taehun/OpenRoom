@@ -26,5 +26,15 @@
       "A visible approval dialog is opened",
       "No external requests are made"
     ]
+  },
+  {
+    "id": "cart-approval-shopify-lines",
+    "prompt": "Add the product-backed scene objects to the cart, then create the Shopify cart through the store's MCP server",
+    "expectedTools": ["add_scene_to_cart"],
+    "assertions": [
+      "In shopify mode the draft carries commerce.lines with merchandiseId and quantity plus commerce.mcpEndpoint",
+      "Unmapped products appear in commerce.skipped and are not sent anywhere",
+      "Nook makes no external request; the agent calls update_cart and get_cart on the store MCP itself"
+    ]
   }
 ]
