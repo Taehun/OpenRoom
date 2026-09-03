@@ -46,5 +46,15 @@
       "The returned scene's chair facing matches the requested direction within 0.01",
       "rotationYDegrees is not sent together with facing"
     ]
+  },
+  {
+    "id": "search-side-tables",
+    "prompt": "Find a side table under $300",
+    "expectedTools": ["search_products"],
+    "assertions": [
+      "search_products is called with category \"side_table\" and no price filter, because the contract has none",
+      "Results arrive in catalog order, capped by the unchanged limit of three",
+      "Only the returned side tables priced under $300 are offered to the shopper"
+    ]
   }
 ]

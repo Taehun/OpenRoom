@@ -196,7 +196,7 @@ function ProductsPanel({
         </button>
       </div>
       <p className={styles.panelIntro}>
-        Three locally cached fixtures, fitted to the selected footprint.
+        Locally cached fixtures, fitted to the selected footprint.
       </p>
 
       <div className={styles.productList}>

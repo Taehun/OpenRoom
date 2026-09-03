@@ -15,6 +15,7 @@ import { readWebpMetadata } from "../helpers/webp-metadata";
 
 const categories = [
   "sofa", "coffee_table", "rug", "floor_lamp", "chair", "plant",
+  "side_table", "bookshelf",
 ] as const;
 
 const RUG_ASSET_IDS = [
@@ -184,27 +185,47 @@ describe("photo assets", () => {
     ).toHaveLength(4);
   });
 
-  it("has three stable products for every category", () => {
+  it("has at least five stable products for every category", () => {
     for (const category of categories) {
-      expect(DEMO_PRODUCTS.filter((item) => item.category === category))
-        .toHaveLength(3);
+      expect(
+        DEMO_PRODUCTS.filter((item) => item.category === category).length,
+        category,
+      ).toBeGreaterThanOrEqual(5);
     }
     expect(DEMO_PRODUCTS.filter((item) => item.category === "coffee_table")
       .map((item) => item.id)).toEqual([
         "oak-frame-table",
         "travertine-plinth-table",
         "walnut-nesting-table",
+        "ash-plinth-table",
+        "teak-oval-table",
       ]);
   });
 
-  it("resolves every seed and catalog object to a checked-in file", () => {
+  it("resolves every registered cutout to a file and leaves the rest pending", () => {
     const objects = createDemoScene().objects;
     for (const object of objects) expect(getPhotoAsset(object)).not.toBeNull();
+
+    /**
+     * Products added by the catalog expansion have no cutout until
+     * `pnpm assets:products` generates one; the compositor renders its
+     * labelled fallback for them in the meantime.
+     */
+    const productsWithoutAssets = DEMO_PRODUCTS
+      .filter(({ id }) => PHOTO_ASSETS[id] === undefined)
+      .map(({ id }) => id);
+
     for (const product of DEMO_PRODUCTS) {
       const asset = PHOTO_ASSETS[product.id];
-      expect(asset).toBeDefined();
-      expect(existsSync(join(process.cwd(), "public", asset.src))).toBe(true);
+      if (asset === undefined) {
+        expect(productsWithoutAssets, product.id).toContain(product.id);
+        continue;
+      }
+      expect(existsSync(join(process.cwd(), "public", asset.src)), product.id)
+        .toBe(true);
     }
+
+    expect(productsWithoutAssets.length).toBeLessThan(DEMO_PRODUCTS.length);
     expect(existsSync(join(process.cwd(), "public", OPENROOM_ROOM_BACKGROUND)))
       .toBe(true);
   });

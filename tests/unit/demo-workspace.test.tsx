@@ -130,7 +130,7 @@ test("moves from object inspection to product preview", async () => {
   const products = screen.getByRole("region", {
     name: "Coffee tables for your room",
   });
-  expect(within(products).getAllByRole("article")).toHaveLength(3);
+  expect(within(products).getAllByRole("article")).toHaveLength(5);
 
   await user.click(
     screen.getByRole("button", { name: "Preview Oak Frame Table" }),
@@ -292,7 +292,7 @@ test.each([
   expect(store.getState().scene.revision).toBe(revision);
 });
 
-test("shows three alternatives for the selected chair category", async () => {
+test("shows every alternative for the selected chair category", async () => {
   const user = userEvent.setup();
   render(<DemoWorkspace />);
 
@@ -303,10 +303,12 @@ test("shows three alternatives for the selected chair category", async () => {
   const products = screen.getByRole("region", {
     name: "Chairs for your room",
   });
-  expect(within(products).getAllByRole("article")).toHaveLength(3);
+  expect(within(products).getAllByRole("article")).toHaveLength(5);
   expect(within(products).getByText("Ash Lounge Chair")).toBeVisible();
   expect(within(products).getByText("Boucle Barrel Chair")).toBeVisible();
   expect(within(products).getByText("Cognac Sling Chair")).toBeVisible();
+  expect(within(products).getByText("Oak Paper Cord Chair")).toBeVisible();
+  expect(within(products).getByText("Shearling Swivel Chair")).toBeVisible();
   expect(within(products).queryByText("Oak Frame Table")).not.toBeInTheDocument();
 });
 
