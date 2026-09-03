@@ -89,7 +89,7 @@ Start and verify:
 
 ```bash
 pnpm dev                                                       # serve the app on :3000
-pnpm mcp:openroom                                               # start the companion on 127.0.0.1:43110
+pnpm mcp:openroom                                              # start the companion on 127.0.0.1:43110
 pnpm exec vitest run tests/integration/local-mcp-companion.test.ts   # real client, real process
 pnpm test                                                      # unit suite plus that integration test
 ```

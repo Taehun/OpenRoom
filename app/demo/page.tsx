@@ -4,7 +4,7 @@ import { DemoWorkspace } from "../../src/features/demo/demo-workspace";
 export const metadata: Metadata = {
   title: "Spatial Atelier | OpenRoom",
   description:
-    "A deterministic spatial commerce workspace where the room becomes the storefront.",
+    "AI Room Planner & Furniture Shopping — furnish a real room photo with catalog products, by hand or through the AI app you already use.",
 };
 
 export default function DemoPage() {
