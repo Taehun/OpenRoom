@@ -20,6 +20,8 @@ import { PhotoContactShadow } from "./photo-contact-shadow";
 import { PhotoObjectLayer } from "./photo-object-layer";
 import { PhotoRugLayer } from "./photo-rug-layer";
 import {
+  LAYER_DEPTH_STRIDE,
+  objectElevationOffset,
   objectVisualWidth,
   projectContactShadow,
   projectRoomPoint,
@@ -387,13 +389,21 @@ export function RoomPhotoStage() {
         { x: object.position[0], z: object.position[2] },
         scene.room,
       );
+      // An object standing on another one is drawn that much higher up the stage and
+      // one depth band above it, so it covers the thing it stands on. Its floor
+      // anchor, rotation handle and selection frame ride the raised frame; its
+      // contact shadow is projected from the footprint and stays on the floor.
+      const elevationOffset = objectElevationOffset(object, scene.room);
       const placement = {
         ...projectedPlacement,
-        zIndex: stableLayerOrder(
-          object,
-          projectedPlacement,
-          lexicalIndexById.get(object.id) ?? 0,
-        ),
+        y: projectedPlacement.y - elevationOffset,
+        top: projectedPlacement.top - elevationOffset,
+        zIndex:
+          stableLayerOrder(
+            object,
+            projectedPlacement,
+            lexicalIndexById.get(object.id) ?? 0,
+          ) + (elevationOffset > 0 ? LAYER_DEPTH_STRIDE : 0),
       };
       placements.set(object.id, placement);
 
@@ -466,11 +476,7 @@ export function RoomPhotoStage() {
               !object.locked
             }
             transforming={renderModel.previewObjectId === object.id}
-            visualWidth={objectVisualWidth(
-              object.dimensionsM.width,
-              placement.scale,
-              object.type,
-            )}
+            visualWidth={objectVisualWidth(object, scene.room)}
           />
         );
       })}
@@ -512,11 +518,7 @@ export function RoomPhotoStage() {
               selected && toolMode === "rotate" && !object.locked
             }
             view={renderModel.views.get(object.id) ?? null}
-            visualWidth={objectVisualWidth(
-              object.dimensionsM.width,
-              placement.scale,
-              object.type,
-            )}
+            visualWidth={objectVisualWidth(object, scene.room)}
           />
         );
       })}

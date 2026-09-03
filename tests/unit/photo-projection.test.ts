@@ -3,13 +3,16 @@ import { PHOTO_ASSETS } from "../../src/features/photo/photo-assets";
 import type { NormalizedQuad } from "../../src/features/photo/photo-assets";
 import { OPENROOM_PHOTO_CALIBRATION } from "../../src/features/photo/photo-calibration";
 import {
+  floorWidthAt,
   layerOrder,
+  objectElevationOffset,
   objectVisualWidth,
   projectContactShadow,
   projectRoomPoint,
   projectRugPlacement,
   stableLayerOrder,
   unprojectStagePoint,
+  verticalScaleAt,
 } from "../../src/features/photo/photo-projection";
 import {
   applyProjectiveTransform,
@@ -17,6 +20,7 @@ import {
   projectiveTransformCss,
   solveProjectiveTransform,
 } from "../../src/features/photo/projective-transform";
+import type { SceneObject } from "../../src/features/scene/scene-schema";
 import { completedProductScene } from "../helpers/natural-placement-fixtures";
 
 const room = { width: 6, depth: 4.8, height: 2.8 };
@@ -53,25 +57,135 @@ describe("photo projection", () => {
     expect(layerOrder("rug", 700)).toBeLessThan(layerOrder("sofa", 700));
   });
 
-  it("applies depth scale once before clamping width by object category", () => {
-    expect(objectVisualWidth(2, 0.8, "sofa")).toBeCloseTo(28.8);
-    expect(objectVisualWidth(2.2, 0.8, "sofa")).toBeGreaterThan(
-      objectVisualWidth(1.8, 0.8, "sofa"),
+  // Spec §3: every cutout is sized from its real width and the calibrated floor
+  // width where it stands, so the old `widthM * 18 * depthScale` heuristic and its
+  // per-category clamps are gone. 0.52 of the stage spans the room at the back wall
+  // and 0.92 at the front, so a 2 m object in a 6 m room always covers a third of it.
+  const testObject = (overrides: Partial<SceneObject>): SceneObject => {
+    const scene = completedProductScene();
+    const sofa = structuredClone(
+      scene.objects.find(({ id }) => id === "sofa_01")!,
     );
-    expect(objectVisualWidth(0.45, 1, "floor_lamp")).toBeCloseTo(8.1);
+    return { ...sofa, ...overrides };
+  };
+
+  const boxAt = (
+    widthM: number,
+    z: number,
+    overrides: Partial<SceneObject> = {},
+  ): SceneObject =>
+    testObject({
+      position: [0, 0.5, z],
+      rotation: [0, 0, 0],
+      dimensionsM: { width: widthM, height: 1, depth: 0.9 },
+      ...overrides,
+    });
+
+  it("sizes an axis-aligned object from the floor width at its depth", () => {
+    expect(objectVisualWidth(boxAt(2, -room.depth / 2), room)).toBeCloseTo(
+      (2 / 6) * 0.52 * 100,
+      10,
+    );
+    expect(objectVisualWidth(boxAt(2, room.depth / 2), room)).toBeCloseTo(
+      (2 / 6) * 0.92 * 100,
+      10,
+    );
+    expect(objectVisualWidth(boxAt(2, 0), room)).toBeCloseTo(
+      (2 / 6) * 0.72 * 100,
+      10,
+    );
   });
 
-  it("preserves catalog physical-width ordering with one depth scale", () => {
-    const depth = 0.8;
-    expect(objectVisualWidth(2.4, depth, "rug")).toBeGreaterThan(
-      objectVisualWidth(2.24, depth, "sofa"),
+  it("interpolates the projected width between the calibrated depths", () => {
+    const quarter = objectVisualWidth(boxAt(2, -room.depth / 4), room);
+
+    expect(quarter).toBeCloseTo((2 / 6) * 0.62 * 100, 10);
+    expect(quarter).toBeGreaterThan(
+      objectVisualWidth(boxAt(2, -room.depth / 2), room),
     );
-    expect(objectVisualWidth(2.24, depth, "sofa")).toBeGreaterThan(
-      objectVisualWidth(1.1, depth, "coffee_table"),
+    expect(quarter).toBeLessThan(objectVisualWidth(boxAt(2, 0), room));
+  });
+
+  it("widens a rotated footprint to its projected lateral extent", () => {
+    const square = { width: 1, height: 1, depth: 1 };
+    const turned = objectVisualWidth(
+      boxAt(1, 0, { dimensionsM: square, rotation: [0, Math.PI / 4, 0] }),
+      room,
     );
-    expect(objectVisualWidth(1.1, depth, "coffee_table")).toBeGreaterThan(
-      objectVisualWidth(0.58, depth, "floor_lamp"),
+    const aligned = objectVisualWidth(boxAt(1, 0, { dimensionsM: square }), room);
+
+    expect(turned).toBeCloseTo((Math.SQRT2 / 6) * 0.72 * 100, 10);
+    expect(aligned).toBeCloseTo((1 / 6) * 0.72 * 100, 10);
+    expect(turned).toBeGreaterThan(aligned);
+  });
+
+  it("keeps catalog width ordering without per-category clamps", () => {
+    expect(objectVisualWidth(boxAt(2.4, 0, { type: "rug" }), room)).toBeCloseTo(
+      28.8,
+      10,
     );
+    expect(objectVisualWidth(boxAt(2.24, 0), room)).toBeCloseTo(26.88, 10);
+    expect(
+      objectVisualWidth(boxAt(1.1, 0, { type: "coffee_table" }), room),
+    ).toBeCloseTo(13.2, 10);
+    expect(
+      objectVisualWidth(boxAt(0.58, 0, { type: "floor_lamp" }), room),
+    ).toBeCloseTo(6.96, 10);
+  });
+
+  it("keeps a sliver-thin footprint readable with one global floor", () => {
+    expect(objectVisualWidth(boxAt(0.2, 0), room)).toBeCloseTo(2.4, 10);
+    expect(objectVisualWidth(boxAt(0.05, 0), room)).toBe(1.5);
+  });
+
+  it("derives the floor width and the vertical scale from the calibration", () => {
+    expect(floorWidthAt(0)).toBeCloseTo(0.52, 12);
+    expect(floorWidthAt(0.5)).toBeCloseTo(0.72, 12);
+    expect(floorWidthAt(1)).toBeCloseTo(0.92, 12);
+    expect(floorWidthAt(-3)).toBeCloseTo(floorWidthAt(0), 12);
+    expect(floorWidthAt(4)).toBeCloseTo(floorWidthAt(1), 12);
+    expect(verticalScaleAt(0, room)).toBeCloseTo(0.52 / 6, 12);
+    expect(verticalScaleAt(0.5, room)).toBeCloseTo(0.72 / 6, 12);
+    expect(verticalScaleAt(1, room)).toBeCloseTo(0.92 / 6, 12);
+  });
+
+  it("raises only an object standing above its resting height", () => {
+    const lamp = { width: 0.35, height: 1.6, depth: 0.35 };
+    const resting = boxAt(0.35, 0, {
+      type: "floor_lamp",
+      dimensionsM: lamp,
+      position: [0, 0.8, 0],
+    });
+    const onTable = boxAt(0.35, 0, {
+      type: "floor_lamp",
+      dimensionsM: lamp,
+      position: [0, 0.42 + 0.8, 0],
+    });
+    const onTableAtTheBackWall = boxAt(0.35, -room.depth / 2, {
+      type: "floor_lamp",
+      dimensionsM: lamp,
+      position: [0, 0.42 + 0.8, -room.depth / 2],
+    });
+
+    expect(objectElevationOffset(resting, room)).toBe(0);
+    expect(objectElevationOffset(onTable, room)).toBeCloseTo(
+      0.42 * verticalScaleAt(0.5, room),
+      12,
+    );
+    expect(objectElevationOffset(onTableAtTheBackWall, room)).toBeCloseTo(
+      0.42 * verticalScaleAt(0, room),
+      12,
+    );
+  });
+
+  it("keeps a rug lying at its 0.01 resting height on the floor", () => {
+    const rug = boxAt(2.4, 0, {
+      type: "rug",
+      dimensionsM: { width: 2.4, height: 0.01, depth: 1.7 },
+      position: [0, 0.01, 0],
+    });
+
+    expect(objectElevationOffset(rug, room)).toBe(0);
   });
 
   it("anchors a bounded contact shadow to the physical footprint", () => {

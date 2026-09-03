@@ -2,7 +2,6 @@ import type {
   ProductCategory,
   Scene,
   SceneObject,
-  SceneObjectType,
 } from "../scene/scene-schema";
 import {
   footprintCorners,
@@ -184,16 +183,6 @@ export function projectRugPlacement(
   };
 }
 
-const VISUAL_WIDTH_BOUNDS = {
-  sofa: [14, 60],
-  coffee_table: [7, 40],
-  rug: [12, 70],
-  floor_lamp: [4, 24],
-  chair: [6, 38],
-  plant: [6, 34],
-  unknown: [6, 60],
-} as const;
-
 const CONTACT_SHADOW_PROFILES = {
   sofa: { widthFactor: 0.72, depthFactor: 0.35, opacity: 0.22 },
   coffee_table: { widthFactor: 0.75, depthFactor: 0.55, opacity: 0.2 },
@@ -206,17 +195,114 @@ const CONTACT_SHADOW_PROFILES = {
 const RUG_LAYER_BASE = 0;
 const SHADOW_LAYER_BASE = 2_000_000;
 const VERTICAL_LAYER_BASE = 4_000_000;
-const LAYER_DEPTH_STRIDE = 1_000;
+export const LAYER_DEPTH_STRIDE = 1_000;
+/** One global sanity floor, so a fallback label stays readable. */
+const MINIMUM_VISUAL_WIDTH_PERCENT = 1.5;
+/** A rug lies on the floor rather than standing on it (`room-engine.floorY`). */
+const RUG_RESTING_HEIGHT_M = 0.01;
+const ELEVATION_EPSILON_M = 1e-6;
 const PHOTO_STAGE_WIDTH_UNITS = 16;
 const PHOTO_STAGE_HEIGHT_UNITS = 9;
 
-export function objectVisualWidth(
-  widthM: number,
-  depthScale: number,
-  type: SceneObjectType,
+/** Where a Z metre lies between the back wall (0) and the front of the room (1). */
+export function floorDepthFraction(z: number, room: SceneRoom): number {
+  return clamp((z + room.depth / 2) / room.depth, 0, 1);
+}
+
+/**
+ * The calibrated floor's width in stage units at one depth: 0.52 at the back wall,
+ * 0.92 at the front. The whole room spans it, so it is the scale of everything
+ * standing there.
+ */
+export function floorWidthAt(
+  depth: number,
+  calibration: PhotoCalibration = OPENROOM_PHOTO_CALIBRATION,
 ): number {
-  const [minimum, maximum] = VISUAL_WIDTH_BOUNDS[type];
-  return clamp(widthM * 18 * depthScale, minimum, maximum);
+  const amount = clamp(depth, 0, 1);
+  return (
+    lerp(calibration.backRight.x, calibration.frontRight.x, amount) -
+    lerp(calibration.backLeft.x, calibration.frontLeft.x, amount)
+  );
+}
+
+/**
+ * Stage units per metre of height at one depth. The photo's perspective is
+ * approximated as uniform at a depth, so a metre up the wall covers as much stage as a
+ * metre across the floor and a cutout keeps its real aspect ratio.
+ */
+export function verticalScaleAt(
+  depth: number,
+  room: SceneRoom,
+  calibration: PhotoCalibration = OPENROOM_PHOTO_CALIBRATION,
+): number {
+  if (!Number.isFinite(room.width) || room.width <= 0) return 0;
+  return floorWidthAt(depth, calibration) / room.width;
+}
+
+/**
+ * The projected lateral extent of an object's oriented footprint, as a percentage of
+ * the stage width: its real width scaled by the floor where it stands, with no
+ * per-category multiplier or clamp. A rotated footprint is wider than its own width
+ * because its corners reach further sideways. Every corner is projected at the
+ * object's own depth, the same depth `verticalScaleAt` uses, so the cutout is scaled
+ * once and stays square with the room.
+ */
+export function objectVisualWidth(
+  object: SceneObject,
+  room: SceneRoom,
+  calibration: PhotoCalibration = OPENROOM_PHOTO_CALIBRATION,
+): number {
+  const z = object.position[2];
+  let minimum = Number.POSITIVE_INFINITY;
+  let maximum = Number.NEGATIVE_INFINITY;
+
+  for (const corner of footprintCorners(objectFootprint(object))) {
+    const projected = projectRoomPoint({ x: corner.x, z }, room, calibration);
+    minimum = Math.min(minimum, projected.x);
+    maximum = Math.max(maximum, projected.x);
+  }
+
+  const width = (maximum - minimum) * 100;
+  return Number.isFinite(width)
+    ? Math.max(width, MINIMUM_VISUAL_WIDTH_PERCENT)
+    : MINIMUM_VISUAL_WIDTH_PERCENT;
+}
+
+/** Where an object's centre sits when it stands on the floor. */
+export function objectRestingHeight(object: SceneObject): number {
+  return object.type === "rug"
+    ? RUG_RESTING_HEIGHT_M
+    : object.dimensionsM.height / 2;
+}
+
+/** How far above the floor an object stands, in metres; 0 when it rests on it. */
+export function objectElevation(object: SceneObject): number {
+  const elevation = object.position[1] - objectRestingHeight(object);
+  return Number.isFinite(elevation) && elevation > ELEVATION_EPSILON_M
+    ? elevation
+    : 0;
+}
+
+/**
+ * How far up the stage a raised object is drawn, in stage units. Only the cutout and
+ * the floor chrome that rides with it move: the contact shadow keeps using the
+ * footprint, so a lamp on a table still casts its shadow on the table's floor patch.
+ */
+export function objectElevationOffset(
+  object: SceneObject,
+  room: SceneRoom,
+  calibration: PhotoCalibration = OPENROOM_PHOTO_CALIBRATION,
+): number {
+  const elevation = objectElevation(object);
+  if (elevation === 0) return 0;
+  return (
+    elevation *
+    verticalScaleAt(
+      floorDepthFraction(object.position[2], room),
+      room,
+      calibration,
+    )
+  );
 }
 
 export function projectContactShadow(

@@ -897,6 +897,54 @@ describe("RoomPhotoStage", () => {
     expect(handle.style.transform).toBe("translate(-50%, -100%)");
   });
 
+  // Spec §3: a cutout's width is its real width scaled by the calibrated floor width
+  // where it stands. The seed room is 6 m wide and the floor spans 0.72 of the stage
+  // at mid depth, so the 2 m sofa covers 24% of the stage and the 0.8 m chair 9.6%.
+  test("sizes every seed cutout from its real width at its own depth", () => {
+    renderStage();
+
+    const sofa = screen.getByTestId("photo-object-frame-sofa_01");
+    const chair = screen.getByTestId("photo-object-frame-chair_01");
+    const table = screen.getByTestId("photo-object-frame-table_01");
+
+    expect(Number.parseFloat(sofa.style.width)).toBeCloseTo(24, 10);
+    expect(Number.parseFloat(chair.style.width)).toBeCloseTo(9.6, 10);
+    expect(Number.parseFloat(table.style.width)).toBeCloseTo(14.4, 10);
+  });
+
+  // Spec §3: a supported object is lifted by its elevation times the vertical scale at
+  // its depth (0.72 / 6 m = 0.12 stage units per metre at mid depth), draws above the
+  // object it stands on, and leaves its contact shadow on the floor.
+  test("raises a stacked cutout above the floor and above its supporter", () => {
+    const scene = createDemoScene();
+    const table = scene.objects.find(({ id }) => id === "table_01")!;
+    const lamp = scene.objects.find(({ id }) => id === "lamp_01")!;
+    lamp.position = [
+      table.position[0],
+      table.dimensionsM.height + lamp.dimensionsM.height / 2,
+      table.position[2],
+    ];
+    scene.selectedObjectId = "lamp_01";
+    renderStage(createSceneStore(scene));
+
+    const lampFrame = screen.getByTestId("photo-object-frame-lamp_01");
+    const tableFrame = screen.getByTestId("photo-object-frame-table_01");
+    const lampShadow = screen.getByTestId("photo-contact-shadow-lamp_01");
+
+    expect(Number.parseFloat(lampFrame.style.top)).toBeCloseTo(
+      74 - 0.42 * (0.72 / 6) * 100,
+      10,
+    );
+    expect(Number.parseFloat(tableFrame.style.top)).toBeCloseTo(74, 10);
+    expect(Number.parseFloat(lampShadow.style.top)).toBeCloseTo(74, 10);
+    expect(Number(lampFrame.style.zIndex)).toBeGreaterThan(
+      Number(tableFrame.style.zIndex),
+    );
+    expect(lampFrame).toContainElement(
+      screen.getByTestId("photo-floor-anchor-lamp_01"),
+    );
+  });
+
   test("renders the chair on the right with the mirrored front-quarter view and no CSS rotation", () => {
     const { stage } = renderStage();
 
