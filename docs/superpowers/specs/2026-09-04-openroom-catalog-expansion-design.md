@@ -114,8 +114,8 @@ every catalog product that has no registered asset:
   pixel. The prompt asks for a pure white studio background, three-quarter
   view turned to the viewer's right, whole product visible with margin,
   standing on an invisible floor, no props, no text, no shadow. Aspect
-  ratio 3:2 for wide categories (sofa, coffee_table, rug, bookshelf, chair),
-  2:3 for tall/narrow ones (floor_lamp, plant, side_table); the returned image's
+  ratio 3:2 for wide categories (sofa, coffee_table, rug, chair),
+  2:3 for tall/narrow ones (floor_lamp, plant, side_table, bookshelf); the returned image's
   own pixel size (after background removal, unchanged) is recorded as the
   intrinsic size.
 - Anchor measured exactly as for views; rugs additionally need a `floorQuad`

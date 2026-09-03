@@ -181,10 +181,10 @@ describe("product jobs", () => {
   });
 
   it("maps wide categories to 3:2 and tall ones to 2:3, defaulting to 3:2", () => {
-    for (const category of ["sofa", "coffee_table", "rug", "bookshelf", "chair"]) {
+    for (const category of ["sofa", "coffee_table", "rug", "chair"]) {
       expect(aspectFor(category)).toBe("3:2");
     }
-    for (const category of ["floor_lamp", "plant", "side_table"]) {
+    for (const category of ["floor_lamp", "plant", "side_table", "bookshelf"]) {
       expect(aspectFor(category)).toBe("2:3");
     }
     expect(aspectFor("unknown")).toBe("3:2");

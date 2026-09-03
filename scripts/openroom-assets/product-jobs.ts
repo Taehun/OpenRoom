@@ -50,7 +50,7 @@ const ASPECT_BY_CATEGORY: Readonly<Record<string, AspectRatio>> = Object.freeze(
   sofa: "3:2",
   coffee_table: "3:2",
   rug: "3:2",
-  bookshelf: "3:2",
+  bookshelf: "2:3",
   chair: "3:2",
   floor_lamp: "2:3",
   plant: "2:3",
