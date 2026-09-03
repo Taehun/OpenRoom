@@ -131,7 +131,7 @@ test("opens a Shopify cart permalink in a new tab without any request from OpenR
     .getByText("Qty 1 · Demo fixture")
     .first()
     .evaluate((node) => getComputedStyle(node).color);
-  expect(skippedColor).toBe(TERRACOTTA);
+  expect(skippedColor).toBe(TERTIARY);
   expect(skippedColor).not.toBe(detailColor);
 
   const [popup] = await Promise.all([
