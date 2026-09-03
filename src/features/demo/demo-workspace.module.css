@@ -1381,22 +1381,6 @@
 }
 
 @media (max-width: 1279px) {
-  .desktopNotice {
-    position: fixed;
-    z-index: 70;
-    right: 14px;
-    bottom: 14px;
-    display: block;
-    max-width: 320px;
-    padding: 10px 13px;
-    border: 1px solid var(--warm-divider);
-    border-radius: var(--md-sys-shape-corner-small);
-    background: var(--paper);
-    color: var(--muted-text);
-    font-size: 0.68rem;
-    line-height: 1.4;
-  }
-
   .header {
     grid-template-columns: minmax(270px, 1fr) auto max-content;
   }
@@ -1428,6 +1412,26 @@
     grid-row: 2;
     justify-self: end;
     margin-top: 0;
+  }
+}
+
+/* The layout holds down to 1000px; below that the workspace scrolls sideways,
+   so the note names the width that works. */
+@media (max-width: 999px) {
+  .desktopNotice {
+    position: fixed;
+    z-index: 70;
+    right: 14px;
+    bottom: 14px;
+    display: block;
+    max-width: 320px;
+    padding: 10px 13px;
+    border: 1px solid var(--warm-divider);
+    border-radius: var(--md-sys-shape-corner-small);
+    background: var(--paper);
+    color: var(--muted-text);
+    font-size: 0.68rem;
+    line-height: 1.4;
   }
 }
 

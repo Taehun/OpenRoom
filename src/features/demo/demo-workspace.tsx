@@ -231,8 +231,7 @@ function DemoWorkspaceContent({
           scene={scene}
         />
         <div className={styles.desktopNotice} role="note">
-          OpenRoom’s room editor is desktop-first. Use a viewport at
-          least 1280px wide for the complete atelier.
+          The demo works best in a window at least 1000px wide.
         </div>
         <div className={styles.workspaceBody}>
           <RoomCanvas
