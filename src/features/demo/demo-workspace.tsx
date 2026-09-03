@@ -68,7 +68,7 @@ function DemoWorkspaceContent({
     (total, object) => total + (object.product?.price.amountMinor ?? 0),
     0,
   );
-  const provider = roomTotalMinor > 0 ? "Cached" : "Demo fallback";
+  const provider = roomTotalMinor > 0 ? "Catalog products" : "Seed fixtures";
   const selectedObject = scene.objects.find(
     ({ id }) => id === scene.selectedObjectId,
   );

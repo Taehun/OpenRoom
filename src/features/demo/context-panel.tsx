@@ -107,7 +107,7 @@ function InspectorPanel({
         .join(" · ")
     : selectedObject.styleTags.length > 0
       ? selectedObject.styleTags.join(" · ")
-      : "Placeholder · Natural";
+      : "Seed fixture";
 
   return (
     <section className={styles.inspectorPanel} aria-labelledby="inspector-title">

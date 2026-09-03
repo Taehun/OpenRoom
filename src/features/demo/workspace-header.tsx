@@ -48,7 +48,7 @@ export function WorkspaceHeader({
         <div className={styles.providerStatus}>
           <span className={styles.statusDot} aria-hidden="true" />
           <span>
-            <small>Provider</small>
+            <small>Showing</small>
             <strong>{provider}</strong>
           </span>
         </div>
