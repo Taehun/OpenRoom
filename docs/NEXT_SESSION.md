@@ -475,3 +475,35 @@ Owner actions still open:
   and `photo-views.generated.ts`.
 - With generated views registered, the solver's option table widens to every
   45° step automatically; no code change is needed.
+
+## 2026-09-04 early-morning changes (hackathon push)
+
+Merged and deployed to https://openroom.taehun.workers.dev, in order:
+
+- **Catalog expansion** (`b3e1bab`): `side_table` and `bookshelf` types; 40
+  products (8 × 5) plus three table-height lamps (43 cutouts); `pnpm
+  assets:products` generates product cutouts through Gemini
+  (`gemini-3.1-flash-image`, `GEMINI_API_KEY` in `.env.local`) or OpenAI, with
+  border flood-fill background removal (bookshelves also clear enclosed wall);
+  docs in `docs/asset-views.md`.
+- **Shopify audit fixes** (`09a12b0`): the deploy job now inlines
+  `NEXT_PUBLIC_*` from repository variables and verifies the domain landed in
+  `dist/client`; bare numeric variant ids accepted; Safari-safe opener; catalog
+  estimate copy; `demoVariantId`.
+- **Arrange naturally removed** (`f57eb11`): button, status band, and the
+  post-redesign auto-arrangement are gone by owner decision; the solver under
+  `src/features/placement/` stays as an unwired library with its tests.
+- **True scale + stacking** (`bb7103d`): cutout width = projected footprint
+  extent from the floor calibration (no category multipliers); footprints are
+  clamped inside the room on every move; a `floor_lamp` whose centre lies on a
+  `coffee_table`/`side_table` is supported by it (`position[1]` raised,
+  `supportedBy` on tool outputs, inspector `On` row).
+- **Design QA** (`4d83e6d`, `b37847f`): product cutout thumbnails in the
+  alternatives panel; demo-mode cart button reads `Approve demo cart`; inspector
+  copy (`Position kept`, `Seed fixture`); calm stage backdrop; header shows
+  `Showing · Seed fixtures | Catalog products`.
+
+Known follow-ups: lossy re-encode of the 43 lossless cutouts (~25 MB);
+`docs/asset-views.md` category label list; rail initials for the new types are
+dormant until an add-object flow exists; the `webmcp-core.spec.ts` remount race
+noted by the removal task (harden with `expect.poll`).
