@@ -8,11 +8,12 @@ import {
   PHOTO_VIEW_NAMES,
   type PhotoViewName,
 } from "../../src/features/photo/photo-facing";
-import type {
-  GeneratedViewEntry,
-  GeneratedViewManifest,
-  PhotoAssetSet,
-  PhotoViewSymmetry,
+import {
+  GeneratedViewManifestSchema,
+  type GeneratedViewEntry,
+  type GeneratedViewManifest,
+  type PhotoAssetSet,
+  type PhotoViewSymmetry,
 } from "../../src/features/photo/photo-views";
 import type { SceneObjectType } from "../../src/features/scene/scene-schema";
 
@@ -145,6 +146,14 @@ export function planJobs(
   manifest: GeneratedViewManifest,
   options: CliOptions,
 ): ViewJob[] {
+  for (const id of options.products) {
+    if (!sets[id]) {
+      throw new Error(
+        `--product ${id} is not a registered asset; see src/features/photo/photo-assets.ts`,
+      );
+    }
+  }
+
   const existing = new Set(
     manifest.views.map((entry) => `${entry.assetId}/${entry.view}`),
   );
@@ -281,4 +290,19 @@ export const GENERATED_VIEW_MANIFEST: GeneratedViewManifest = ${JSON.stringify(
     2,
   )};
 `;
+}
+
+/**
+ * Inverse of `renderManifestModule`: reads back the manifest a run wrote and
+ * validates it, so tooling and tests never re-implement the wrapper.
+ */
+export function parseManifestModule(source: string): GeneratedViewManifest {
+  const start = source.indexOf("= ");
+  const end = source.lastIndexOf(";");
+  if (start < 0 || end <= start) {
+    throw new Error("not a generated manifest module");
+  }
+  return GeneratedViewManifestSchema.parse(
+    JSON.parse(source.slice(start + 2, end)),
+  );
 }

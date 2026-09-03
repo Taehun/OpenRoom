@@ -206,7 +206,13 @@ export async function runGenerateViews(
     return { exitCode: 2 };
   }
 
-  const jobs = planJobs(sets, manifest, options);
+  let jobs;
+  try {
+    jobs = planJobs(sets, manifest, options);
+  } catch (error) {
+    log(`[views] ${error instanceof Error ? error.message : String(error)}`);
+    return { exitCode: 2 };
+  }
   log(`[views] planned ${jobs.length} job(s)`);
   for (const job of jobs) {
     log(`[views] plan ${job.assetId}/${job.view} -> ${job.outputSrc}`);

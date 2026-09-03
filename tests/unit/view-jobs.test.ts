@@ -7,6 +7,7 @@ import {
   multipartFields,
   outputSrcFor,
   parseArgs,
+  parseManifestModule,
   planJobs,
   renderManifestModule,
 } from "../../scripts/openinterior-assets/view-jobs";
@@ -249,11 +250,29 @@ describe("view jobs", () => {
     );
     expect(rendered.endsWith(";\n")).toBe(true);
 
-    const json = rendered.slice(
-      rendered.indexOf("= ") + 2,
-      rendered.lastIndexOf(";"),
-    );
-    expect(GeneratedViewManifestSchema.parse(JSON.parse(json))).toEqual(manifest);
+    expect(parseManifestModule(rendered)).toEqual(manifest);
+    expect(
+      GeneratedViewManifestSchema.parse(parseManifestModule(rendered)),
+    ).toEqual(manifest);
+  });
+
+  it("rejects a manifest module it did not write", () => {
+    expect(() => parseManifestModule("export const nothing = 1")).toThrow();
+    expect(() => parseManifestModule("")).toThrow(/manifest module/);
+  });
+
+  it("rejects a --product that is not a registered asset", () => {
+    expect(() =>
+      planJobs(
+        PHOTO_ASSET_SETS,
+        { version: 1, views: [] },
+        parseArgs(["--product", "no-such-sofa"]),
+      ),
+    ).toThrow(/no-such-sofa/);
+  });
+
+  it("rejects a --view outside the generated views", () => {
+    expect(() => parseArgs(["--view", "top"])).toThrow(/top/);
   });
 });
 
@@ -261,6 +280,56 @@ describe("generate-views shell", () => {
   const noop = async () => {
     throw new Error("not used in tests");
   };
+
+  const KEY = "sk-test-key-not-real";
+
+  /** A minimal fetch Response: no global fetch stack is involved anywhere here. */
+  function jsonResponse(status: number, body: unknown): Response {
+    return {
+      ok: status >= 200 && status < 300,
+      status,
+      json: async () => body,
+      text: async () => JSON.stringify(body),
+    } as unknown as Response;
+  }
+
+  function imageResponse(): Response {
+    return jsonResponse(200, {
+      data: [{ b64_json: Buffer.from("pretend-webp-bytes").toString("base64") }],
+    });
+  }
+
+  /** Every side effect faked: one opaque pixel in, three bytes out. */
+  function generationDeps(fetch: ReturnType<typeof vi.fn>) {
+    const writes = new Map<string, string | number>();
+    const sleep = vi.fn(async () => {});
+    const log = vi.fn();
+    return {
+      writes,
+      sleep,
+      log,
+      deps: {
+        env: { OPENAI_API_KEY: KEY },
+        fetch: fetch as unknown as typeof globalThis.fetch,
+        log,
+        sleep,
+        readFile: async () => new Uint8Array([1, 2, 3, 4]),
+        writeFile: async (path: string, data: Uint8Array | string) => {
+          writes.set(path, typeof data === "string" ? data : data.byteLength);
+        },
+        decode: async () => ({
+          rgba: new Uint8Array([0, 0, 0, 255]),
+          width: 1,
+          height: 1,
+        }),
+        encode: async () => new Uint8Array([1, 2, 3]),
+        now: () => new Date("2026-09-04T12:00:00.000Z"),
+      },
+    };
+  }
+
+  const MANIFEST_PATH = "src/features/photo/photo-views.generated.ts";
+  const SIDE_WEBP = "public/demo/photo/products/hinoki-low-sofa--side.webp";
 
   it("prints the plan and exits 0 for --dry-run without touching the network", async () => {
     const fetch = vi.fn();
@@ -330,5 +399,131 @@ describe("generate-views shell", () => {
       encode: noop,
     });
     expect(log.mock.calls.flat().join("\n")).not.toContain("sk-secret-value");
+  });
+  it("retries a 429, then writes the view, the anchor, and the manifest", async () => {
+    const fetch = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse(429, { error: { message: "slow down" } }))
+      .mockResolvedValueOnce(imageResponse());
+    const { writes, sleep, deps } = generationDeps(fetch);
+
+    const result = await runGenerateViews({
+      ...deps,
+      argv: ["--product", "hinoki-low-sofa", "--view", "side"],
+    });
+
+    expect(result).toEqual({ exitCode: 0 });
+    expect(fetch).toHaveBeenCalledTimes(2);
+    expect(sleep).toHaveBeenCalledTimes(1);
+    expect(sleep).toHaveBeenCalledWith(2000);
+
+    const [url, init] = fetch.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe("https://api.openai.com/v1/images/edits");
+    expect(init.method).toBe("POST");
+    expect(init.headers).toEqual({ Authorization: `Bearer ${KEY}` });
+    const body = init.body as FormData;
+    expect(body.get("model")).toBe("gpt-image-1");
+    expect(body.get("background")).toBe("transparent");
+    expect(body.get("size")).toBe("1536x1024");
+    expect(body.get("image")).toBeInstanceOf(Blob);
+
+    expect(writes.get(SIDE_WEBP)).toBe(3);
+    const manifest = parseManifestModule(writes.get(MANIFEST_PATH) as string);
+    expect(manifest).toEqual({
+      version: 1,
+      views: [
+        {
+          assetId: "hinoki-low-sofa",
+          view: "side",
+          src: "/demo/photo/products/hinoki-low-sofa--side.webp",
+          intrinsicWidth: 1,
+          intrinsicHeight: 1,
+          anchorX: 0.5,
+          anchorY: 1,
+          model: "gpt-image-1",
+          generatedAt: "2026-09-04T12:00:00.000Z",
+        },
+      ],
+    });
+    expect(GeneratedViewManifestSchema.parse(manifest)).toEqual(manifest);
+  });
+
+  it("keeps the completed job and exits 1 when a later job fails outright", async () => {
+    const fetch = vi
+      .fn()
+      .mockResolvedValueOnce(imageResponse())
+      .mockResolvedValueOnce(jsonResponse(400, { error: { message: "bad request" } }));
+    const { writes, sleep, deps } = generationDeps(fetch);
+
+    const result = await runGenerateViews({
+      ...deps,
+      argv: ["--product", "hinoki-low-sofa", "--view", "side", "--view", "back"],
+    });
+
+    expect(result).toEqual({ exitCode: 1 });
+    // A 400 is not retried, so exactly one request per job.
+    expect(fetch).toHaveBeenCalledTimes(2);
+    expect(sleep).not.toHaveBeenCalled();
+    expect(writes.has(SIDE_WEBP)).toBe(true);
+    expect(writes.has("public/demo/photo/products/hinoki-low-sofa--back.webp")).toBe(
+      false,
+    );
+    const manifest = parseManifestModule(writes.get(MANIFEST_PATH) as string);
+    expect(manifest.views.map((view) => `${view.assetId}/${view.view}`)).toEqual([
+      "hinoki-low-sofa/side",
+    ]);
+  });
+
+  it("exhausts three retries on 429 and leaves the manifest untouched", async () => {
+    const fetch = vi
+      .fn()
+      .mockResolvedValue(jsonResponse(429, { error: { message: "slow down" } }));
+    const { writes, sleep, deps } = generationDeps(fetch);
+
+    const result = await runGenerateViews({
+      ...deps,
+      argv: ["--product", "hinoki-low-sofa", "--view", "side"],
+    });
+
+    expect(result).toEqual({ exitCode: 1 });
+    expect(fetch).toHaveBeenCalledTimes(4);
+    expect(sleep.mock.calls.flat()).toEqual([2000, 4000, 8000]);
+    expect(writes.size).toBe(0);
+  });
+
+  it("exits 2 for an unknown --product and never calls fetch", async () => {
+    const fetch = vi.fn();
+    const log = vi.fn();
+    const result = await runGenerateViews({
+      argv: ["--product", "no-such-sofa"],
+      env: { OPENAI_API_KEY: KEY },
+      fetch: fetch as unknown as typeof globalThis.fetch,
+      log,
+      readFile: noop,
+      writeFile: noop,
+      decode: noop,
+      encode: noop,
+    });
+    expect(result).toEqual({ exitCode: 2 });
+    expect(fetch).not.toHaveBeenCalled();
+    expect(log.mock.calls.flat().join("\n")).toContain("no-such-sofa");
+  });
+
+  it("exits 2 for an unknown --view and never calls fetch", async () => {
+    const fetch = vi.fn();
+    const log = vi.fn();
+    const result = await runGenerateViews({
+      argv: ["--view", "top"],
+      env: { OPENAI_API_KEY: KEY },
+      fetch: fetch as unknown as typeof globalThis.fetch,
+      log,
+      readFile: noop,
+      writeFile: noop,
+      decode: noop,
+      encode: noop,
+    });
+    expect(result).toEqual({ exitCode: 2 });
+    expect(fetch).not.toHaveBeenCalled();
+    expect(log.mock.calls.flat().join("\n")).toContain("top");
   });
 });
