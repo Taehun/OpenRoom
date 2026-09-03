@@ -21,6 +21,16 @@ export interface OpeningClearanceZone extends Footprint2D {
   depthM: 0.75;
 }
 
+/**
+ * One orientation the solver may propose for an object, with how truthfully a
+ * registered photo view can show it (0 < fidelity <= 1). Built from the photo
+ * view registry; `placement` never imports from `photo`.
+ */
+export interface RotationOption {
+  rotationY: number;
+  fidelity: number;
+}
+
 export interface ProposedPlacement {
   objectId: string;
   position: Vec3;
