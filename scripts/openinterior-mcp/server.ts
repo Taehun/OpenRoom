@@ -18,9 +18,6 @@ import { SessionRegistry } from "./session-registry";
 
 const LOG_PREFIX = "openinterior-mcp:";
 
-/** The relay emits this once a code has absorbed its allowance of wrong guesses. */
-const PAIR_LOCKOUT_DIAGNOSTIC = "pair code invalidated after too many failed attempts";
-
 /**
  * Registry diagnostics that leave nobody attached and no way back in, so the
  * operator needs a replacement code. Deliberately exact rather than a prefix
@@ -43,6 +40,14 @@ const EXIT_GRACE_MS = 250;
 function log(message: string): void {
   console.error(`${LOG_PREFIX} ${message}`);
 }
+
+/**
+ * Set as soon as `main` can create anything worth releasing. Startup can fail
+ * after the relay has bound its port or the transport has started, and exiting
+ * without closing those leaves the port held and a client talking to a server
+ * that will never answer.
+ */
+let releaseStartedResources: (() => Promise<void>) | undefined;
 
 /**
  * `0` asks the kernel for an ephemeral port, which is what the tests use;
@@ -83,6 +88,7 @@ async function main(): Promise<void> {
     await stdio?.close().catch(() => undefined);
     process.stdin.pause();
   };
+  releaseStartedResources = teardown;
 
   const stop = (reason: string): void => {
     if (stopping) return;
@@ -145,12 +151,10 @@ async function main(): Promise<void> {
     registry,
     port,
     allowedOrigins,
-    onDiagnostic: (message) => {
-      log(message);
-      // A retired code would otherwise strand the operator with no way to pair;
-      // minting the replacement here is also what clears the attempt counter.
-      if (message === PAIR_LOCKOUT_DIAGNOSTIC) announcePairCode();
-    },
+    onDiagnostic: log,
+    // A retired code would otherwise strand the operator with no way to pair;
+    // minting the replacement here is also what clears the attempt counter.
+    onPairLockout: announcePairCode,
   });
   if (stopping) return teardown();
 
@@ -164,7 +168,8 @@ async function main(): Promise<void> {
   if (stopping) return teardown();
 }
 
-void main().catch((error: unknown) => {
+void main().catch(async (error: unknown) => {
   log(`failed to start: ${error instanceof Error ? error.message : String(error)}`);
+  await releaseStartedResources?.().catch(() => undefined);
   process.exitCode = 1;
 });

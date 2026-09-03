@@ -85,6 +85,14 @@ export interface RelayHttpServerOptions {
   maxPairAttempts?: number;
   /** Mints a fresh pair code; defaults to the registry's own generator. */
   issuePairCode?: () => { code: string; expiresAt: number };
+  /**
+   * Called once when a code is retired by too many failed attempts. A retired
+   * code cannot pair and nothing else replaces it, so the owning process uses
+   * this to mint and announce a replacement. Typed on purpose: the diagnostic
+   * line is prose an editor may reword, and a caller matching on that string
+   * would silently stop reissuing while every test stayed green.
+   */
+  onPairLockout?: () => void;
   /** Operator facing log sink; never receives secrets or tool payloads. */
   onDiagnostic?: (message: string) => void;
 }
@@ -238,6 +246,7 @@ export async function startRelayHttpServer(options: RelayHttpServerOptions): Pro
   const maxPairAttempts = options.maxPairAttempts ?? MAX_PAIR_ATTEMPTS;
   const issue = options.issuePairCode ?? (() => registry.issuePairCode());
   const onDiagnostic = options.onDiagnostic ?? ((): void => {});
+  const onPairLockout = options.onPairLockout ?? ((): void => {});
 
   /**
    * Cached copy of the token minted by the last successful pair. It is only a
@@ -275,6 +284,9 @@ export async function startRelayHttpServer(options: RelayHttpServerOptions): Pro
       // One line, no code and no origin: the operator only needs to know that a
       // fresh code must be issued before the page can pair again.
       onDiagnostic("pair code invalidated after too many failed attempts");
+      // Fires on the attempt that retires the code and not again while it stays
+      // retired, because the early return above guards every later guess.
+      onPairLockout();
     }
   }
 

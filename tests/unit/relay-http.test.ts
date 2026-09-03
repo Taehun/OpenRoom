@@ -203,7 +203,10 @@ function expectPairRejected(probe: Probe, secrets: string[] = []): void {
  * Each relay gets its own registry because `close()` is terminal: it shuts the
  * registry down, so a test that needs a second server needs a second registry.
  */
-async function startRelay(longPollMs = TEST_LONG_POLL_MS): Promise<RelayHttpServer> {
+async function startRelay(
+  longPollMs = TEST_LONG_POLL_MS,
+  onPairLockout?: () => void,
+): Promise<RelayHttpServer> {
   registry = new SessionRegistry({
     manifestHash: MANIFEST_HASH,
     allowedOrigins: ALLOWED_ORIGINS,
@@ -216,6 +219,7 @@ async function startRelay(longPollMs = TEST_LONG_POLL_MS): Promise<RelayHttpServ
     port: 0,
     allowedOrigins: ALLOWED_ORIGINS,
     longPollMs,
+    onPairLockout,
     onDiagnostic: (message) => diagnostics.push(message),
   });
   relays.push(relay);
@@ -376,6 +380,32 @@ describe("pair attempt throttling", () => {
     const lockouts = diagnostics.filter((line) => line.includes("pair code invalidated"));
     expect(lockouts).toHaveLength(1);
     expect(lockouts[0]).not.toContain(issued.code);
+  });
+
+  it("calls onPairLockout exactly once per lockout", async () => {
+    // The owning process mints the replacement code from this callback. A
+    // string match on the diagnostic line would survive a rewording silently;
+    // a typed hook does not, so the operator can never be left holding a
+    // retired code with a green suite.
+    let lockouts = 0;
+    const wrongFor = (code: string): string => (code === "111111" ? "222222" : "111111");
+    const hooked = await startRelay(TEST_LONG_POLL_MS, () => {
+      lockouts += 1;
+    });
+
+    const first = hooked.issuePairCode();
+    for (let attempt = 0; attempt < MAX_PAIR_ATTEMPTS + 2; attempt += 1) {
+      expectPairRejected(await postPair(pairBody({ code: wrongFor(first.code) })), [first.code]);
+    }
+    // Fired on the attempt that retired the code, and not again while it stays
+    // retired: extra guesses past the ceiling must not re-announce it.
+    expect(lockouts).toBe(1);
+
+    const second = hooked.issuePairCode();
+    for (let attempt = 0; attempt < MAX_PAIR_ATTEMPTS; attempt += 1) {
+      expectPairRejected(await postPair(pairBody({ code: wrongFor(second.code) })), [second.code]);
+    }
+    expect(lockouts).toBe(2);
   });
 
   it("allows the correct code while attempts remain", async () => {

@@ -10,6 +10,7 @@ import { StdioClientTransport } from "@modelcontextprotocol/client/stdio";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { relayCallFailure } from "../../src/local-mcp/page-relay-client";
+import { MAX_PAIR_ATTEMPTS } from "../../scripts/openinterior-mcp/relay-http";
 import {
   CORE_TOOL_MANIFEST,
   getCoreToolManifestHash,
@@ -506,6 +507,60 @@ describe("local MCP companion", () => {
     }
     throw new Error(`companion process ${pid} was still alive after the transport closed`);
   }, 15_000);
+});
+
+describe("pair code lockout", () => {
+  it("prints a replacement the operator can pair with", async () => {
+    const child: ChildProcess = spawn(
+      process.execPath,
+      ["--import", "tsx", "scripts/openinterior-mcp/server.ts"],
+      {
+        cwd: REPO_ROOT,
+        env: inheritedEnv({
+          OPENINTERIOR_MCP_PORT: "0",
+          OPENINTERIOR_ALLOWED_ORIGINS: PAGE_ORIGIN,
+        }) as NodeJS.ProcessEnv,
+        stdio: ["pipe", "pipe", "pipe"],
+      },
+    );
+    const log: string[] = [];
+    const started = readStartup(child.stderr as unknown as Stream, log);
+
+    try {
+      const { port, code } = await started;
+      const manifestHash = await getCoreToolManifestHash();
+      const page = new FakePage(`http://127.0.0.1:${port}`);
+
+      // Burn the whole attempt budget, which retires the live code.
+      for (let attempt = 0; attempt < MAX_PAIR_ATTEMPTS; attempt += 1) {
+        const guess = String(attempt).repeat(6);
+        const response = await page.pair({
+          code: guess === code ? "999999" : guess,
+          origin: PAGE_ORIGIN,
+          manifestHash,
+          pageNonce: pageNonce(),
+        });
+        expect(response.status).toBe(403);
+      }
+
+      // A retired code with no replacement would strand the operator: there is
+      // no other way to pair, and the relay answers even the right code 403.
+      const reissued = await waitForPairCode(log, 2);
+      expect(reissued).toMatch(/^\d{6}$/);
+      const paired = await page.pair({
+        code: reissued,
+        origin: PAGE_ORIGIN,
+        manifestHash,
+        pageNonce: pageNonce(),
+      });
+      expect(paired.status).toBe(200);
+    } finally {
+      const exited = new Promise<void>((resolve) => child.once("exit", () => resolve()));
+      child.kill("SIGINT");
+      await Promise.race([exited, new Promise((resolve) => setTimeout(resolve, 3_000))]);
+      if (child.exitCode === null) child.kill("SIGKILL");
+    }
+  }, 30_000);
 });
 
 describe("companion shutdown", () => {
