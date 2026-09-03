@@ -121,7 +121,7 @@ const HAND_REGISTERED_ASSETS: Record<string, PhotoAsset> = {
   "seed-vinyl-chair": { id: "seed-vinyl-chair", src: "/demo/photo/seed/seed-vinyl-chair.webp", intrinsicWidth: 1382, intrinsicHeight: 1138, anchorX: 0.5, anchorY: 0.9473 },
   "seed-faux-plant": { id: "seed-faux-plant", src: "/demo/photo/seed/seed-faux-plant.webp", intrinsicWidth: 1024, intrinsicHeight: 1536, anchorX: 0.5205, anchorY: 0.974 },
   "hinoki-low-sofa": { id: "hinoki-low-sofa", src: "/demo/photo/products/hinoki-low-sofa.webp", intrinsicWidth: 1536, intrinsicHeight: 1024, anchorX: 0.5, anchorY: 0.8584 },
-  "boucle-curve-sofa": { id: "boucle-curve-sofa", src: "/demo/photo/products/boucle-curve-sofa.webp", intrinsicWidth: 1536, intrinsicHeight: 1024, anchorX: 0.4997, anchorY: 0.8604 },
+  "boucle-curve-sofa": { id: "boucle-curve-sofa", src: "/demo/photo/products/boucle-curve-sofa.webp", intrinsicWidth: 1536, intrinsicHeight: 1024, anchorX: 0.5003, anchorY: 0.8604 },
   "walnut-frame-sofa": { id: "walnut-frame-sofa", src: "/demo/photo/products/walnut-frame-sofa.webp", intrinsicWidth: 1536, intrinsicHeight: 1024, anchorX: 0.5042, anchorY: 0.8789 },
   "oak-frame-table": { id: "oak-frame-table", src: "/demo/photo/products/oak-frame-table.webp", intrinsicWidth: 1536, intrinsicHeight: 1024, anchorX: 0.5094, anchorY: 0.8418 },
   "travertine-plinth-table": { id: "travertine-plinth-table", src: "/demo/photo/products/travertine-plinth-table.webp", intrinsicWidth: 1536, intrinsicHeight: 1024, anchorX: 0.5003, anchorY: 0.8369 },

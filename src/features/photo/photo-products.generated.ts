@@ -40,11 +40,11 @@ export const GENERATED_PRODUCT_ASSETS: GeneratedProductAsset[] = [
     "src": "/demo/photo/products/cane-back-teak-sofa.webp",
     "intrinsicWidth": 1264,
     "intrinsicHeight": 848,
-    "anchorX": 0.5,
-    "anchorY": 0.9175,
+    "anchorX": 0.5008,
+    "anchorY": 0.9104,
     "provider": "gemini",
     "model": "gemini-3.1-flash-image",
-    "generatedAt": "2026-09-03T17:11:34.837Z"
+    "generatedAt": "2026-09-03T18:19:03.680Z"
   },
   {
     "id": "ceramic-column-lamp",
@@ -147,11 +147,11 @@ export const GENERATED_PRODUCT_ASSETS: GeneratedProductAsset[] = [
     "src": "/demo/photo/products/oak-paper-cord-chair.webp",
     "intrinsicWidth": 1264,
     "intrinsicHeight": 848,
-    "anchorX": 0.4917,
-    "anchorY": 0.941,
+    "anchorX": 0.5028,
+    "anchorY": 0.9458,
     "provider": "gemini",
     "model": "gemini-3.1-flash-image",
-    "generatedAt": "2026-09-03T17:12:49.483Z"
+    "generatedAt": "2026-09-03T18:19:15.531Z"
   },
   {
     "id": "oak-tripod-lamp",
@@ -169,7 +169,7 @@ export const GENERATED_PRODUCT_ASSETS: GeneratedProductAsset[] = [
     "src": "/demo/photo/products/oat-linen-slipcover-sofa.webp",
     "intrinsicWidth": 1264,
     "intrinsicHeight": 848,
-    "anchorX": 0.5016,
+    "anchorX": 0.4984,
     "anchorY": 0.8844,
     "provider": "gemini",
     "model": "gemini-3.1-flash-image",
@@ -287,7 +287,7 @@ export const GENERATED_PRODUCT_ASSETS: GeneratedProductAsset[] = [
     "src": "/demo/photo/products/walnut-low-shelf.webp",
     "intrinsicWidth": 848,
     "intrinsicHeight": 1264,
-    "anchorX": 0.5018,
+    "anchorX": 0.4982,
     "anchorY": 0.8331,
     "provider": "gemini",
     "model": "gemini-3.1-flash-image",
@@ -309,7 +309,7 @@ export const GENERATED_PRODUCT_ASSETS: GeneratedProductAsset[] = [
     "src": "/demo/photo/products/white-oak-cube-storage.webp",
     "intrinsicWidth": 848,
     "intrinsicHeight": 1264,
-    "anchorX": 0.5012,
+    "anchorX": 0.4988,
     "anchorY": 0.9153,
     "provider": "gemini",
     "model": "gemini-3.1-flash-image",
