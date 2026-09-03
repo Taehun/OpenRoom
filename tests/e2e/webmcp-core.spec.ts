@@ -276,7 +276,9 @@ test("completes WebMCP Core 6 against the shared demo Scene", async ({
   await expect(dialog.getByRole("listitem")).toHaveCount(1);
   await expect(dialog.getByText("Travertine Plinth Table")).toBeVisible();
   await expect(dialog.getByText("$249 USD")).toBeVisible();
-  await expect(dialog.getByText(/Scene revision 2/)).toBeVisible();
+  await expect(
+    dialog.getByText(/from your room (is|are) ready for approval/),
+  ).toBeVisible();
   expect(await page.evaluate(() => window.__webMcpFetchCount)).toBe(0);
   trackCartRequests = false;
   expect(externalRequestsDuringCart).toEqual([]);
