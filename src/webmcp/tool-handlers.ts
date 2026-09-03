@@ -18,12 +18,14 @@ import {
 import { CORE_TOOL_MANIFEST } from "./core-tool-manifest";
 import {
   addSceneToCartInputSchema,
+  FACING_DIRECTION_MESSAGE,
   getSceneInputSchema,
   getSelectionInputSchema,
   moveObjectInputSchema,
   replaceObjectInputSchema,
   searchProductsInputSchema,
   type CoreToolName,
+  type ToolScene,
   type ToolSceneObject,
 } from "./tool-contracts";
 import {
@@ -223,6 +225,11 @@ function withFacing(object: SceneObject): ToolSceneObject {
   return { ...object, facing: roundFacing(facingOf(object.rotation[1])) };
 }
 
+/** Every Scene a tool hands back — read or committed — carries facing. */
+function withSceneFacing(scene: Scene): ToolScene {
+  return { ...scene, objects: scene.objects.map(withFacing) };
+}
+
 function draftFor(scene: Scene, objects: readonly SceneObject[]): CartApprovalDraft {
   const items = objects.flatMap((object) => {
     if (object.source !== "product" || !object.product) return [];
@@ -264,10 +271,7 @@ export function createCoreTools(context: ToolContext): readonly ModelContextTool
       "get_scene",
       snapshot.scene.revision,
       snapshot.stateVersion,
-      {
-        ...snapshot.scene,
-        objects: snapshot.scene.objects.map(withFacing),
-      },
+      withSceneFacing(snapshot.scene),
       "Scene returned.",
     );
   }
@@ -390,7 +394,10 @@ export function createCoreTools(context: ToolContext): readonly ModelContextTool
       "replace_object",
       result.scene.revision,
       latestStateVersion,
-      { scene: SceneSchema.parse(result.scene), message: result.message },
+      {
+        scene: withSceneFacing(SceneSchema.parse(result.scene)),
+        message: result.message,
+      },
       result.message,
     );
   }
@@ -426,11 +433,24 @@ export function createCoreTools(context: ToolContext): readonly ModelContextTool
     signal.throwIfAborted();
     // A facing vector is the same orientation in the model's frame: converting
     // it here keeps the store, history, and conflict handling untouched. The
-    // input contract has already rejected a zero-length or doubled-up value.
+    // input contract has already rejected a zero-length or doubled-up value;
+    // if a future contract edit ever lets one through, fail the same way
+    // instead of silently dropping the orientation the caller asked for.
     const requestedFacing =
       parsed.data.facing === undefined
         ? null
         : normalizeFacing(parsed.data.facing);
+    if (parsed.data.facing !== undefined && requestedFacing === null) {
+      return toolError(
+        "move_object",
+        snapshot.scene.revision,
+        snapshot.stateVersion,
+        "INVALID_INPUT",
+        FACING_DIRECTION_MESSAGE,
+        true,
+        { issues: [{ path: "facing", message: FACING_DIRECTION_MESSAGE }] },
+      );
+    }
     const rotationYDegrees =
       requestedFacing === null
         ? parsed.data.rotationYDegrees
@@ -452,7 +472,7 @@ export function createCoreTools(context: ToolContext): readonly ModelContextTool
       result.scene.revision,
       latestStateVersion,
       {
-        scene: SceneSchema.parse(result.scene),
+        scene: withSceneFacing(SceneSchema.parse(result.scene)),
         message: result.message,
         adjustedToFit: result.adjustedToFit ?? false,
         appliedPosition: result.appliedPosition,

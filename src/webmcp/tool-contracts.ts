@@ -31,6 +31,9 @@ const facing = z
   })
   .strict()
   .optional();
+/** Shared so the input refine and the handler guard cannot drift apart. */
+export const FACING_DIRECTION_MESSAGE =
+  "facing must be a non-zero finite XZ vector";
 const limit = z.number().int().min(1).max(3).default(3);
 
 export const getSceneInputSchema = z.object({}).strict();
@@ -88,7 +91,7 @@ export const moveObjectInputSchema = z
       context.addIssue({
         code: "custom",
         path: ["facing"],
-        message: "facing must be a non-zero finite XZ vector",
+        message: FACING_DIRECTION_MESSAGE,
       });
     }
   });

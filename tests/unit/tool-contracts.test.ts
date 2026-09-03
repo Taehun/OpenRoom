@@ -567,19 +567,38 @@ describe("WebMCP Core 6 contracts", () => {
         facing: { x: 0, z: 1, y: 0 },
       }).success,
     ).toBe(false);
+    const scene = {
+      id: "demo",
+      version: 1,
+      revision: 1,
+      source: "demo",
+      styleIntent: null,
+      room: { width: 4, height: 2.6, depth: 5 },
+      openings: [],
+      objects: [object],
+      selectedObjectId: null,
+    };
+    expect(ToolSceneSchema.safeParse(scene).success).toBe(false);
+    const facingScene = {
+      ...scene,
+      objects: [{ ...object, facing: { x: 0, z: 1 } }],
+    };
+    expect(ToolSceneSchema.safeParse(facingScene).success).toBe(true);
+    // Overwriting `objects` needs Zod 4's `safeExtend`; these two guard that
+    // the Scene contract it carries over stays exactly as strict as before.
+    expect(
+      ToolSceneSchema.safeParse({ ...facingScene, unexpected: 1 }).success,
+    ).toBe(false);
     expect(
       ToolSceneSchema.safeParse({
-        id: "demo",
-        version: 1,
-        revision: 1,
-        source: "demo",
-        styleIntent: null,
-        room: { width: 4, height: 2.6, depth: 5 },
-        openings: [],
-        objects: [object],
-        selectedObjectId: null,
+        ...facingScene,
+        selectedObjectId: "not_an_object",
       }).success,
     ).toBe(false);
+    expect(
+      ToolSceneSchema.safeParse({ ...facingScene, selectedObjectId: "chair_01" })
+        .success,
+    ).toBe(true);
   });
 
   test("reuses the published JSON Schemas in the shared manifest", () => {
