@@ -12,6 +12,7 @@ import type {
   Scene,
   SceneProduct,
 } from "../../src/features/scene/scene-schema";
+import { supportOf } from "../../src/features/scene/support";
 import { completedProductScene } from "../helpers/natural-placement-fixtures";
 
 function sceneProductFor(type: Scene["objects"][number]["type"]): SceneProduct {
@@ -279,5 +280,69 @@ describe("createSceneStore", () => {
     expect(result.ok).toBe(true);
     expect(installedDuringCallback).toEqual(store.getState().scene);
     expect(store.getState().scene.objects[0]!.position[0]).not.toBe(999);
+  });
+});
+
+describe("lamp stacking through the store", () => {
+  function tableCentre(store: SceneStore) {
+    const table = store
+      .getState()
+      .scene.objects.find(({ id }) => id === "table_01")!;
+    return { x: table.position[0], z: table.position[2] };
+  }
+
+  test("recomputes elevation on a move and again on a replacement", () => {
+    const store = createSceneStore();
+    const table = store
+      .getState()
+      .scene.objects.find(({ id }) => id === "table_01")!;
+
+    const moved = store.getState().applyCommand({
+      expectedRevision: store.getState().scene.revision,
+      actor: "agent",
+      command: { type: "move", objectId: "lamp_01", position: tableCentre(store) },
+    });
+    expect(moved.ok).toBe(true);
+
+    const raised = store
+      .getState()
+      .scene.objects.find(({ id }) => id === "lamp_01")!;
+    expect(supportOf(store.getState().scene, raised)?.id).toBe("table_01");
+    expect(raised.position[1]).toBeCloseTo(
+      table.dimensionsM.height + raised.dimensionsM.height / 2,
+      9,
+    );
+
+    // Replacing the table changes the height the lamp stands at, without a move.
+    const replaced = replaceDemoObject(store, "table_01", "human");
+    expect(replaced.ok).toBe(true);
+    const newTable = store
+      .getState()
+      .scene.objects.find(({ id }) => id === "table_01")!;
+    const settledLamp = store
+      .getState()
+      .scene.objects.find(({ id }) => id === "lamp_01")!;
+    expect(settledLamp.position[1]).toBeCloseTo(
+      newTable.dimensionsM.height + settledLamp.dimensionsM.height / 2,
+      9,
+    );
+  });
+
+  test("commits a transform through the same settling path and undoes it", () => {
+    const store = createSceneStore();
+    const before = structuredClone(store.getState().scene);
+    const centre = tableCentre(store);
+
+    const result = store
+      .getState()
+      .commitTransform("lamp_01", [centre.x, 0, centre.z]);
+    expect(result.ok).toBe(true);
+    expect(
+      store.getState().scene.objects.find(({ id }) => id === "lamp_01")!
+        .position[1],
+    ).toBeGreaterThan(1);
+
+    expect(store.getState().undo()).toBe(true);
+    expect(store.getState().scene.objects).toEqual(before.objects);
   });
 });

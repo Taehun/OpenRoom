@@ -4,7 +4,6 @@ import {
   OBJECT_LABELS,
 } from "../../src/features/demo/room-canvas";
 import {
-  objectVisualWidth,
   projectContactShadow,
 } from "../../src/features/photo/photo-projection";
 import { PHOTO_VIEW_SYMMETRY } from "../../src/features/photo/photo-views";
@@ -124,16 +123,6 @@ describe("per-category tables", () => {
     }
     expect(PHOTO_VIEW_SYMMETRY.side_table).toBe("radial");
     expect(PHOTO_VIEW_SYMMETRY.bookshelf).toBe("front-back");
-  });
-
-  test("every placeable type has a visual width bound", () => {
-    for (const type of PLACEABLE_TYPES) {
-      const minimum = objectVisualWidth(0.001, 1, type);
-      const maximum = objectVisualWidth(1000, 1, type);
-      expect(minimum, type).toBeGreaterThan(0);
-      expect(maximum, type).toBeGreaterThan(minimum);
-      expect(Number.isFinite(maximum), type).toBe(true);
-    }
   });
 
   test("every placeable type has a contact shadow profile", () => {

@@ -32,6 +32,11 @@ const LEGACY_ENVELOPE_EXCEPTIONS = [
   "ceramic-olive-tree",
   "stone-planter-ficus",
   "teak-planter-palm",
+  // Table-height stand lamps sit inside the floor_lamp category on purpose (spec
+  // true-scale §5); their height is a third of the category envelope.
+  "linen-drum-table-lamp",
+  "ceramic-gourd-table-lamp",
+  "brass-stem-table-lamp",
 ] as const;
 
 const CATEGORIES = ProductCategorySchema.options;

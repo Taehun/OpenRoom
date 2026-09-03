@@ -57,5 +57,16 @@
       "Results arrive in catalog order, capped by the unchanged limit of three",
       "Only the returned side tables priced under $300 are offered to the shopper"
     ]
+  },
+  {
+    "id": "lamp-on-side-table",
+    "prompt": "Put the lamp on the side table",
+    "expectedTools": ["get_scene", "move_object"],
+    "assertions": [
+      "move_object is called with the lamp's objectId and the table's XZ centre",
+      "The returned lamp carries supportedBy set to that table's id",
+      "The returned lamp's position[1] is the table height plus half the lamp height, above its floor resting height",
+      "The seed scene has no side table, so the coffee table table_01 is the supporter the assertions name"
+    ]
   }
 ]

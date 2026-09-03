@@ -516,6 +516,7 @@ describe("WebMCP Core 6 contracts", () => {
         "cart-approval-shopify-lines",
         "face-the-sofa",
         "search-side-tables",
+        "lamp-on-side-table",
       ]),
     );
     expect(journeys).toHaveLength(6);
@@ -532,7 +533,7 @@ describe("WebMCP Core 6 contracts", () => {
     expect(z.object({}).strict().safeParse({ unexpected: 1 }).success).toBe(false);
   });
 
-  test("publishes facing on both contract layers and on the tool Scene shape", () => {
+  test("publishes facing and support on both contract layers and on the tool Scene shape", () => {
     expect(MOVE_OBJECT_JSON_SCHEMA.properties.facing).toMatchObject({
       type: "object",
       properties: { x: { type: "number" }, z: { type: "number" } },
@@ -556,16 +557,39 @@ describe("WebMCP Core 6 contracts", () => {
       styleTags: [],
       addedBy: "seed",
     };
-    // The stored Scene shape never carries facing; the tool shape always does.
+    // The stored Scene shape never carries facing or supportedBy; the tool
+    // shape always carries both, and supportedBy is a nullable object id.
     expect(ToolSceneObjectSchema.safeParse(object).success).toBe(false);
     expect(
       ToolSceneObjectSchema.safeParse({ ...object, facing: { x: 0, z: 1 } })
         .success,
+    ).toBe(false);
+    expect(
+      ToolSceneObjectSchema.safeParse({
+        ...object,
+        facing: { x: 0, z: 1 },
+        supportedBy: null,
+      }).success,
     ).toBe(true);
     expect(
       ToolSceneObjectSchema.safeParse({
         ...object,
+        facing: { x: 0, z: 1 },
+        supportedBy: "table_01",
+      }).success,
+    ).toBe(true);
+    expect(
+      ToolSceneObjectSchema.safeParse({
+        ...object,
+        facing: { x: 0, z: 1 },
+        supportedBy: "",
+      }).success,
+    ).toBe(false);
+    expect(
+      ToolSceneObjectSchema.safeParse({
+        ...object,
         facing: { x: 0, z: 1, y: 0 },
+        supportedBy: null,
       }).success,
     ).toBe(false);
     const scene = {
@@ -582,7 +606,7 @@ describe("WebMCP Core 6 contracts", () => {
     expect(ToolSceneSchema.safeParse(scene).success).toBe(false);
     const facingScene = {
       ...scene,
-      objects: [{ ...object, facing: { x: 0, z: 1 } }],
+      objects: [{ ...object, facing: { x: 0, z: 1 }, supportedBy: null }],
     };
     expect(ToolSceneSchema.safeParse(facingScene).success).toBe(true);
     // Overwriting `objects` needs Zod 4's `safeExtend`; these two guard that

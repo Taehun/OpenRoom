@@ -12,6 +12,7 @@ import type {
   RotationOption,
 } from "../placement/placement-types";
 import { SceneSchema, type Scene, type SceneObject } from "./scene-schema";
+import { supportRelations } from "./support";
 
 export type PlacementApplication =
   | { ok: true; changed: true; scene: Scene }
@@ -52,15 +53,25 @@ function rotationIsAllowed(
   );
 }
 
-function hasNonRugCollision(objects: readonly SceneObject[]) {
-  const obstacles = objects.filter(({ type }) => type !== "rug");
+/**
+ * Spec §5: an object standing on another shares its floor area on purpose, so a
+ * supported lamp and its table are not a collision. Every other non-rug pair is.
+ */
+function hasNonRugCollision(scene: Scene) {
+  const supporters = supportRelations(scene);
+  const obstacles = scene.objects.filter(({ type }) => type !== "rug");
   for (let first = 0; first < obstacles.length; first += 1) {
     for (let second = first + 1; second < obstacles.length; second += 1) {
+      const left = obstacles[first]!;
+      const right = obstacles[second]!;
       if (
-        footprintsOverlap(
-          objectFootprint(obstacles[first]!),
-          objectFootprint(obstacles[second]!),
-        )
+        supporters.get(left.id) === right.id ||
+        supporters.get(right.id) === left.id
+      ) {
+        continue;
+      }
+      if (
+        footprintsOverlap(objectFootprint(left), objectFootprint(right))
       ) {
         return true;
       }
@@ -136,7 +147,7 @@ export function validateAndApplyPlacement(
             PLACEMENT_LIMITS.roomInsetM,
           ) || blocksOpening(next, object),
       ) ||
-      hasNonRugCollision(next.objects)
+      hasNonRugCollision(next)
     ) {
       return invalid(scene);
     }

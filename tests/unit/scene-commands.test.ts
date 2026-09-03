@@ -2,7 +2,11 @@ import { describe, expect, test } from "vitest";
 
 import { createDemoScene } from "../../src/demo/demo-scene";
 import { hasCirculationPath } from "../../src/features/placement/circulation";
-import { objectFootprint } from "../../src/features/placement/footprint-geometry";
+import {
+  footprintCorners,
+  footprintInsideRoom,
+  objectFootprint,
+} from "../../src/features/placement/footprint-geometry";
 import { proposeNaturalPlacement } from "../../src/features/placement/natural-placement";
 import type {
   NaturalPlacementResult,
@@ -15,6 +19,11 @@ import {
   type Scene,
   type SceneProduct,
 } from "../../src/features/scene/scene-schema";
+import {
+  restingY,
+  settleElevations,
+  supportOf,
+} from "../../src/features/scene/support";
 import { completedProductScene } from "../helpers/natural-placement-fixtures";
 
 const LIGHT_OAK_TABLE: SceneProduct = {
@@ -27,6 +36,18 @@ const LIGHT_OAK_TABLE: SceneProduct = {
   styleTags: ["japandi", "light-oak"],
   color: "light-oak",
   material: "oak",
+};
+
+const TABLE_LAMP_PRODUCT: SceneProduct = {
+  id: "linen-drum-table-lamp",
+  variantId: "demo-variant-linen-drum-table-lamp",
+  title: "Linen Drum Table Lamp",
+  category: "floor_lamp",
+  price: { amountMinor: 8900, currency: "USD" },
+  dimensionsCm: { width: 28, height: 46, depth: 28 },
+  styleTags: ["japandi", "linen", "table-height"],
+  color: "natural-flax",
+  material: "linen-and-oak",
 };
 
 const CHAIR_PRODUCT: SceneProduct = {
@@ -187,6 +208,123 @@ describe("applySceneCommand", () => {
     expect(lamp.position[2]).toBeGreaterThan(-2.5);
     expect(lamp.rotation[1]).toBeCloseTo(Math.PI / 2);
     expect(result.scene.revision).toBe(2);
+  });
+
+  test("keeps every corner of a rotated footprint inside the room", () => {
+    const seed = createDemoScene();
+    const rotated = applySceneCommand(seed, {
+      expectedRevision: 1,
+      actor: "human",
+      command: {
+        type: "move",
+        objectId: "sofa_01",
+        position: { x: 2.9, z: 2.3 },
+        rotationYDegrees: 45,
+      },
+    });
+
+    expect(rotated.ok).toBe(true);
+    if (!rotated.ok) return;
+    const sofa = rotated.scene.objects.find(({ id }) => id === "sofa_01")!;
+    // The centre clamp alone would leave the 2.0 x 0.9 m sofa's diagonal corners
+    // 0.6 m into the wall; the footprint clamp pulls the whole rectangle back.
+    expect(rotated.adjustedToFit).toBe(true);
+    expect(
+      footprintInsideRoom(objectFootprint(sofa), rotated.scene.room, 0.1),
+    ).toBe(true);
+    for (const corner of footprintCorners(objectFootprint(sofa))) {
+      expect(Math.abs(corner.x)).toBeLessThanOrEqual(rotated.scene.room.width / 2 - 0.1);
+      expect(Math.abs(corner.z)).toBeLessThanOrEqual(rotated.scene.room.depth / 2 - 0.1);
+    }
+    // Clamping never rejects: the sofa still moved toward the corner it was sent to.
+    expect(sofa.position[0]).toBeGreaterThan(0);
+    expect(sofa.position[2]).toBeGreaterThan(0);
+  });
+
+  test("centres a footprint wider than the room instead of rejecting the move", () => {
+    const seed = createDemoScene();
+    const wide = structuredClone(seed);
+    wide.objects.find(({ id }) => id === "sofa_01")!.dimensionsM = {
+      width: 9,
+      height: 0.85,
+      depth: 0.9,
+    };
+    const result = applySceneCommand(SceneSchema.parse(wide), {
+      expectedRevision: 1,
+      actor: "human",
+      command: { type: "move", objectId: "sofa_01", position: { x: 2, z: 0 } },
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const sofa = result.scene.objects.find(({ id }) => id === "sofa_01")!;
+    expect(sofa.position[0]).toBeCloseTo(0, 9);
+  });
+
+  test("raises a lamp onto the table it is moved over and drops it back off", () => {
+    const seed = createDemoScene();
+    const table = seed.objects.find(({ id }) => id === "table_01")!;
+    const onto = applySceneCommand(seed, {
+      expectedRevision: 1,
+      actor: "agent",
+      command: {
+        type: "move",
+        objectId: "lamp_01",
+        position: { x: table.position[0], z: table.position[2] },
+      },
+    });
+
+    expect(onto.ok).toBe(true);
+    if (!onto.ok) return;
+    const raised = onto.scene.objects.find(({ id }) => id === "lamp_01")!;
+    expect(supportOf(onto.scene, raised)?.id).toBe("table_01");
+    expect(raised.position[1]).toBeCloseTo(
+      table.dimensionsM.height + raised.dimensionsM.height / 2,
+      9,
+    );
+    // The reported position is the settled one, not the pre-settle request.
+    expect(onto.appliedPosition).toEqual(raised.position);
+
+    const away = applySceneCommand(onto.scene, {
+      expectedRevision: 2,
+      actor: "agent",
+      command: { type: "move", objectId: "lamp_01", position: { x: -2.5, z: 2 } },
+    });
+    expect(away.ok).toBe(true);
+    if (!away.ok) return;
+    const lowered = away.scene.objects.find(({ id }) => id === "lamp_01")!;
+    expect(supportOf(away.scene, lowered)).toBeNull();
+    expect(lowered.position[1]).toBeCloseTo(lowered.dimensionsM.height / 2, 9);
+  });
+
+  test("settles a replacement onto the table the object already stands on", () => {
+    const seed = createDemoScene();
+    const table = seed.objects.find(({ id }) => id === "table_01")!;
+    const moved = applySceneCommand(seed, {
+      expectedRevision: 1,
+      actor: "agent",
+      command: {
+        type: "move",
+        objectId: "lamp_01",
+        position: { x: table.position[0], z: table.position[2] },
+      },
+    });
+    expect(moved.ok).toBe(true);
+    if (!moved.ok) return;
+
+    const replaced = applySceneCommand(moved.scene, {
+      expectedRevision: 2,
+      actor: "agent",
+      command: {
+        type: "replace",
+        objectId: "lamp_01",
+        product: TABLE_LAMP_PRODUCT,
+      },
+    });
+    expect(replaced.ok).toBe(true);
+    if (!replaced.ok) return;
+    const lamp = replaced.scene.objects.find(({ id }) => id === "lamp_01")!;
+    expect(lamp.position[1]).toBeCloseTo(0.42 + 0.46 / 2, 9);
   });
 
   test("sets style intent and toggles preserve through successful commands", () => {
@@ -413,5 +551,83 @@ describe("validateAndApplyPlacement", () => {
       scene: parsed,
       reason: "invalid-input",
     });
+  });
+});
+
+describe("supportOf and restingY", () => {
+  function lampAt(scene: Scene, x: number, z: number) {
+    const lamp = scene.objects.find(({ id }) => id === "lamp_01")!;
+    lamp.position = [x, lamp.position[1], z];
+    return lamp;
+  }
+
+  test("supports a lamp whose centre is inside, on the edge of, or off the table", () => {
+    const scene = createDemoScene();
+    const table = scene.objects.find(({ id }) => id === "table_01")!;
+    const [tableX, , tableZ] = table.position;
+    const halfWidth = table.dimensionsM.width / 2;
+
+    expect(supportOf(scene, lampAt(scene, tableX, tableZ))?.id).toBe("table_01");
+    // Exactly on the edge counts as on the table.
+    expect(supportOf(scene, lampAt(scene, tableX + halfWidth, tableZ))?.id).toBe(
+      "table_01",
+    );
+    expect(
+      supportOf(scene, lampAt(scene, tableX + halfWidth + 0.01, tableZ)),
+    ).toBeNull();
+  });
+
+  test("respects the table's own rotation", () => {
+    const scene = createDemoScene();
+    const table = scene.objects.find(({ id }) => id === "table_01")!;
+    table.rotation = [0, Math.PI / 2, 0];
+    const [tableX, , tableZ] = table.position;
+    // Turned a quarter turn, the 1.2 x 0.6 m table reaches 0.6 m along z, not x.
+    expect(supportOf(scene, lampAt(scene, tableX, tableZ + 0.55))?.id).toBe(
+      "table_01",
+    );
+    expect(supportOf(scene, lampAt(scene, tableX + 0.55, tableZ))).toBeNull();
+  });
+
+  test("never supports a non-lamp, and never lets a table support itself", () => {
+    const scene = createDemoScene();
+    const table = scene.objects.find(({ id }) => id === "table_01")!;
+    const chair = scene.objects.find(({ id }) => id === "chair_01")!;
+    chair.position = [table.position[0], chair.position[1], table.position[2]];
+
+    expect(supportOf(scene, chair)).toBeNull();
+    expect(supportOf(scene, table)).toBeNull();
+  });
+
+  test("rests objects on the floor, on a rug offset, or on a supporter", () => {
+    const scene = createDemoScene();
+    const lamp = scene.objects.find(({ id }) => id === "lamp_01")!;
+    const rug = scene.objects.find(({ id }) => id === "rug_01")!;
+    const table = scene.objects.find(({ id }) => id === "table_01")!;
+
+    expect(restingY(lamp, null)).toBe(lamp.dimensionsM.height / 2);
+    expect(restingY(rug, null)).toBe(0.01);
+    expect(restingY(lamp, table)).toBe(
+      table.dimensionsM.height + lamp.dimensionsM.height / 2,
+    );
+  });
+
+  test("settles every elevation in one pass and returns the Scene unchanged when nothing moves", () => {
+    const scene = createDemoScene();
+    expect(settleElevations(scene)).toBe(scene);
+
+    const stacked = structuredClone(scene);
+    const table = stacked.objects.find(({ id }) => id === "table_01")!;
+    const lamp = stacked.objects.find(({ id }) => id === "lamp_01")!;
+    lamp.position = [table.position[0], 0, table.position[2]];
+    const settled = settleElevations(stacked);
+    expect(settled).not.toBe(stacked);
+    expect(
+      settled.objects.find(({ id }) => id === "lamp_01")!.position[1],
+    ).toBeCloseTo(table.dimensionsM.height + lamp.dimensionsM.height / 2, 9);
+    // Nothing else moved.
+    expect(
+      settled.objects.filter(({ id }) => id !== "lamp_01"),
+    ).toEqual(stacked.objects.filter(({ id }) => id !== "lamp_01"));
   });
 });

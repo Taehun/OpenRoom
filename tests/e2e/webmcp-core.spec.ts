@@ -333,6 +333,65 @@ test("completes WebMCP Core 6 against the shared demo Scene", async ({
   expect(chair?.rotation[1]).toBeCloseTo(Math.PI / 2, 9);
   expect(chair?.facing).toEqual({ x: -1, z: 0 });
 
+  // Spec §5: a lamp moved onto a table stands on it. The Scene reports the
+  // supporter, and the lamp's Y is the table height plus half the lamp height,
+  // well above the 0.42 m coffee-table top it now rests on.
+  const beforeStack = await page.evaluate(() =>
+    window.__webMcpTools.get_scene?.execute(
+      {},
+      { signal: new AbortController().signal },
+    ),
+  );
+  const stackScene = beforeStack?.structuredContent.data as
+    | {
+        objects: Array<{
+          id: string;
+          position: [number, number, number];
+          supportedBy: string | null;
+        }>;
+      }
+    | undefined;
+  const tableBefore = stackScene?.objects.find(
+    (object) => object.id === "table_01",
+  );
+  expect(
+    stackScene?.objects.find((object) => object.id === "lamp_01")?.supportedBy,
+  ).toBeNull();
+  const stackMove = await page.evaluate(
+    (state) =>
+      window.__webMcpTools.move_object?.execute(
+        {
+          objectId: "lamp_01",
+          position: { x: state.x, z: state.z },
+          expectedRevision: state.sceneRevision,
+          expectedStateVersion: state.stateVersion,
+        },
+        { signal: new AbortController().signal },
+      ),
+    {
+      x: tableBefore?.position[0] ?? 0,
+      z: tableBefore?.position[2] ?? 0,
+      sceneRevision: beforeStack?.structuredContent.sceneRevision ?? 0,
+      stateVersion: beforeStack?.structuredContent.stateVersion ?? 0,
+    },
+  );
+  expect(stackMove?.structuredContent.ok).toBe(true);
+  const stackedLamp = (
+    stackMove?.structuredContent.data as
+      | {
+          scene: {
+            objects: Array<{
+              id: string;
+              position: [number, number, number];
+              supportedBy: string | null;
+            }>;
+          };
+        }
+      | undefined
+  )?.scene.objects.find((object) => object.id === "lamp_01");
+  expect(stackedLamp?.supportedBy).toBe("table_01");
+  expect(stackedLamp?.position[1]).toBeGreaterThan(0.42);
+
   await page.getByRole("link", { name: "OpenRoom home" }).click();
   await expect(page).toHaveURL("/");
   // `/` is the dashboard whenever WebMCP is present, so it remounts the

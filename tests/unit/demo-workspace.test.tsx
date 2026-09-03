@@ -9,6 +9,8 @@ import {
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, expect, test, vi } from "vitest";
+import { createDemoScene } from "../../src/demo/demo-scene";
+import { ContextPanel } from "../../src/features/demo/context-panel";
 import { DemoWorkspace } from "../../src/features/demo/demo-workspace";
 import type { ModelContextTool } from "../../src/webmcp/tool-handlers";
 import {
@@ -744,4 +746,39 @@ test("discloses the selected object's facing and chosen view", async () => {
     .toHaveTextContent(
       "x −1.00 · z 0.00 · front-quarter · mirrored · approximate",
     );
+});
+
+// Spec §5: the inspector names the object a lamp stands on, and says nothing at all
+// when it stands on the floor.
+test("shows an On row only while the selected object is supported", () => {
+  const state = {
+    mode: "inspector" as const,
+    isCartOpen: false,
+    cartDraft: null,
+    toast: null,
+    announcement: null,
+  };
+  const floorScene = createDemoScene();
+  floorScene.selectedObjectId = "lamp_01";
+
+  const { unmount } = render(
+    <ContextPanel dispatch={() => {}} scene={floorScene} state={state} />,
+  );
+  expect(screen.queryByText("On")).toBeNull();
+  unmount();
+
+  const stackedScene = createDemoScene();
+  stackedScene.selectedObjectId = "lamp_01";
+  const table = stackedScene.objects.find(({ id }) => id === "table_01")!;
+  const lamp = stackedScene.objects.find(({ id }) => id === "lamp_01")!;
+  lamp.position = [
+    table.position[0],
+    table.dimensionsM.height + lamp.dimensionsM.height / 2,
+    table.position[2],
+  ];
+
+  render(<ContextPanel dispatch={() => {}} scene={stackedScene} state={state} />);
+  expect(screen.getByText("On").nextElementSibling).toHaveTextContent(
+    "Coffee table",
+  );
 });
