@@ -680,7 +680,7 @@ test("explains an insecure context instead of pairing", async () => {
 });
 
 // The seed table sits at x = 0, so the front-quarter tie resolves to the
-// mirrored twin and the inspector has to disclose that choice.
+// photographed cutout and the inspector has to name that view.
 test("discloses the selected object's facing and chosen view", async () => {
   const user = userEvent.setup();
   render(<DemoWorkspace />);
@@ -690,7 +690,8 @@ test("discloses the selected object's facing and chosen view", async () => {
     .closest("section");
   if (!inspector) throw new Error("Missing inspector section");
   const facing = within(inspector).getByText("Facing").nextElementSibling;
-  expect(facing).toHaveTextContent("x 0.00 · z 1.00 · front-quarter · mirrored");
+  expect(facing).toHaveTextContent("x 0.00 · z 1.00 · front-quarter");
+  expect(facing?.textContent).not.toContain("mirrored");
   expect(within(inspector).getByText("Rotation")).toBeVisible();
 
   const stage = screen.getByRole("region", { name: "Editable room photo" });

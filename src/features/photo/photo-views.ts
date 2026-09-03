@@ -16,10 +16,11 @@ import {
   PHOTO_VIEW_NAMES,
   angleBetweenDegrees,
   facingOf,
+  rotationYOf,
   type FacingVector,
   type PhotoViewName,
 } from "./photo-facing";
-import generatedManifest from "./photo-views.generated.json";
+import { GENERATED_VIEW_MANIFEST as manifest } from "./photo-views.generated";
 
 export type { RotationOption };
 
@@ -200,7 +201,7 @@ export const PHOTO_ASSET_SETS: Readonly<Record<string, PhotoAssetSet>> =
     buildPhotoAssetSets(
       PHOTO_ASSETS,
       PHOTO_ASSET_TYPES,
-      GeneratedViewManifestSchema.parse(generatedManifest),
+      GeneratedViewManifestSchema.parse(manifest),
     ),
   );
 
@@ -229,6 +230,12 @@ interface ViewCandidate {
   order: number;
 }
 
+/**
+ * Consults both sides on purpose: the object type keeps a rug or lamp from ever
+ * being turned even when it carries a mismatched `assetId`, and the set keeps a
+ * radial image from being mirrored. `viewFidelity` stays set-only because Task
+ * 4 scores bare facings against a set, with no object in hand.
+ */
 function isRadial(type: SceneObjectType, set: PhotoAssetSet | null): boolean {
   return PHOTO_VIEW_SYMMETRY[type] === "radial" || set?.symmetry === "radial";
 }
@@ -317,8 +324,9 @@ export function selectPhotoView(
     angleDegrees: candidateAngleDegrees(candidate, facing, set.symmetry),
   }));
   const closest = Math.min(...scored.map((entry) => entry.angleDegrees));
-  // A yaw-0 object matches the front-quarter pair equally; turn it inward.
-  const preferPositiveX = object.position[0] < 0;
+  // A yaw-0 object matches the front-quarter pair equally; turn it inward, and
+  // on the centre line keep the photographed orientation (spec 6 rule 4).
+  const preferPositiveX = object.position[0] <= 0;
   const best = scored
     .filter((entry) => entry.angleDegrees <= closest + TIE_DEGREES)
     .sort((left, right) =>
@@ -357,10 +365,13 @@ export function rotationOptionsFor(
   object: Pick<SceneObject, "rotation" | "type" | "assetId">,
   set: PhotoAssetSet | null,
 ): readonly RotationOption[] {
-  const current = object.rotation[1];
   if (set === null || isRadial(object.type, set)) {
-    return [{ rotationY: current, fidelity: 1 }];
+    return [{ rotationY: object.rotation[1], fidelity: 1 }];
   }
+
+  // The stage accumulates rotations without bounds, so fold the incumbent into
+  // (-π, π] before comparing it with the grid: 2π must not appear beside 0.
+  const current = rotationYOf(facingOf(object.rotation[1]));
 
   const options: RotationOption[] = [];
   for (let k = -3; k <= 4; k += 1) {

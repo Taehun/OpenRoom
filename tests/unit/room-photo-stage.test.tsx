@@ -866,33 +866,33 @@ describe("RoomPhotoStage", () => {
     expect(stage).toContainElement(table);
   });
 
-  // The seed table sits at x = 0, so the tie between the front-quarter pair
-  // resolves to the mirrored twin and every piece of floor chrome has to follow
-  // the mirrored anchor 1 - 0.5007 rather than the photographed 0.5007.
+  // The seed table sits at x = 0, where the tie between the front-quarter pair
+  // resolves to the photographed cutout, so every piece of floor chrome has to
+  // follow its native anchor 0.5007.
   test("anchors the object frame, floor marker, and rotation handle to the selected view", () => {
     const store = createSceneStore();
     store.getState().setToolMode("rotate");
     renderStage(store);
 
     const frame = screen.getByTestId("photo-object-frame-table_01");
-    expect(frame.dataset.photoMirrored).toBe("true");
-    expect(frame.style.getPropertyValue("--photo-anchor-x")).toBe("49.93%");
+    expect(frame.dataset.photoMirrored).toBe("false");
+    expect(frame.style.getPropertyValue("--photo-anchor-x")).toBe("50.07%");
     expect(frame.style.getPropertyValue("--photo-anchor-y")).toBe("86.13%");
     expect(frame.style.left).toBe("50%");
     expect(frame.style.top).toBe("74%");
-    expect(frame.style.transform).toBe("translate(-49.93%, -86.13%)");
-    expect(frame.style.transformOrigin).toBe("49.93% 86.13%");
+    expect(frame.style.transform).toBe("translate(-50.07%, -86.13%)");
+    expect(frame.style.transformOrigin).toBe("50.07% 86.13%");
     const floorAnchor = screen.getByTestId("photo-floor-anchor-table_01");
     const object = screen.getByRole("button", { name: "Coffee table" });
     const handle = screen.getByRole("button", { name: "Rotate Coffee table" });
     expect(frame).toContainElement(floorAnchor);
     expect(frame).toContainElement(handle);
-    expect(floorAnchor.style.left).toBe("49.93%");
+    expect(floorAnchor.style.left).toBe("50.07%");
     expect(floorAnchor.style.top).toBe("86.13%");
     expect(floorAnchor.style.transform).toBe("translate(-50%, -50%)");
     expect(object.style.width).toBe("100%");
     expect(object.style.transform).toBe("none");
-    expect(handle.style.left).toBe("49.93%");
+    expect(handle.style.left).toBe("50.07%");
     expect(handle.style.top).toBe("0px");
     expect(handle.style.transform).toBe("translate(-50%, -100%)");
   });

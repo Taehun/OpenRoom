@@ -14,7 +14,7 @@ import {
   viewFidelity,
   type PhotoAssetSet,
 } from "../../src/features/photo/photo-views";
-import manifest from "../../src/features/photo/photo-views.generated.json";
+import { GENERATED_VIEW_MANIFEST as manifest } from "../../src/features/photo/photo-views.generated";
 
 const sofaSet = () => PHOTO_ASSET_SETS["hinoki-low-sofa"]!;
 
@@ -138,6 +138,12 @@ describe("selectPhotoView", () => {
     expect(pick.anchorX).toBeCloseTo(1 - sofaSet().views[0]!.anchorX, 12);
   });
 
+  it("keeps the photographed cutout for an object on the centre line", () => {
+    const pick = selectPhotoView(objectAt(0, 0), sofaSet());
+    expect(pick.mirrored).toBe(false);
+    expect(pick.anchorX).toBe(sofaSet().views[0]!.anchorX);
+  });
+
   it("uses the native view for a right-turned object anywhere", () => {
     expect(
       selectPhotoView(objectAt(1.8, -Math.PI / 4), sofaSet()).mirrored,
@@ -216,6 +222,32 @@ describe("viewFidelity and rotation options", () => {
       .map((o) => Math.round((o.rotationY * 180) / Math.PI))
       .sort((a, b) => a - b);
     expect(degrees).toEqual([-135, -45, 0, 17, 45, 135, 180]);
+  });
+
+  it("keeps an uncovered current rotation scoreable but never preferred", () => {
+    const options = rotationOptionsFor(
+      {
+        rotation: [0, Math.PI / 2, 0],
+        type: "sofa",
+        assetId: "hinoki-low-sofa",
+      },
+      sofaSet(),
+    );
+    expect(options.at(-1)).toEqual({ rotationY: Math.PI / 2, fidelity: 0.01 });
+  });
+
+  it("folds an out-of-range current rotation into (-π, π]", () => {
+    const optionsAt = (rotationY: number) =>
+      rotationOptionsFor(
+        { rotation: [0, rotationY, 0], type: "sofa", assetId: "hinoki-low-sofa" },
+        sofaSet(),
+      );
+    expect(optionsAt(2 * Math.PI)).toEqual(optionsAt(0));
+    expect(optionsAt(-Math.PI)).toEqual(optionsAt(Math.PI));
+    expect(optionsAt(-Math.PI).at(-1)).toEqual({
+      rotationY: Math.PI,
+      fidelity: 0.01,
+    });
   });
 
   it("gives radial and unregistered objects only their current rotation at fidelity 1", () => {
