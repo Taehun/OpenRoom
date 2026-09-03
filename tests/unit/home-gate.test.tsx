@@ -142,7 +142,7 @@ describe("the one-screen guide", () => {
       "/demo",
     );
 
-    const repoLink = screen.getByRole("link", { name: "OpenRoom on GitHub" });
+    const repoLink = screen.getByRole("link", { name: /^OpenRoom on GitHub/ });
     expect(repoLink).toHaveAttribute(
       "href",
       "https://github.com/Taehun/OpenRoom",
@@ -240,7 +240,7 @@ describe("the one-screen guide", () => {
     const claudeCard = screen.getByRole("article", {
       name: "Claude Code & Claude Desktop",
     });
-    const copies = within(claudeCard).getAllByRole("button", { name: "Copy" });
+    const copies = within(claudeCard).getAllByRole("button", { name: /^Copy Claude/ });
     expect(copies).toHaveLength(2);
     // The client launches the companion: the first step registers it behind
     // the stderr-log wrapper, the second tails that log for the pair code.

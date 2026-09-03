@@ -230,7 +230,7 @@ describe("CartApprovalSheet in shopify mode", () => {
     fireEvent.click(
       screen.getByRole("button", { name: "Continue to Shopify · $518" }),
     );
-    const link = screen.getByRole("link", { name: "Open Shopify checkout" });
+    const link = screen.getByRole("link", { name: /^Open Shopify checkout/ });
     expect(link).toHaveAttribute("href", PERMALINK);
     expect(link).toHaveAttribute("target", "_blank");
     expect(link).toHaveAttribute("rel", "noopener noreferrer");
@@ -309,7 +309,7 @@ describe("CartApprovalSheet in shopify mode", () => {
         itemCount: 2,
       });
       expect(
-        screen.queryByRole("link", { name: "Open Shopify checkout" }),
+        screen.queryByRole("link", { name: /^Open Shopify checkout/ }),
       ).toBeNull();
     } finally {
       open.mockRestore();

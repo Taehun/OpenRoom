@@ -185,7 +185,7 @@ test("exposes six photo controls and six object-rail controls", () => {
 test("links the workspace header to the public repository", () => {
   render(<DemoWorkspace />);
 
-  const repoLink = screen.getByRole("link", { name: "OpenRoom on GitHub" });
+  const repoLink = screen.getByRole("link", { name: /^OpenRoom on GitHub/ });
   expect(repoLink).toHaveAttribute("href", "https://github.com/Taehun/OpenRoom");
   expect(repoLink).toHaveAttribute("target", "_blank");
   expect(repoLink.getAttribute("rel")).toContain("noopener");

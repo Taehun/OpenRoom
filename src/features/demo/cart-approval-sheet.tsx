@@ -272,7 +272,7 @@ export function CartApprovalSheet({
             Your browser blocked the new tab.{" "}
             <a href={blockedUrl} rel="noopener noreferrer" target="_blank">
               Open Shopify checkout
-            </a>
+            <span className={styles.visuallyHidden}> (opens in a new tab)</span></a>
           </p>
         ) : null}
 

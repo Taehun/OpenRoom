@@ -172,13 +172,21 @@ function BannerIcon({ ready }: { ready: boolean }) {
 }
 
 interface CopyButtonProps {
+  /** Accessible name when several buttons share the same visible label. */
+  accessibleLabel?: string | undefined;
   className: string;
   describedBy?: string | undefined;
   label: string;
   text: string;
 }
 
-function CopyButton({ className, describedBy, label, text }: CopyButtonProps) {
+function CopyButton({
+  accessibleLabel,
+  className,
+  describedBy,
+  label,
+  text,
+}: CopyButtonProps) {
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
@@ -188,8 +196,10 @@ function CopyButton({ className, describedBy, label, text }: CopyButtonProps) {
   }, [copied]);
 
   return (
+    <>
     <button
       aria-describedby={describedBy}
+      aria-label={accessibleLabel}
       className={className}
       onClick={() => {
         // Clipboard access is absent on insecure origins and can be denied.
@@ -208,6 +218,11 @@ function CopyButton({ className, describedBy, label, text }: CopyButtonProps) {
     >
       {copied ? "Copied" : label}
     </button>
+    {/* The label change alone is not announced; this is. */}
+    <span aria-atomic="true" aria-live="polite" className={styles.srOnly}>
+      {copied ? "Copied to the clipboard" : ""}
+    </span>
+    </>
   );
 }
 
@@ -303,6 +318,7 @@ function ConnectCard({ card }: { card: ConnectCardContent }) {
                     ))}
                   </code>
                   <CopyButton
+                    accessibleLabel={`Copy ${card.title} command ${index + 1}`}
                     className={`md-button md-button--text md-button--dense ${styles.stepCopy}`}
                     describedBy={`${baseId}-${index}`}
                     label="Copy"
@@ -360,7 +376,7 @@ export function WebMcpGuide({ onCheckAgain, status }: WebMcpGuideProps) {
               Connect an AI app
             </a>
             <a
-              aria-label="OpenRoom on GitHub"
+              aria-label="OpenRoom on GitHub (opens in a new tab)"
               className="md-icon-button"
               href={REPOSITORY_URL}
               rel="noopener noreferrer"
@@ -448,13 +464,14 @@ export function WebMcpGuide({ onCheckAgain, status }: WebMcpGuideProps) {
               target="_blank"
             >
               Commerce integration in the README
+              <span className={styles.srOnly}> (opens in a new tab)</span>
             </a>
           </details>
 
           <details className={styles.disclosure}>
             <summary className={styles.summary}>Open source</summary>
             <p className={styles.disclosureBody}>
-              {"OpenRoom is MIT-licensed: the deterministic solver, the photo compositor, and the WebMCP tools are all in the repository."}
+              {"OpenRoom is MIT-licensed: the photo compositor, the true-scale placement, and the WebMCP tools are all in the repository."}
             </p>
             <a
               className={styles.textLink}
@@ -463,6 +480,7 @@ export function WebMcpGuide({ onCheckAgain, status }: WebMcpGuideProps) {
               target="_blank"
             >
               Taehun/OpenRoom on GitHub
+              <span className={styles.srOnly}> (opens in a new tab)</span>
             </a>
           </details>
         </div>

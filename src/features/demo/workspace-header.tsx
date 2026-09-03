@@ -113,7 +113,7 @@ export function WorkspaceHeader({
           ) : null}
         </button>
         <a
-          aria-label="OpenRoom on GitHub"
+          aria-label="OpenRoom on GitHub (opens in a new tab)"
           className={`md-icon-button ${styles.repoLink}`}
           href={REPOSITORY_URL}
           rel="noopener noreferrer"
