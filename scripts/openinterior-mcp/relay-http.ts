@@ -93,6 +93,13 @@ export interface RelayHttpServerOptions {
    * would silently stop reissuing while every test stayed green.
    */
   onPairLockout?: () => void;
+  /**
+   * Called on every successful pair. Typed for the same reason `onPairLockout`
+   * is: the owning process resets its lockout backoff here, and a caller
+   * matching on a diagnostic string would keep backing off forever after one
+   * bad block while every test stayed green.
+   */
+  onPairSuccess?: () => void;
   /** Operator facing log sink; never receives secrets or tool payloads. */
   onDiagnostic?: (message: string) => void;
 }
@@ -247,6 +254,7 @@ export async function startRelayHttpServer(options: RelayHttpServerOptions): Pro
   const issue = options.issuePairCode ?? (() => registry.issuePairCode());
   const onDiagnostic = options.onDiagnostic ?? ((): void => {});
   const onPairLockout = options.onPairLockout ?? ((): void => {});
+  const onPairSuccess = options.onPairSuccess ?? ((): void => {});
 
   /**
    * Cached copy of the token minted by the last successful pair. It is only a
@@ -419,6 +427,7 @@ export async function startRelayHttpServer(options: RelayHttpServerOptions): Pro
       failedPairAttempts = 0;
       activeToken = paired.sessionToken;
       respond.json(200, paired);
+      onPairSuccess();
     } catch (error) {
       noteFailedPairAttempt();
       respond.fromError(error, "PAIR_REJECTED");

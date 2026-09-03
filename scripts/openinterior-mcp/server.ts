@@ -3,8 +3,9 @@ import { serveStdio, type StdioServerHandle } from "@modelcontextprotocol/server
 import { DEFAULT_RELAY_PORT } from "../../src/local-mcp/relay-protocol";
 import { getCoreToolManifestHash } from "../../src/webmcp/core-tool-manifest";
 import { createOpenInteriorMcpServer } from "./mcp-server";
+import { createPairCodeAnnouncer, type PairCodeAnnouncer } from "./pair-code-announcer";
 import { allowedOriginsFromEnv, startRelayHttpServer, type RelayHttpServer } from "./relay-http";
-import { REPAIRABLE_SESSION_CLOSURES, SessionRegistry, startExpirySweep } from "./session-registry";
+import { SessionRegistry, startExpirySweep } from "./session-registry";
 
 /**
  * Process entry point for the localhost MCP companion.
@@ -57,7 +58,7 @@ export function parseRelayPort(value: string | undefined): number {
 }
 
 async function main(): Promise<void> {
-  // Explicitly initialized: `teardown` closes over all four and may run before
+  // Explicitly initialized: `teardown` closes over all five and may run before
   // startup has filled any of them in.
   let registry: SessionRegistry | undefined = undefined;
   let relay: RelayHttpServer | undefined = undefined;
@@ -66,10 +67,24 @@ async function main(): Promise<void> {
   let stopping: Promise<void> | undefined = undefined;
 
   /**
+   * Every code is minted through the relay handle, which is also what clears the
+   * failed-attempt lockout, so there is never more than one live at a time. The
+   * announcer owns the rest of the policy: an immediate replacement when a
+   * session ends with nobody attached, and after a lockout a doubling delay with
+   * a per-process ceiling. `relay` is read late because the registry is built
+   * first and may already emit a diagnostic while it is still undefined.
+   */
+  const announcer: PairCodeAnnouncer = createPairCodeAnnouncer({
+    issue: () => relay?.issuePairCode() ?? null,
+    log,
+  });
+
+  /**
    * Releases whatever startup has built so far. Every step is idempotent, so it
    * is safe to run again for anything that was created after a signal raced it.
    */
   const teardown = async (): Promise<void> => {
+    announcer.stop();
     stopSweep?.();
     registry?.shutdown();
     await relay?.close().catch((error: unknown) => {
@@ -108,23 +123,6 @@ async function main(): Promise<void> {
   // of the Core 6 manifest, so a page from a different build cannot attach.
   const manifestHash = await getCoreToolManifestHash();
 
-  /**
-   * Mints the single active code through the relay, which is also what clears
-   * the failed-attempt lockout. Minting replaces any unused previous code, so
-   * there is never more than one live at a time. A failure here must not break
-   * whatever request produced the diagnostic, so it is reported and swallowed.
-   */
-  const announcePairCode = (): void => {
-    if (!relay) return;
-    try {
-      const { code, expiresAt } = relay.issuePairCode();
-      log(`pairing code ${code} expires ${new Date(expiresAt).toISOString()}`);
-      log('enter it in OpenInterior\'s "Pairing code" field, then press "Connect Claude"');
-    } catch (error) {
-      log(`could not issue a pair code: ${error instanceof Error ? error.message : String(error)}`);
-    }
-  };
-
   registry = new SessionRegistry({
     manifestHash,
     allowedOrigins,
@@ -133,7 +131,7 @@ async function main(): Promise<void> {
       // A code is single use, so a page that disconnects or times out spends the
       // only way back in. Replacing it here is what lets an operator re-pair
       // without restarting the companion and its MCP client.
-      if (REPAIRABLE_SESSION_CLOSURES.has(message)) announcePairCode();
+      announcer.onSessionDiagnostic(message);
     },
   });
 
@@ -148,15 +146,17 @@ async function main(): Promise<void> {
     port,
     allowedOrigins,
     onDiagnostic: log,
-    // A retired code would otherwise strand the operator with no way to pair;
-    // minting the replacement here is also what clears the attempt counter.
-    onPairLockout: announcePairCode,
+    // A retired code would otherwise strand the operator with no way to pair,
+    // but replacing it at once would also hand a guesser a fresh code every
+    // five attempts, so the announcer delays and ultimately stops replacing it.
+    onPairLockout: () => announcer.onPairLockout(),
+    onPairSuccess: () => announcer.onPairSuccess(),
   });
   if (stopping) return teardown();
 
   log(`relay listening on http://${relay.address}:${relay.port}`);
   log(`allowed page origins: ${[...allowedOrigins].join(", ")}`);
-  announcePairCode();
+  announcer.announce();
 
   stdio = serveStdio(() => createOpenInteriorMcpServer(registry as SessionRegistry), {
     onerror: (error) => log(`stdio transport error: ${error.message}`),

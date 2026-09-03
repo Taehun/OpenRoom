@@ -206,6 +206,7 @@ function expectPairRejected(probe: Probe, secrets: string[] = []): void {
 async function startRelay(
   longPollMs = TEST_LONG_POLL_MS,
   onPairLockout?: () => void,
+  onPairSuccess?: () => void,
 ): Promise<RelayHttpServer> {
   registry = new SessionRegistry({
     manifestHash: MANIFEST_HASH,
@@ -220,6 +221,7 @@ async function startRelay(
     allowedOrigins: ALLOWED_ORIGINS,
     longPollMs,
     onPairLockout,
+    onPairSuccess,
     onDiagnostic: (message) => diagnostics.push(message),
   });
   relays.push(relay);
@@ -406,6 +408,26 @@ describe("pair attempt throttling", () => {
       expectPairRejected(await postPair(pairBody({ code: wrongFor(second.code) })), [second.code]);
     }
     expect(lockouts).toBe(2);
+  });
+
+  it("calls onPairSuccess only when a page actually pairs", async () => {
+    // The lockout backoff resets on this hook. Matching a diagnostic string
+    // instead would leave the delay growing forever after one bad block, so the
+    // hook is typed for the same reason `onPairLockout` is.
+    let successes = 0;
+    const hooked = await startRelay(TEST_LONG_POLL_MS, undefined, () => {
+      successes += 1;
+    });
+
+    const issued = hooked.issuePairCode();
+    expectPairRejected(await postPair(pairBody({ code: issued.code === "111111" ? "222222" : "111111" })), [
+      issued.code,
+    ]);
+    expect(successes).toBe(0);
+
+    const paired = await postPair(pairBody({ code: issued.code }));
+    expect(paired.status).toBe(200);
+    expect(successes).toBe(1);
   });
 
   it("allows the correct code while attempts remain", async () => {

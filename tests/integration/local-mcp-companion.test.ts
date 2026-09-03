@@ -10,6 +10,10 @@ import { StdioClientTransport } from "@modelcontextprotocol/client/stdio";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { relayCallFailure } from "../../src/local-mcp/page-relay-client";
+import {
+  LOCKOUT_REISSUE_BASE_DELAY_MS,
+  MAX_LOCKOUT_REISSUES,
+} from "../../scripts/openinterior-mcp/pair-code-announcer";
 import { MAX_PAIR_ATTEMPTS } from "../../scripts/openinterior-mcp/relay-http";
 import {
   CORE_TOOL_MANIFEST,
@@ -510,6 +514,91 @@ describe("local MCP companion", () => {
 });
 
 describe("pair code lockout", () => {
+  /**
+   * Spawns a companion on an ephemeral port and hands back its stderr log, the
+   * fake page, and a helper that burns the whole attempt budget against the
+   * live code. Callers must call `stop()`; nothing here may outlive the test.
+   */
+  async function startLockoutHarness(): Promise<{
+    log: string[];
+    page: FakePage;
+    burnAttempts: (liveCode: string) => Promise<void>;
+    stop: () => Promise<void>;
+  }> {
+    const child: ChildProcess = spawn(
+      process.execPath,
+      ["--import", "tsx", "scripts/openinterior-mcp/server.ts"],
+      {
+        cwd: REPO_ROOT,
+        env: inheritedEnv({
+          OPENINTERIOR_MCP_PORT: "0",
+          OPENINTERIOR_ALLOWED_ORIGINS: PAGE_ORIGIN,
+        }) as NodeJS.ProcessEnv,
+        stdio: ["pipe", "pipe", "pipe"],
+      },
+    );
+    const log: string[] = [];
+    const started = readStartup(child.stderr as unknown as Stream, log);
+    const stop = async (): Promise<void> => {
+      const exited = new Promise<void>((resolve) => child.once("exit", () => resolve()));
+      child.kill("SIGINT");
+      await Promise.race([exited, new Promise((resolve) => setTimeout(resolve, 3_000))]);
+      if (child.exitCode === null) child.kill("SIGKILL");
+    };
+
+    try {
+      const { port } = await started;
+      const manifestHash = await getCoreToolManifestHash();
+      const page = new FakePage(`http://127.0.0.1:${port}`);
+      const burnAttempts = async (liveCode: string): Promise<void> => {
+        for (let attempt = 0; attempt < MAX_PAIR_ATTEMPTS; attempt += 1) {
+          const guess = String(attempt).repeat(6);
+          const response = await page.pair({
+            code: guess === liveCode ? "999999" : guess,
+            origin: PAGE_ORIGIN,
+            manifestHash,
+            pageNonce: pageNonce(),
+          });
+          expect(response.status).toBe(403);
+        }
+      };
+      return { log, page, burnAttempts, stop };
+    } catch (error) {
+      await stop();
+      throw error;
+    }
+  }
+
+  it("makes each consecutive lockout wait longer for its replacement", async () => {
+    const { log, burnAttempts, stop } = await startLockoutHarness();
+
+    try {
+      const first = await waitForPairCode(log, 1);
+      await burnAttempts(first);
+      // The first replacement is delayed too, so guessing can never run at the
+      // speed of the network.
+      await new Promise((resolve) => setTimeout(resolve, LOCKOUT_REISSUE_BASE_DELAY_MS / 2));
+      expect(pairCodes(log)).toHaveLength(1);
+
+      const second = await waitForPairCode(log, 2);
+      expect(second).not.toBe(first);
+
+      await burnAttempts(second);
+      const lockedOutAt = Date.now();
+      // Twice the first delay: a replacement inside the first window would mean
+      // the backoff is flat and the cost of a guessing block never grows.
+      await new Promise((resolve) => setTimeout(resolve, LOCKOUT_REISSUE_BASE_DELAY_MS + 200));
+      expect(pairCodes(log)).toHaveLength(2);
+
+      const third = await waitForPairCode(log, 3);
+      expect(third).not.toBe(second);
+      expect(Date.now() - lockedOutAt).toBeGreaterThanOrEqual(LOCKOUT_REISSUE_BASE_DELAY_MS);
+      expect(log.join("")).toContain(`of ${MAX_LOCKOUT_REISSUES}`);
+    } finally {
+      await stop();
+    }
+  }, 30_000);
+
   it("prints a replacement the operator can pair with", async () => {
     const child: ChildProcess = spawn(
       process.execPath,
