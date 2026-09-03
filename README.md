@@ -141,9 +141,13 @@ git status --short
 
 ## Environment variables
 
-Copy `.env.example` to `.env.local` and set only what you need. Every variable is
-public and inlined at build time (`NEXT_PUBLIC_*`), so rebuild after changing
-one. Nook never needs a Shopify access token.
+Copy `.env.example` to `.env.local` and set only what you need. The three
+commerce variables (`NEXT_PUBLIC_*`) are inlined into the client bundle at build
+time: both `next build` (`pnpm build:next`) and `vinext build` (`pnpm build`)
+read them from the environment that runs the build, so set them there and
+rebuild to change them. `ASSET_PROVIDER` is a reserved value that nothing reads
+today. Cloudflare Worker `vars` are runtime-only and never reach the client
+bundle. Nook never needs a Shopify access token.
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
