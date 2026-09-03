@@ -38,6 +38,13 @@ export function demoReducer(state: DemoState, action: DemoAction): DemoState {
         cartDraft: null,
         announcement: "Demo only — no external cart was created.",
       };
+    case "open-external-checkout":
+      return {
+        ...state,
+        isCartOpen: false,
+        cartDraft: null,
+        announcement: `Opened Shopify checkout in a new tab (${action.itemCount} item${action.itemCount === 1 ? "" : "s"})`,
+      };
     case "undo":
       return { ...state, mode: "inspector", toast: null };
     case "reset":

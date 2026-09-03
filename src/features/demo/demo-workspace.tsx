@@ -231,7 +231,11 @@ function DemoWorkspaceContent({ commerce }: { commerce: CommerceContext }) {
       </div>
 
       {state.isCartOpen ? (
-        <CartApprovalSheet dispatch={routeAction} draft={state.cartDraft} />
+        <CartApprovalSheet
+          commerce={commerce}
+          dispatch={routeAction}
+          draft={state.cartDraft}
+        />
       ) : null}
     </div>
   );

@@ -1,13 +1,30 @@
-import { useEffect, useRef, type Dispatch, type KeyboardEvent } from "react";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type Dispatch,
+  type KeyboardEvent,
+} from "react";
 import { CART_ITEMS } from "./demo-data";
 import type { DemoAction } from "./demo-types";
 import { NookIcon } from "./nook-icon";
 import styles from "./demo-workspace.module.css";
 import type { CartApprovalDraft } from "../../webmcp/tool-context";
+import type { CommerceContext, CommerceDraft } from "../commerce/commerce-types";
+import { buildCommerceDraft } from "../commerce/shopify-cart";
 
 interface CartApprovalSheetProps {
+  commerce: CommerceContext;
   dispatch: Dispatch<DemoAction>;
   draft?: CartApprovalDraft | null;
+  openWindow?: (url: string) => Window | null;
+}
+
+export function openInNewTab(url: string): Window | null {
+  const opened = window.open(url, "_blank");
+  if (opened) opened.opener = null;
+  return opened;
 }
 
 function formatPrice(priceMinor: number) {
@@ -19,13 +36,75 @@ const CART_TOTAL_MINOR = CART_ITEMS.reduce(
   0,
 );
 
+interface SheetLine {
+  key: string;
+  productId: string;
+  title: string;
+  detail: string;
+  priceMinor: number;
+}
+
 export function CartApprovalSheet({
+  commerce,
   dispatch,
   draft,
+  openWindow = openInNewTab,
 }: CartApprovalSheetProps) {
   const closeButtonRef = useRef<HTMLButtonElement>(null);
-  const totalMinor = draft?.totalMinor ?? CART_TOTAL_MINOR;
+  const [blockedUrl, setBlockedUrl] = useState<string | null>(null);
+  const isShopify = commerce.config.provider === "shopify";
+
+  const lines = useMemo<SheetLine[]>(
+    () =>
+      draft
+        ? draft.items.map((item) => ({
+            key: item.objectId,
+            productId: item.productId,
+            title: item.title,
+            detail: `Qty ${item.quantity} · Scene product`,
+            priceMinor: item.price.amountMinor,
+          }))
+        : CART_ITEMS.map((item) => ({
+            key: item.id,
+            productId: item.id,
+            title: item.name,
+            detail: "Qty 1 · Demo fixture",
+            priceMinor: item.priceMinor,
+          })),
+    [draft],
+  );
+
+  const commerceDraft = useMemo<CommerceDraft | null>(() => {
+    if (!isShopify) return null;
+    if (draft) return draft.commerce ?? null;
+    return buildCommerceDraft(
+      commerce,
+      CART_ITEMS.map(({ id }) => ({ productId: id, quantity: 1 })),
+    );
+  }, [commerce, draft, isShopify]);
+
+  const mappedProductIds = useMemo(
+    () => new Set(commerceDraft?.lines.map(({ productId }) => productId) ?? []),
+    [commerceDraft],
+  );
+  const skippedProductIds = useMemo(
+    () =>
+      new Set(commerceDraft?.skipped.map(({ productId }) => productId) ?? []),
+    [commerceDraft],
+  );
+
+  const totalMinor = isShopify
+    ? lines
+        .filter(({ productId }) => mappedProductIds.has(productId))
+        .reduce((total, line) => total + line.priceMinor, 0)
+    : (draft?.totalMinor ?? CART_TOTAL_MINOR);
   const total = formatPrice(totalMinor);
+  const checkoutUrl = commerceDraft?.checkoutPermalink ?? null;
+  const canCheckout = isShopify && checkoutUrl !== null;
+  const storeDomain =
+    commerce.config.provider === "shopify" ? commerce.config.storeDomain : null;
+  const buttonLabel =
+    draft && !isShopify ? "Approve Scene cart" : "Continue to Shopify";
 
   useEffect(() => {
     closeButtonRef.current?.focus();
@@ -59,6 +138,23 @@ export function CartApprovalSheet({
     }
   }
 
+  function handleContinue() {
+    if (!isShopify) {
+      dispatch({ type: "confirm-demo-cart" });
+      return;
+    }
+    if (!commerceDraft || checkoutUrl === null) return;
+    const opened = openWindow(checkoutUrl);
+    if (opened === null) {
+      setBlockedUrl(checkoutUrl);
+      return;
+    }
+    dispatch({
+      type: "open-external-checkout",
+      itemCount: commerceDraft.lines.length,
+    });
+  }
+
   return (
     <div className={styles.sheetLayer}>
       <div className={styles.sheetScrim} aria-hidden="true" />
@@ -87,43 +183,41 @@ export function CartApprovalSheet({
         </header>
 
         <p className={styles.sheetIntro}>
-          {draft
-            ? `Nook has prepared ${draft.items.length} Scene item${draft.items.length === 1 ? "" : "s"} from Scene revision ${draft.sceneRevision} for your approval. Nothing has been sent to Shopify.`
-            : "Nook has prepared these four fixtures for your approval. Nothing has been sent to Shopify."}
+          {isShopify
+            ? "Approving opens Shopify checkout in a new tab. Nook sends nothing itself."
+            : draft
+              ? `Nook has prepared ${draft.items.length} Scene item${draft.items.length === 1 ? "" : "s"} from Scene revision ${draft.sceneRevision} for your approval. Nothing has been sent to Shopify.`
+              : "Nook has prepared these four fixtures for your approval. Nothing has been sent to Shopify."}
         </p>
 
         <ul className={styles.cartItems}>
-          {draft
-            ? draft.items.map((item, index) => (
-                <li key={item.objectId}>
-                  <span className={styles.cartThumbnail} aria-hidden="true">
-                    {String(index + 1).padStart(2, "0")}
-                  </span>
-                  <span className={styles.cartItemCopy}>
-                    <strong>{item.title}</strong>
-                    <small>Qty {item.quantity} · Scene product</small>
-                  </span>
-                  <strong>{formatPrice(item.price.amountMinor)}</strong>
-                </li>
-              ))
-            : CART_ITEMS.map((item, index) => (
-                <li key={item.id}>
-                  <span className={styles.cartThumbnail} aria-hidden="true">
-                    {String(index + 1).padStart(2, "0")}
-                  </span>
-                  <span className={styles.cartItemCopy}>
-                    <strong>{item.name}</strong>
-                    <small>Qty 1 · Demo fixture</small>
-                  </span>
-                  <strong>{formatPrice(item.priceMinor)}</strong>
-                </li>
-              ))}
+          {lines.map((line, index) => (
+            <li key={line.key}>
+              <span className={styles.cartThumbnail} aria-hidden="true">
+                {String(index + 1).padStart(2, "0")}
+              </span>
+              <span className={styles.cartItemCopy}>
+                <strong>{line.title}</strong>
+                <small>{line.detail}</small>
+                {isShopify && skippedProductIds.has(line.productId) ? (
+                  <small className={styles.cartSkipped}>
+                    Not mapped to a Shopify variant
+                  </small>
+                ) : null}
+              </span>
+              <strong>{formatPrice(line.priceMinor)}</strong>
+            </li>
+          ))}
         </ul>
 
         <div className={styles.cartTotal}>
           <span>
             <strong>Estimated total</strong>
-            <small>Taxes and delivery calculated later</small>
+            <small>
+              {isShopify
+                ? "Mapped items only · taxes and delivery calculated by Shopify"
+                : "Taxes and delivery calculated later"}
+            </small>
           </span>
           <strong>{total} USD</strong>
         </div>
@@ -131,23 +225,36 @@ export function CartApprovalSheet({
         <div className={styles.sheetDisclosure}>
           <span aria-hidden="true">i</span>
           <p>
-            UI-only approval. Continuing closes this sheet and creates no
-            external cart or network request.
+            {isShopify && storeDomain
+              ? `Checkout opens on ${storeDomain} in a new tab. Nook stores no Shopify credentials and makes no request of its own.`
+              : "UI-only approval. Continuing closes this sheet and creates no external cart or network request."}
           </p>
         </div>
 
+        {isShopify && !canCheckout ? (
+          <p className={styles.sheetNotice} role="status">
+            No item in this cart is mapped to a Shopify variant yet.
+          </p>
+        ) : null}
+
+        {blockedUrl ? (
+          <p className={styles.sheetNotice} role="status">
+            Your browser blocked the new tab.{" "}
+            <a href={blockedUrl} rel="noopener noreferrer" target="_blank">
+              Open Shopify checkout
+            </a>
+          </p>
+        ) : null}
+
         <div className={styles.sheetActions}>
           <button
-            aria-label={
-              draft
-                ? `Approve Scene cart · ${total}`
-                : "Continue to Shopify · $626"
-            }
+            aria-label={`${buttonLabel} · ${total}`}
             className={styles.commerceButton}
-            onClick={() => dispatch({ type: "confirm-demo-cart" })}
+            disabled={isShopify && !canCheckout}
+            onClick={handleContinue}
             type="button"
           >
-            <span>{draft ? "Approve Scene cart" : "Continue to Shopify"}</span>
+            <span>{buttonLabel}</span>
             <strong>{total}</strong>
           </button>
           <button
