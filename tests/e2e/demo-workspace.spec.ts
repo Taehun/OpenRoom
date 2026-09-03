@@ -137,11 +137,34 @@ test("completes the deterministic spatial commerce UI journey", async ({
   await expect(
     page.getByRole("status", { name: "Scene diagnostics" }),
   ).toContainText("Revision 1 · table_01 · placeholder");
-  await page.getByRole("button", { name: "View cart" }).click();
+  // The cart is the room. The reset seed room holds placeholders only, so the
+  // header carries no badge and the sheet says so instead of inventing lines.
+  const viewCart = page.getByRole("button", { name: "View cart" });
+  await expect(viewCart).toHaveText("View cart");
+  await viewCart.click();
   const dialog = page.getByRole("dialog", { name: "Review your room" });
-  await expect(dialog.getByRole("listitem")).toHaveCount(4);
+  await expect(dialog.getByRole("listitem")).toHaveCount(0);
   await expect(
-    dialog.getByRole("button", { name: "Approve demo cart · $626" }),
+    dialog.getByText(
+      "Nothing to order yet. Add products with Find alternatives or ask your AI app.",
+    ),
+  ).toBeVisible();
+  await expect(
+    dialog.getByRole("button", { name: "Approve demo cart", exact: true }),
+  ).toBeDisabled();
+  await page.keyboard.press("Escape");
+  await expect(dialog).toBeHidden();
+
+  // Put one catalog product in the room and the cart follows it.
+  await page.getByRole("button", { name: "Find alternatives" }).click();
+  await page.getByRole("button", { name: "Preview Oak Frame Table" }).click();
+  await expect(viewCart).toHaveText("View cart1");
+  await viewCart.click();
+  await expect(dialog.getByRole("listitem")).toHaveCount(1);
+  await expect(dialog.getByText("Oak Frame Table")).toBeVisible();
+  await expect(dialog.getByText("$169 USD")).toBeVisible();
+  await expect(
+    dialog.getByRole("button", { name: "Approve demo cart · $169" }),
   ).toBeInViewport();
   await page.keyboard.press("Escape");
   await expect(dialog).toBeHidden();

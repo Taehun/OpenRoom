@@ -640,7 +640,7 @@ test("redesigns the whole photo room through Core 6 and preserves human transfor
   for (const { title } of REPLACEMENTS) {
     await expect(dialog.getByText(title)).toBeVisible();
   }
-  await dialog.getByRole("button", { name: /Approve Scene cart/ }).click();
+  await dialog.getByRole("button", { name: /Approve demo cart/ }).click();
   await expect(dialog).toBeHidden();
   expect(await page.evaluate(() => window.__photoFetchCount)).toBe(0);
   trackCartRequests = false;

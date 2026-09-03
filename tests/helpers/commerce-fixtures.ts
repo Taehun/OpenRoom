@@ -25,12 +25,13 @@ export const FIXTURE_VARIANTS: ShopifyVariantMap = {
 };
 
 /**
- * The three mappings the Shopify-mode dev server is started with
+ * The catalog products the Shopify-mode dev server is started with
  * (`playwright.commerce.config.ts`), so the E2E and the unit fixtures cannot
- * drift apart.
+ * drift apart. Every other catalog product stays unmapped on purpose: the
+ * journeys need a skipped line to render.
  */
 export const FIXTURE_VARIANT_OVERRIDES = (
-  ["coffee-table", "rug", "oak-frame-table"] as const
+  ["oak-frame-table", "woven-jute-rug"] as const
 )
   .map((productId) => `${productId}=${fixtureGid(productId)}`)
   .join(",");

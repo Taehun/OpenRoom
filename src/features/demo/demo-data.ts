@@ -1,4 +1,4 @@
-import type { DemoCartItem, DemoProduct } from "./demo-types";
+import type { DemoProduct } from "./demo-types";
 
 export const PRODUCT_IDS_BY_CATEGORY = {
   sofa: [
@@ -602,11 +602,4 @@ export const DEMO_PRODUCTS: readonly DemoProduct[] = [
     description:
       "An open-backed hinoki case that reads light against a plain wall.",
   },
-];
-
-export const CART_ITEMS: readonly DemoCartItem[] = [
-  { id: "coffee-table", name: "Coffee Table", priceMinor: 18900 },
-  { id: "floor-lamp", name: "Floor Lamp", priceMinor: 12900 },
-  { id: "rug", name: "Rug", priceMinor: 24900 },
-  { id: "plant", name: "Plant", priceMinor: 5900 },
 ];

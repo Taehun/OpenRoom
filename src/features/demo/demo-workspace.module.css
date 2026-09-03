@@ -1246,6 +1246,16 @@
   font-size: 0.61rem;
 }
 
+.cartEmpty {
+  margin: 0;
+  padding: 22px 0;
+  border-top: 1px solid var(--warm-divider);
+  border-bottom: 1px solid var(--warm-divider);
+  color: var(--muted-text);
+  font-size: 0.72rem;
+  line-height: 1.5;
+}
+
 .cartTotal {
   display: flex;
   align-items: center;

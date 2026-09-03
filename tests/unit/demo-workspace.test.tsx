@@ -219,21 +219,54 @@ test("uses Scene selection without incrementing revision", async () => {
   ).toHaveTextContent("Revision 1 · chair_01 · placeholder");
 });
 
-test("opens a four-item approval sheet and confirms without an external cart request", async () => {
-  const fetchSpy = vi.spyOn(globalThis, "fetch");
+/** Puts one catalog product in the seed room through the product rail. */
+async function previewOakFrameTable(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(screen.getByRole("button", { name: "Find alternatives" }));
+  await user.click(
+    screen.getByRole("button", { name: "Preview Oak Frame Table" }),
+  );
+}
+
+test("opens an empty cart for a room that holds no catalog product yet", async () => {
   const user = userEvent.setup();
   render(<DemoWorkspace />);
 
+  // The seed room is placeholders only, so the badge is absent, not zero.
   const viewCart = screen.getByRole("button", { name: "View cart" });
+  expect(within(viewCart).queryByText(/^\d+$/)).toBeNull();
   await user.click(viewCart);
 
   const sheet = screen.getByRole("dialog", { name: "Review your room" });
-  expect(within(sheet).getAllByRole("listitem")).toHaveLength(4);
-  expect(within(sheet).getByText("$626 USD")).toBeVisible();
+  expect(within(sheet).queryAllByRole("listitem")).toHaveLength(0);
+  expect(
+    within(sheet).getByText(
+      "Nothing to order yet. Add products with Find alternatives or ask your AI app.",
+    ),
+  ).toBeVisible();
+  expect(
+    within(sheet).getByRole("button", { name: "Approve demo cart" }),
+  ).toBeDisabled();
+});
+
+test("counts the room's products in the badge and approves them without an external cart request", async () => {
+  const fetchSpy = vi.spyOn(globalThis, "fetch");
+  const user = userEvent.setup();
+  render(<DemoWorkspace />);
+  await previewOakFrameTable(user);
+
+  const viewCart = screen.getByRole("button", { name: "View cart" });
+  expect(within(viewCart).getByText("1")).toBeVisible();
+  await user.click(viewCart);
+
+  const sheet = screen.getByRole("dialog", { name: "Review your room" });
+  expect(within(sheet).getAllByRole("listitem")).toHaveLength(1);
+  expect(within(sheet).getByText("Oak Frame Table")).toBeVisible();
+  expect(within(sheet).getByText("Qty 1")).toBeVisible();
+  expect(within(sheet).getByText("$169 USD")).toBeVisible();
 
   await user.click(
     within(sheet).getByRole("button", {
-      name: "Approve demo cart · $626",
+      name: "Approve demo cart · $169",
     }),
   );
 
@@ -250,6 +283,7 @@ test("opens a four-item approval sheet and confirms without an external cart req
 test("keeps keyboard focus inside the cart approval sheet", async () => {
   const user = userEvent.setup();
   render(<DemoWorkspace />);
+  await previewOakFrameTable(user);
 
   await user.click(screen.getByRole("button", { name: "View cart" }));
 
@@ -258,7 +292,7 @@ test("keeps keyboard focus inside the cart approval sheet", async () => {
     name: "Close cart review",
   });
   const continueToShopify = within(sheet).getByRole("button", {
-    name: "Approve demo cart · $626",
+    name: "Approve demo cart · $169",
   });
   const keepEditing = within(sheet).getByRole("button", {
     name: "Keep editing",

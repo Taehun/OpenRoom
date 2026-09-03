@@ -3,8 +3,8 @@ import type { ShopifyVariantMap } from "./commerce-types";
 export const SHOPIFY_VARIANT_GID_PATTERN = /^gid:\/\/shopify\/ProductVariant\/(\d+)$/;
 
 // Fill these with your store's variant GIDs, or set NEXT_PUBLIC_SHOPIFY_VARIANTS.
-// Keys are demo catalog product ids (src/features/demo/demo-data.ts) followed by
-// the four human fixture cart item ids. Never commit a real store's GIDs here.
+// Keys are the demo catalog product ids (src/features/demo/demo-data.ts) — the
+// only things a cart can hold. Never commit a real store's GIDs here.
 export const SHOPIFY_VARIANTS: ShopifyVariantMap = {
   "hinoki-low-sofa": null,
   "boucle-curve-sofa": null,
@@ -49,10 +49,6 @@ export const SHOPIFY_VARIANTS: ShopifyVariantMap = {
   "white-oak-cube-storage": null,
   "steel-and-ash-etagere": null,
   "hinoki-open-bookcase": null,
-  "coffee-table": null,
-  "floor-lamp": null,
-  rug: null,
-  plant: null,
 };
 
 export interface VariantIssue {

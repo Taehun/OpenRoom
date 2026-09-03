@@ -22,6 +22,13 @@ function formatRoomTotal(totalMinor: number) {
   return `$${Math.round(totalMinor / 100).toLocaleString("en-US")}`;
 }
 
+/** The cart is the room, so the badge counts product-backed objects only. */
+function cartCountOf(scene: Scene): number {
+  return scene.objects.filter(
+    (object) => object.source === "product" && object.product,
+  ).length;
+}
+
 export function WorkspaceHeader({
   cartButtonRef,
   canUndo,
@@ -31,6 +38,8 @@ export function WorkspaceHeader({
   roomTotalMinor,
   scene,
 }: WorkspaceHeaderProps) {
+  const cartCount = cartCountOf(scene);
+
   return (
     <header className={styles.header}>
       <div className={styles.brandBlock}>
@@ -97,9 +106,11 @@ export function WorkspaceHeader({
         >
           <OpenRoomIcon name="cart" />
           <span>View cart</span>
-          <span className={styles.cartCount} aria-hidden="true">
-            4
-          </span>
+          {cartCount > 0 ? (
+            <span className={styles.cartCount} aria-hidden="true">
+              {cartCount}
+            </span>
+          ) : null}
         </button>
         <a
           aria-label="OpenRoom on GitHub"

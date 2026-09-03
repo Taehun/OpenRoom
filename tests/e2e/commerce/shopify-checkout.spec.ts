@@ -8,7 +8,7 @@ import {
 
 const STORE = PLACEHOLDER_STORE_DOMAIN;
 const APP_ORIGIN = "http://127.0.0.1:3001";
-const FIXTURE_PERMALINK = `https://${STORE}/cart/${FIXTURE_VARIANT_IDS["coffee-table"]}:1,${FIXTURE_VARIANT_IDS.rug}:1`;
+const ROOM_PERMALINK = `https://${STORE}/cart/${FIXTURE_VARIANT_IDS["oak-frame-table"]}:1,${FIXTURE_VARIANT_IDS["woven-jute-rug"]}:1`;
 const TABLE_PERMALINK = `https://${STORE}/cart/${FIXTURE_VARIANT_IDS["oak-frame-table"]}:1`;
 // app/globals.css:10 — --terracotta: #c8784e
 // --md-sys-color-tertiary (#8A5A3C), the role skipped lines are painted with.
@@ -102,18 +102,48 @@ async function callTool(
   );
 }
 
+/** Replaces the seed object of a category with a catalog product. */
+async function replaceWith(page: Page, objectType: string, productId: string) {
+  const scene = await callTool(page, "get_scene", {});
+  const { objects } = scene.structuredContent.data as {
+    objects: Array<{ id: string; type: string }>;
+  };
+  const target = objects.find(({ type }) => type === objectType);
+  if (!target) throw new Error(`seed has no ${objectType}`);
+  const replaced = await callTool(page, "replace_object", {
+    objectId: target.id,
+    productId,
+    expectedRevision: scene.structuredContent.sceneRevision,
+    expectedStateVersion: scene.structuredContent.stateVersion,
+  });
+  if (!replaced.structuredContent.ok) {
+    throw new Error(`replace_object failed for ${productId}`);
+  }
+}
+
 test("opens a Shopify cart permalink in a new tab without any request from OpenRoom", async ({
   context,
   page,
 }) => {
   const { storeRequests, foreign, consoleErrors } = await watchNetwork(page);
+  await captureModelContextTools(page);
 
   await page.goto("/demo");
+  await expect
+    .poll(() => page.evaluate(() => Object.keys(window.__commerceTools).length))
+    .toBe(6);
+
+  // Two mapped catalog products and one that the store has no variant for.
+  await replaceWith(page, "coffee_table", "oak-frame-table");
+  await replaceWith(page, "rug", "woven-jute-rug");
+  await replaceWith(page, "floor_lamp", "rice-paper-floor-lamp");
+
+  // The header cart is the room, so it opens the same draft the tool builds.
   await page.getByRole("button", { name: "View cart" }).click();
 
   const dialog = page.getByRole("dialog", { name: "Review your room" });
   await expect(dialog).toBeVisible();
-  await expect(dialog.getByRole("listitem")).toHaveCount(4);
+  await expect(dialog.getByRole("listitem")).toHaveCount(3);
   await expect(dialog.getByText(STORE, { exact: false })).toHaveCount(1);
   await expect(
     dialog.getByText(
@@ -121,11 +151,11 @@ test("opens a Shopify cart permalink in a new tab without any request from OpenR
     ),
   ).toBeVisible();
 
-  // Only coffee-table and rug are mapped; floor-lamp and plant are skipped, so
-  // the total drops from the demo-mode $626 to the mapped-only $438.
+  // Only the table ($169) and the rug ($349) are mapped, so the lamp ($289) is
+  // shown skipped and the estimate counts the mapped lines only.
   const skipped = dialog.getByText("Not mapped to a Shopify variant");
-  await expect(skipped).toHaveCount(2);
-  await expect(dialog.getByText("$438 USD")).toBeVisible();
+  await expect(skipped).toHaveCount(1);
+  await expect(dialog.getByText("$518 USD")).toBeVisible();
   await expect(dialog.getByText("Catalog estimate")).toBeVisible();
   await expect(
     dialog.getByText("Shopify shows the store's prices at checkout."),
@@ -139,7 +169,7 @@ test("opens a Shopify cart permalink in a new tab without any request from OpenR
     .first()
     .evaluate((node) => getComputedStyle(node).color);
   const detailColor = await dialog
-    .getByText("Qty 1 · Demo fixture")
+    .getByText("Qty 1")
     .first()
     .evaluate((node) => getComputedStyle(node).color);
   expect(skippedColor).toBe(TERTIARY);
@@ -148,11 +178,11 @@ test("opens a Shopify cart permalink in a new tab without any request from OpenR
   const [popup] = await Promise.all([
     context.waitForEvent("page"),
     dialog
-      .getByRole("button", { name: "Continue to Shopify · $438" })
+      .getByRole("button", { name: "Continue to Shopify · $518" })
       .click(),
   ]);
   await popup.waitForLoadState();
-  expect(popup.url()).toBe(FIXTURE_PERMALINK);
+  expect(popup.url()).toBe(ROOM_PERMALINK);
 
   await expect(
     page
@@ -163,7 +193,7 @@ test("opens a Shopify cart permalink in a new tab without any request from OpenR
 
   // The permalink is the only thing that ever touched the store domain, and it
   // came from the popup Chromium opened — OpenRoom itself issued no request.
-  expect(storeRequests).toEqual([FIXTURE_PERMALINK]);
+  expect(storeRequests).toEqual([ROOM_PERMALINK]);
   expect(foreign).toEqual([]);
   expect(consoleErrors).toEqual([]);
 });

@@ -26,6 +26,8 @@ import type { ToolContext } from "../../webmcp/tool-context";
 import { useWebMcpTools } from "../../webmcp/use-webmcp-tools";
 import { useLocalMcpRelay } from "../../local-mcp/use-local-mcp-relay";
 import { ACTIVE_COMMERCE } from "../commerce/commerce-runtime";
+import { cartDraftForScene } from "../commerce/scene-cart";
+import { enrichCartDraft } from "../commerce/shopify-cart";
 import type { CommerceContext } from "../commerce/commerce-types";
 
 interface DemoWorkspaceProps {
@@ -165,9 +167,22 @@ function DemoWorkspaceContent({
         return;
       }
 
+      // The header opens the cart without a draft: the cart is the room, so
+      // build it here exactly the way `add_scene_to_cart` does.
+      if (action.type === "open-cart" && !action.draft) {
+        dispatch({
+          type: "open-cart",
+          draft: enrichCartDraft(
+            commerce,
+            cartDraftForScene(store.scene, store.scene.objects),
+          ),
+        });
+        return;
+      }
+
       dispatch(action);
     },
-    [sceneStore],
+    [commerce, sceneStore],
   );
 
   useEffect(() => {
@@ -251,7 +266,12 @@ function DemoWorkspaceContent({
         <CartApprovalSheet
           commerce={commerce}
           dispatch={routeAction}
-          draft={state.cartDraft}
+          // `routeAction` always attaches a draft; the fallback only keeps the
+          // sheet honest if some future dispatcher forgets to.
+          draft={
+            state.cartDraft ??
+            enrichCartDraft(commerce, cartDraftForScene(scene, scene.objects))
+          }
         />
       ) : null}
     </div>
