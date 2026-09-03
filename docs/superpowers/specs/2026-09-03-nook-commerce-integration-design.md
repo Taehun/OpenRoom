@@ -32,7 +32,8 @@ Two paths use the same static product-to-variant mapping:
   `commerce` block, `Demo only — no external cart was created.` on approval,
   zero requests.
 - Nook stores no Shopify token. Only public, build-time values exist:
-  `NEXT_PUBLIC_COMMERCE_PROVIDER` and `NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN`.
+  `NEXT_PUBLIC_COMMERCE_PROVIDER`, `NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN`, and the
+  optional `NEXT_PUBLIC_SHOPIFY_VARIANTS` mapping override.
 - Invalid or missing Shopify configuration fails closed to demo mode with a
   visible reason in the sheet; it never throws at runtime or build time.
 - No product is sent to Shopify without a registered variant mapping. Unmapped
@@ -72,9 +73,13 @@ at build time, so changing them requires a rebuild; the README says so.
 `src/features/commerce/shopify-variants.ts` exports
 `SHOPIFY_VARIANTS: Readonly<Record<string, string | null>>` keyed by demo product
 id (all 24 catalog products plus the human fixture cart's product ids), with
-`null` meaning "not mapped yet". A validated accessor rejects any value that is
-not `gid://shopify/ProductVariant/<digits>` and any duplicate GID, returning a
-typed error the tests assert; it never throws in production paths.
+`null` meaning "not mapped yet". Operators may also supply or override entries
+without editing source through `NEXT_PUBLIC_SHOPIFY_VARIANTS`, a comma-separated
+list of `productId=gid://shopify/ProductVariant/<digits>` pairs merged over the
+file at build time. A validator rejects any value that is not
+`gid://shopify/ProductVariant/<digits>` and any duplicate GID, returning typed
+issues the tests assert; production paths never throw and treat products with
+issues as skipped with reason `invalid`.
 
 ## 6. Permalink and draft enrichment
 
@@ -94,7 +99,7 @@ interface CommerceDraft {
   storeDomain: string;
   mcpEndpoint: string;
   lines: Array<{ productId: string; merchandiseId: string; quantity: number }>;
-  skipped: Array<{ productId: string; reason: "unmapped" }>;
+  skipped: Array<{ productId: string; reason: "unmapped" | "invalid" }>;
   checkoutPermalink: string | null;
 }
 ```
@@ -131,7 +136,7 @@ cart opens.
 
 ## 9. Documentation
 
-- `.env.example` with the two variables and an `ASSET_PROVIDER=cached` line the
+- `.env.example` with the three variables and an `ASSET_PROVIDER=cached` line the
   README already references.
 - README: a `Commerce integration` section covering modes, environment
   variables, variant mapping steps, the human checkout flow, connecting
@@ -148,10 +153,12 @@ cart opens.
   aggregation, permalink construction, draft enrichment in both modes, tool
   contract/handler/evals alignment, sheet component states (demo unchanged,
   shopify success, popup blocked, zero mapped lines, skipped list).
-- E2E: existing demo journeys unchanged. One Playwright project configured with
-  `NEXT_PUBLIC_COMMERCE_PROVIDER=shopify` and a placeholder domain, stubbing
-  `**/cart/**` on that domain with `page.route`, asserting the new tab's URL,
-  the announcement, and that no real external request left the browser.
+- E2E: existing demo journeys unchanged. A second Playwright config
+  (`playwright.commerce.config.ts`, dev server on port 3001) sets
+  `NEXT_PUBLIC_COMMERCE_PROVIDER=shopify`, a placeholder domain, and placeholder
+  variant GIDs through `NEXT_PUBLIC_SHOPIFY_VARIANTS`, stubs every request to
+  that domain at the browser-context level, and asserts the new tab's URL, the
+  announcement, and that no real external request left the browser.
 - Full gate: `pnpm test`, `pnpm run typecheck`, `pnpm run lint`, `pnpm run
   test:e2e`, and `pnpm run build`/`pnpm run build:next` because the config is
   build-time inlined.
