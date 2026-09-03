@@ -148,10 +148,12 @@ test("opens the dashboard for a Claude-only browser at ?view=dashboard", async (
     await screen.findByRole("main", { name: "Room canvas" }),
   ).toBeVisible();
   expect(
-    screen.getByRole("status", { name: "Claude connection status" })
+    screen.getByRole("status", { name: "Local agent connection status" })
       .textContent,
-  ).toBe("Claude: Not connected");
-  expect(screen.getByLabelText("Pairing code")).toBeVisible();
+  ).toBe("Local agent: Not connected");
+  expect(
+    screen.getByRole("button", { name: "Connect an AI app" }),
+  ).toBeVisible();
   expect(screen.getByRole("link", { name: "Guide" })).toHaveAttribute(
     "href",
     "/?view=guide",

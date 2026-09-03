@@ -1,0 +1,320 @@
+/*
+ * OpenRoom component classes — Material Design 3.
+ *
+ * Classes only; every value comes from `material-tokens.css`, which is
+ * imported before this file. Nothing here needs JavaScript: state layers are
+ * pseudo-elements and the dialog is the native `<dialog>` element.
+ *
+ * A consumer may add its own class next to an `.md-*` one for placement
+ * (grid position, margin, width). Where a surface must also override a metric
+ * these classes set, it does so from a CSS module, whose selectors are more
+ * specific or repeated, so the outcome does not depend on stylesheet order.
+ */
+
+/* ---------------------------------------------------------------- buttons */
+
+.md-button {
+  position: relative;
+  display: inline-flex;
+  box-sizing: border-box;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 40px;
+  padding-inline: 24px;
+  overflow: hidden;
+  border: 0;
+  border-radius: var(--md-sys-shape-corner-full);
+  background: transparent;
+  color: var(--md-sys-color-primary);
+  cursor: pointer;
+  font-family: var(--font-ui), Arial, sans-serif;
+  font-size: var(--md-sys-typescale-label-large-size);
+  font-weight: var(--md-sys-typescale-label-large-weight);
+  letter-spacing: var(--md-sys-typescale-label-large-tracking);
+  line-height: var(--md-sys-typescale-label-large-line-height);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+/* The state layer tints with the label colour, as Material specifies. */
+.md-button::before {
+  position: absolute;
+  border-radius: inherit;
+  background: currentColor;
+  content: "";
+  inset: 0;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 120ms ease;
+}
+
+.md-button:hover:not(:disabled)::before {
+  opacity: var(--md-sys-state-hover-opacity);
+}
+
+.md-button:focus-visible:not(:disabled)::before {
+  opacity: var(--md-sys-state-focus-opacity);
+}
+
+.md-button:active:not(:disabled)::before {
+  opacity: var(--md-sys-state-pressed-opacity);
+}
+
+.md-button:focus-visible {
+  outline: 2px solid var(--md-sys-color-primary);
+  outline-offset: 2px;
+}
+
+.md-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.38;
+}
+
+.md-button--filled {
+  background: var(--md-sys-color-primary);
+  color: var(--md-sys-color-on-primary);
+}
+
+.md-button--tonal {
+  background: var(--md-sys-color-secondary-container);
+  color: var(--md-sys-color-on-secondary-container);
+}
+
+.md-button--outlined {
+  border: 1px solid var(--md-sys-color-outline-variant);
+}
+
+.md-button--text {
+  padding-inline: 16px;
+}
+
+/* ------------------------------------------------------------------ cards */
+
+.md-card {
+  box-sizing: border-box;
+  padding: 16px 24px;
+  border-radius: var(--md-sys-shape-corner-medium);
+  background: var(--md-sys-color-surface);
+  color: var(--md-sys-color-on-surface);
+}
+
+.md-card--filled {
+  background: var(--md-sys-color-surface-container-highest);
+}
+
+.md-card--outlined {
+  border: 1px solid var(--md-sys-color-outline-variant);
+  background: var(--md-sys-color-surface);
+}
+
+.md-card--elevated {
+  background: var(--md-sys-color-surface-container-low);
+  box-shadow: var(--md-sys-elevation-level1);
+}
+
+/* ------------------------------------------------------------------ chips */
+
+.md-chip {
+  display: inline-flex;
+  box-sizing: border-box;
+  align-items: center;
+  gap: 8px;
+  height: 32px;
+  padding-inline: 12px;
+  border: 1px solid var(--md-sys-color-outline-variant);
+  border-radius: var(--md-sys-shape-corner-small);
+  background: transparent;
+  color: var(--md-sys-color-on-surface-variant);
+  font-family: var(--font-ui), Arial, sans-serif;
+  font-size: var(--md-sys-typescale-label-large-size);
+  font-weight: var(--md-sys-typescale-label-large-weight);
+  letter-spacing: var(--md-sys-typescale-label-large-tracking);
+  line-height: var(--md-sys-typescale-label-large-line-height);
+  white-space: nowrap;
+}
+
+.md-chip--selected {
+  border-color: transparent;
+  background: var(--md-sys-color-secondary-container);
+  color: var(--md-sys-color-on-secondary-container);
+}
+
+/* ----------------------------------------------------------- top app bar */
+
+.md-top-app-bar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  box-sizing: border-box;
+  align-items: center;
+  gap: 16px;
+  height: 64px;
+  padding-inline: 16px;
+  background: var(--md-sys-color-surface);
+  color: var(--md-sys-color-on-surface);
+  font-size: var(--md-sys-typescale-title-large-size);
+  font-weight: var(--md-sys-typescale-title-large-weight);
+  letter-spacing: var(--md-sys-typescale-title-large-tracking);
+  line-height: var(--md-sys-typescale-title-large-line-height);
+}
+
+/* Elevation appears only once the page has scrolled under the bar. */
+.md-top-app-bar[data-scrolled="true"] {
+  box-shadow: var(--md-sys-elevation-level1);
+}
+
+/* -------------------------------------------------------------- nav rail */
+
+.md-nav-rail {
+  display: flex;
+  box-sizing: border-box;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  width: 80px;
+  padding-block: 12px;
+  background: var(--md-sys-color-surface);
+}
+
+.md-nav-rail-item {
+  display: grid;
+  box-sizing: border-box;
+  width: 56px;
+  height: 56px;
+  place-items: center;
+  gap: 4px;
+  border: 0;
+  border-radius: var(--md-sys-shape-corner-large);
+  background: transparent;
+  color: var(--md-sys-color-on-surface-variant);
+  cursor: pointer;
+  font-family: var(--font-ui), Arial, sans-serif;
+  font-size: var(--md-sys-typescale-label-medium-size);
+  font-weight: var(--md-sys-typescale-label-medium-weight);
+  letter-spacing: var(--md-sys-typescale-label-medium-tracking);
+  line-height: var(--md-sys-typescale-label-medium-line-height);
+  text-decoration: none;
+}
+
+.md-nav-rail-item[aria-pressed="true"],
+.md-nav-rail-item[aria-current="page"] {
+  background: var(--md-sys-color-secondary-container);
+  color: var(--md-sys-color-on-secondary-container);
+}
+
+/* ----------------------------------------------------------------- banner */
+
+/*
+ * Grid: the icon holds the first column across both rows, the title and body
+ * stack in the second, and the actions sit under the body, left-aligned with
+ * it. Sub-elements are optional — a banner with only a title still lays out.
+ */
+.md-banner {
+  display: grid;
+  box-sizing: border-box;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: 4px 16px;
+  padding: 16px 24px;
+  border-radius: var(--md-sys-shape-corner-medium);
+  background: var(--md-sys-color-surface-container-low);
+  color: var(--md-sys-color-on-surface);
+}
+
+.md-banner-icon {
+  display: grid;
+  grid-row: 1 / -1;
+  width: 24px;
+  height: 24px;
+  place-items: center;
+  color: var(--md-sys-color-primary);
+}
+
+.md-banner-title {
+  grid-column: 2;
+  margin: 0;
+  font-size: var(--md-sys-typescale-title-medium-size);
+  font-weight: var(--md-sys-typescale-title-medium-weight);
+  letter-spacing: var(--md-sys-typescale-title-medium-tracking);
+  line-height: var(--md-sys-typescale-title-medium-line-height);
+}
+
+.md-banner-body {
+  grid-column: 2;
+  margin: 0;
+  color: var(--md-sys-color-on-surface-variant);
+  font-size: var(--md-sys-typescale-body-medium-size);
+  font-weight: var(--md-sys-typescale-body-medium-weight);
+  letter-spacing: var(--md-sys-typescale-body-medium-tracking);
+  line-height: var(--md-sys-typescale-body-medium-line-height);
+}
+
+.md-banner-actions {
+  display: flex;
+  grid-column: 2;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+/* ------------------------------------------------------------------- code */
+
+.md-code {
+  padding: 2px 6px;
+  border-radius: var(--md-sys-shape-corner-small);
+  background: var(--md-sys-color-surface-container);
+  color: var(--md-sys-color-on-surface);
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: var(--md-sys-typescale-body-medium-size);
+  font-weight: var(--md-sys-typescale-body-medium-weight);
+  letter-spacing: var(--md-sys-typescale-body-medium-tracking);
+  line-height: var(--md-sys-typescale-body-medium-line-height);
+  word-break: break-word;
+}
+
+/* ----------------------------------------------------------------- dialog */
+
+.md-dialog {
+  box-sizing: border-box;
+  /* Tailwind's preflight zeroes every margin, which defeats the UA rule that
+     centres a modal dialog in the viewport; restore it explicitly. */
+  margin: auto;
+  width: min(560px, calc(100vw - 48px));
+  max-width: min(560px, calc(100vw - 48px));
+  padding: 24px;
+  border: 0;
+  border-radius: var(--md-sys-shape-corner-extra-large);
+  background: var(--md-sys-color-surface-container-high);
+  color: var(--md-sys-color-on-surface);
+  box-shadow: var(--md-sys-elevation-level1);
+}
+
+/* A consumer that sets `display` on the dialog would defeat the UA rule that
+   hides a closed one, so state it here where every `.md-dialog` inherits it. */
+.md-dialog:not([open]) {
+  display: none;
+}
+
+.md-dialog::backdrop {
+  background: rgba(0, 0, 0, 0.32);
+}
+
+.md-dialog-title {
+  margin: 0 0 16px;
+  font-size: var(--md-sys-typescale-headline-small-size);
+  font-weight: var(--md-sys-typescale-headline-small-weight);
+  letter-spacing: var(--md-sys-typescale-headline-small-tracking);
+  line-height: var(--md-sys-typescale-headline-small-line-height);
+}
+
+.md-dialog-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 24px;
+}

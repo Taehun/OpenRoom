@@ -67,9 +67,16 @@ test("guides a browser without WebMCP to the flag and the demo", async ({
 
   await expect(page.getByRole("main", { name: "Room canvas" })).toBeVisible();
   await expect(
-    page.getByRole("status", { name: "Claude connection status" }),
-  ).toHaveText("Claude: Not connected");
-  await expect(page.getByLabel("Pairing code")).toBeVisible();
+    page.getByRole("status", { name: "Local agent connection status" }),
+  ).toHaveText("Local agent: Not connected");
+
+  // The fields moved into a modal dialog; the composer keeps one button.
+  await page.getByRole("button", { name: "Connect an AI app" }).click();
+  const pairing = page.getByRole("dialog", { name: "Connect an AI app" });
+  await expect(pairing).toBeVisible();
+  await expect(pairing.getByLabel("Pairing code")).toBeVisible();
+  await pairing.getByRole("button", { name: "Cancel" }).click();
+  await expect(pairing).toBeHidden();
 
   await page.getByRole("link", { name: "Guide" }).click();
   await expect(

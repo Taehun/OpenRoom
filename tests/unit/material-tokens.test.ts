@@ -1,0 +1,50 @@
+import { readFileSync } from "node:fs";
+import { describe, expect, it } from "vitest";
+
+/**
+ * The token file is the single source of colour, type, shape and state for both
+ * surfaces. The legacy aliases are what let the ~130 existing `var(--…)` usages
+ * in `demo-workspace.module.css` adopt the Material palette without a per-rule
+ * edit, so they are asserted line by line rather than by spot check.
+ */
+const tokens = readFileSync("app/material-tokens.css", "utf8");
+
+describe("material tokens", () => {
+  it("defines the color roles and legacy aliases", () => {
+    for (const line of [
+      "--md-sys-color-primary: #4B6543",
+      "--md-sys-color-surface: #FBF9F4",
+      "--md-sys-color-outline-variant: #C3C8BC",
+      "--ink: var(--md-sys-color-on-surface)",
+      "--muted-text: var(--md-sys-color-on-surface-variant)",
+      "--paper: var(--md-sys-color-surface-container-lowest)",
+      "--limestone: var(--md-sys-color-surface)",
+      "--warm-divider: var(--md-sys-color-outline-variant)",
+      "--moss: var(--md-sys-color-primary)",
+      "--terracotta: var(--md-sys-color-tertiary)",
+      "--md-sys-shape-corner-extra-large: 28px",
+      "--md-sys-typescale-label-large-size: 14px",
+    ])
+      expect(tokens).toContain(line);
+  });
+
+  it("leaves no hex color in the module stylesheets", () => {
+    for (const file of [
+      "src/features/demo/demo-workspace.module.css",
+      "src/features/home/home.module.css",
+    ]) {
+      expect(readFileSync(file, "utf8")).not.toMatch(/#[0-9a-fA-F]{3,8}\b/);
+    }
+  });
+
+  it("drops the editorial serif family everywhere", () => {
+    for (const file of [
+      "app/globals.css",
+      "app/layout.tsx",
+      "src/features/demo/demo-workspace.module.css",
+      "src/features/home/home.module.css",
+    ]) {
+      expect(readFileSync(file, "utf8")).not.toContain("--font-editorial");
+    }
+  });
+});

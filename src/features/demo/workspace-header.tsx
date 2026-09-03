@@ -60,12 +60,15 @@ export function WorkspaceHeader({
         {guideHref ? (
           // Same-route query switch: a soft navigation would leave the
           // workspace mounted in browsers without the Navigation API.
-          <a className={styles.quietButton} href={guideHref}>
+          <a
+            className={`md-button md-button--text ${styles.quietButton}`}
+            href={guideHref}
+          >
             <span>Guide</span>
           </a>
         ) : null}
         <button
-          className={styles.quietButton}
+          className={`md-button md-button--text ${styles.quietButton}`}
           disabled={!canUndo}
           onClick={() => dispatch({ type: "undo" })}
           title="Undo last scene change (Cmd/Ctrl+Z)"
@@ -75,7 +78,7 @@ export function WorkspaceHeader({
           <span>Undo</span>
         </button>
         <button
-          className={styles.quietButton}
+          className={`md-button md-button--text ${styles.quietButton}`}
           onClick={() => dispatch({ type: "reset" })}
           title="Restore the canonical demo room"
           type="button"
@@ -85,7 +88,7 @@ export function WorkspaceHeader({
         </button>
         <button
           aria-label="View cart"
-          className={styles.cartButton}
+          className={`md-button md-button--filled ${styles.cartButton}`}
           onClick={() => dispatch({ type: "open-cart" })}
           ref={cartButtonRef}
           type="button"

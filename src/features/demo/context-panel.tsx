@@ -102,7 +102,7 @@ function InspectorPanel({
         </div>
       </dl>
 
-      <div className={styles.lockRow}>
+      <div className={`md-card md-card--outlined ${styles.lockRow}`}>
         <span className={styles.lockMark} aria-hidden="true">
           〼
         </span>
@@ -113,7 +113,7 @@ function InspectorPanel({
       </div>
 
       <button
-        className={styles.primaryPanelButton}
+        className={`md-button md-button--filled ${styles.primaryPanelButton}`}
         onClick={() => dispatch({ type: "show-products" })}
         type="button"
       >

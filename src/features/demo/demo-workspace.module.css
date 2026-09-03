@@ -34,7 +34,7 @@
 
 .brand {
   color: var(--ink);
-  font-family: var(--font-editorial), Georgia, serif;
+  font-family: var(--font-ui), Arial, sans-serif;
   font-size: 1.7rem;
   font-weight: 600;
   letter-spacing: -0.04em;
@@ -116,15 +116,17 @@
   padding-right: 12px;
 }
 
-.quietButton,
-.cartButton,
+/*
+ * Controls still styled here rather than by an `.md-*` class. The ones that
+ * adopted `.md-button` are absent on purpose: that class already resets the
+ * border, dims `:disabled`, and draws the Material focus ring, and repeating
+ * any of it at equal specificity would make the result depend on which
+ * stylesheet the bundler emitted first.
+ */
 .iconButton,
 .textButton,
-.primaryPanelButton,
 .previewButton,
 .previewButtonActive,
-.agentButton,
-.pairButton,
 .commerceButton,
 .cancelButton,
 .toolButton,
@@ -135,17 +137,10 @@
   cursor: pointer;
 }
 
-.quietButton:focus-visible,
-.cartButton:focus-visible,
 .iconButton:focus-visible,
 .textButton:focus-visible,
-.primaryPanelButton:focus-visible,
 .previewButton:focus-visible,
 .previewButtonActive:focus-visible,
-.agentButton:focus-visible,
-.pairButton:focus-visible,
-.pairSecondaryButton:focus-visible,
-.localAgentField input:focus-visible,
 .commerceButton:focus-visible,
 .cancelButton:focus-visible,
 .toolButton:focus-visible,
@@ -160,41 +155,21 @@
   outline-offset: 3px;
 }
 
-.quietButton,
-.cartButton {
-  display: inline-flex;
-  text-decoration: none;
-  align-items: center;
-  justify-content: center;
+/*
+ * Material metrics at header density: four actions plus the room identity have
+ * to fit a 64px bar that starts at a 1000px workspace, so the labels keep a
+ * tighter inline padding than the 24px/16px defaults.
+ */
+.headerActions .quietButton,
+.headerActions .cartButton {
   gap: 7px;
-  min-height: 40px;
-  padding: 0 11px;
-  border-radius: 7px;
-  background: transparent;
-  color: var(--ink);
-  font-size: 0.76rem;
-  font-weight: 650;
+  padding-inline: 12px;
 }
 
-.quietButton:hover:not(:disabled) {
-  background: var(--limestone);
-}
-
-.quietButton:disabled {
-  cursor: not-allowed;
-  opacity: 0.38;
-}
-
-.cartButton {
-  min-height: 44px;
+.headerActions .cartButton {
+  height: 44px;
   margin-left: 4px;
-  padding-inline: 15px 10px;
-  background: var(--ink);
-  color: var(--paper);
-}
-
-.cartButton:hover {
-  background: #343830;
+  padding-inline: 16px 12px;
 }
 
 .cartCount {
@@ -257,8 +232,8 @@
 
 .toolButton:hover,
 .toolButtonActive {
-  background: #e9e5dc;
-  color: var(--ink);
+  background: var(--md-sys-color-surface-container-high);
+  color: var(--md-sys-color-on-surface);
 }
 
 .toolButton:disabled {
@@ -296,7 +271,7 @@
   height: 36px;
   border: 1px solid transparent;
   border-radius: 50%;
-  background: #ece8df;
+  background: var(--md-sys-color-surface-container);
   color: var(--muted-text);
   font-size: 0.58rem;
   font-weight: 750;
@@ -310,8 +285,8 @@
 
 .objectButtonSelected {
   border-color: var(--moss);
-  background: var(--moss);
-  color: white;
+  background: var(--md-sys-color-primary);
+  color: var(--md-sys-color-on-primary);
   box-shadow: 0 0 0 2px var(--paper), 0 0 0 3px var(--moss);
 }
 
@@ -320,7 +295,7 @@
   grid-template-rows: minmax(0, 1fr) auto;
   min-width: 0;
   min-height: 0;
-  background: #dad5ca;
+  background: var(--md-sys-color-surface-dim);
 }
 
 .roomFigure {
@@ -328,7 +303,7 @@
   min-height: 0;
   margin: 0;
   overflow: hidden;
-  background: #d5d0c6;
+  background: var(--md-sys-color-surface-dim);
 }
 
 .roomFigure::after {
@@ -366,7 +341,7 @@
   width: 100%;
   aspect-ratio: 16 / 9;
   overflow: hidden;
-  background-color: #d8d2c7;
+  background-color: var(--md-sys-color-surface-dim);
   background-position: center;
   background-size: cover;
 }
@@ -485,7 +460,7 @@
   position: absolute;
   display: block;
   border-radius: 50%;
-  background: #242722;
+  background: var(--openroom-contact-shadow);
   pointer-events: none;
 }
 
@@ -623,7 +598,7 @@
 
 .arrangeButton:hover:not(:disabled) {
   border-color: var(--moss);
-  background: #e5e9df;
+  background: var(--md-sys-color-secondary-container);
 }
 
 .arrangeButton:disabled {
@@ -727,8 +702,8 @@
   height: 25px;
   place-items: center;
   border-radius: 50%;
-  background: #e2e7dd;
-  color: var(--moss);
+  background: var(--md-sys-color-secondary-container);
+  color: var(--md-sys-color-on-secondary-container);
 }
 
 .undoToast button {
@@ -761,8 +736,8 @@
   height: 34px;
   place-items: center;
   border-radius: 50%;
-  background: #e5e9df;
-  color: var(--moss);
+  background: var(--md-sys-color-secondary-container);
+  color: var(--md-sys-color-on-secondary-container);
 }
 
 /*
@@ -805,32 +780,24 @@
 }
 
 .promptSuggestions span {
-  padding: 2px 6px;
-  border: 1px solid var(--warm-divider);
-  border-radius: 999px;
+  height: 20px;
+  padding-inline: 8px;
+  border-radius: var(--md-sys-shape-corner-full);
   color: var(--moss);
   font-size: 0.59rem;
+  letter-spacing: normal;
+  line-height: 1;
 }
 
 .webMcpStatus {
   font-weight: 700;
 }
 
-.agentButton {
+.composer .agentButton {
   grid-column: 3;
   grid-row: 1;
-  min-height: 44px;
+  height: 44px;
   margin-top: 1px;
-  padding: 0 16px;
-  border-radius: 7px;
-  background: var(--moss);
-  color: white;
-  font-size: 0.74rem;
-  font-weight: 700;
-}
-
-.agentButton:hover {
-  background: #4e5b40;
 }
 
 .localAgent {
@@ -840,69 +807,88 @@
   gap: 4px 8px;
 }
 
+/*
+ * The composer shares its column with the 16:9 photo stage, so a row that
+ * grows here costs the stage half its growth in clearance. The chip and the
+ * button therefore run at composer density rather than the 32px/40px
+ * Material defaults; the dialog they open uses the full metrics.
+ */
+.localAgent .localAgentChip {
+  height: 22px;
+  padding-inline: 8px;
+  font-size: 0.61rem;
+  letter-spacing: normal;
+  line-height: 1;
+}
+
+.localAgent .localAgentButton {
+  height: 26px;
+  padding-inline: 12px;
+  font-size: 0.61rem;
+  letter-spacing: normal;
+}
+
+/* Scoped to `[open]` so the closed dialog keeps the UA `display: none`. */
+.pairDialog[open] {
+  display: grid;
+  gap: 12px;
+}
+
+.pairDialog p {
+  margin: 0;
+  color: var(--md-sys-color-on-surface-variant);
+  font-size: var(--md-sys-typescale-body-medium-size);
+  line-height: var(--md-sys-typescale-body-medium-line-height);
+}
+
 .localAgentField {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  color: var(--muted-text);
-  font-size: 0.59rem;
+  display: grid;
+  gap: 6px;
+  justify-items: start;
+  color: var(--md-sys-color-on-surface-variant);
+  font-size: var(--md-sys-typescale-body-small-size);
+  line-height: var(--md-sys-typescale-body-small-line-height);
 }
 
 .localAgentField input {
-  width: 74px;
-  min-height: 24px;
-  padding: 2px 6px;
-  border: 1px solid var(--warm-divider);
-  border-radius: 5px;
-  background: var(--paper);
-  color: var(--ink);
-  font-size: 0.62rem;
+  width: 8rem;
+  min-height: 40px;
+  padding: 0 12px;
+  border: 1px solid var(--md-sys-color-outline);
+  border-radius: var(--md-sys-shape-corner-extra-small);
+  background: var(--md-sys-color-surface-container-lowest);
+  color: var(--md-sys-color-on-surface);
+  font-size: var(--md-sys-typescale-body-large-size);
   font-variant-numeric: tabular-nums;
+  letter-spacing: 0.2em;
 }
 
 .localAgentPort input {
-  width: 62px;
+  width: 6rem;
+  letter-spacing: normal;
 }
 
-.pairButton,
-.pairSecondaryButton {
-  min-height: 26px;
-  padding: 0 10px;
-  border-radius: 6px;
+/* A Material text field marks focus on its own edge, not with a third ring. */
+.localAgentField input:focus-visible {
+  outline: 2px solid var(--md-sys-color-primary);
+  outline-offset: 0;
+}
+
+.pairAdvanced summary {
   cursor: pointer;
-  font-size: 0.6rem;
-  font-weight: 700;
+  font-size: var(--md-sys-typescale-label-large-size);
+  font-weight: var(--md-sys-typescale-label-large-weight);
 }
 
-.pairButton {
-  background: var(--moss);
-  color: white;
+.pairAdvanced > *:not(summary) {
+  margin-top: 12px;
 }
 
-.pairButton:hover:not(:disabled) {
-  background: #4e5b40;
-}
-
-.pairButton:disabled {
-  cursor: not-allowed;
-  opacity: 0.38;
-}
-
-.pairSecondaryButton {
-  border: 1px solid var(--warm-divider);
-  background: transparent;
-  color: var(--ink);
-  font-weight: 650;
-}
-
-.pairSecondaryButton:hover {
-  background: var(--limestone);
-}
-
-.pairNote {
-  color: var(--muted-text);
-  font-size: 0.59rem;
-  line-height: 1.35;
+/* Beats `.pairDialog p`, which would otherwise mute the failure note. */
+.pairDialog .pairNote {
+  color: var(--md-sys-color-error);
+  font-size: var(--md-sys-typescale-body-small-size);
+  line-height: var(--md-sys-typescale-body-small-line-height);
 }
 
 .copyStatusSuccess,
@@ -919,13 +905,13 @@
 }
 
 .copyStatusSuccess {
-  background: #e2e7dd;
-  color: var(--moss);
+  background: var(--md-sys-color-secondary-container);
+  color: var(--md-sys-color-on-secondary-container);
 }
 
 .copyStatusError {
-  background: #f5e4dc;
-  color: #8a3f25;
+  background: var(--md-sys-color-error-container);
+  color: var(--md-sys-color-on-error-container);
 }
 
 .contextPanel {
@@ -975,7 +961,7 @@
 .emptyInspector h2,
 .sheetHeader h2 {
   margin: 0;
-  font-family: var(--font-editorial), Georgia, serif;
+  font-family: var(--font-ui), Arial, sans-serif;
   font-size: 1.65rem;
   font-weight: 500;
   letter-spacing: -0.025em;
@@ -997,7 +983,7 @@
   grid-template-columns: 86px 1fr;
   gap: 12px;
   padding: 12px 0;
-  border-bottom: 1px solid #e6e1d8;
+  border-bottom: 1px solid var(--warm-divider);
 }
 
 .objectSummary dt {
@@ -1011,14 +997,13 @@
   font-weight: 620;
 }
 
-.lockRow {
+/* An `.md-card--outlined`; only the row layout and its margin stay here. */
+.inspectorPanel .lockRow {
   display: flex;
   align-items: center;
   gap: 11px;
   margin: 20px 0;
-  padding: 13px;
-  border-left: 2px solid var(--moss);
-  background: #f0f1eb;
+  padding: 13px 16px;
 }
 
 .lockMark {
@@ -1026,7 +1011,7 @@
   width: 28px;
   height: 28px;
   place-items: center;
-  border: 1px solid #ccd2c2;
+  border: 1px solid var(--warm-divider);
   border-radius: 50%;
   color: var(--moss);
   font-size: 0.75rem;
@@ -1046,18 +1031,9 @@
   font-size: 0.65rem;
 }
 
-.primaryPanelButton {
+.inspectorPanel .primaryPanelButton {
   width: 100%;
-  min-height: 46px;
-  border-radius: 7px;
-  background: var(--ink);
-  color: var(--paper);
-  font-size: 0.76rem;
-  font-weight: 700;
-}
-
-.primaryPanelButton:hover {
-  background: #343830;
+  height: 46px;
 }
 
 .textButton {
@@ -1091,7 +1067,7 @@
   overflow: hidden;
   border: 1px solid var(--warm-divider);
   border-radius: 8px;
-  background: #f7f5ef;
+  background: var(--md-sys-color-surface-container-low);
 }
 
 .productActive {
@@ -1102,15 +1078,15 @@
 .productMaterial {
   position: relative;
   overflow: hidden;
-  background: #cfae82;
+  background: var(--openroom-finish-oak);
 }
 
 .productMaterial[data-material="2"] {
-  background: #c9c0ae;
+  background: var(--openroom-finish-linen);
 }
 
 .productMaterial[data-material="3"] {
-  background: #80604b;
+  background: var(--openroom-finish-walnut);
 }
 
 .productMaterial::before,
@@ -1191,16 +1167,16 @@
 .previewButton:hover,
 .previewButtonActive {
   border-color: var(--moss);
-  background: var(--moss);
-  color: white;
+  background: var(--md-sys-color-primary);
+  color: var(--md-sys-color-on-primary);
 }
 
 .agentPrompt {
   margin: 20px 0;
   padding: 15px 16px;
   border-left: 2px solid var(--moss);
-  background: #f0f1eb;
-  font-family: var(--font-editorial), Georgia, serif;
+  background: var(--md-sys-color-surface-container-low);
+  font-family: var(--font-ui), Arial, sans-serif;
   font-size: 1rem;
   line-height: 1.4;
 }
@@ -1213,7 +1189,7 @@
   padding: 14px;
   border: 1px solid var(--warm-divider);
   border-radius: 8px;
-  background: #f7f5ef;
+  background: var(--md-sys-color-surface-container-low);
 }
 
 .revisionSpark {
@@ -1324,7 +1300,7 @@
 .cartItems {
   margin: 0;
   padding: 0;
-  border-top: 1px solid #e6e1d8;
+  border-top: 1px solid var(--warm-divider);
   list-style: none;
 }
 
@@ -1334,7 +1310,7 @@
   align-items: center;
   gap: 11px;
   min-height: 58px;
-  border-bottom: 1px solid #e6e1d8;
+  border-bottom: 1px solid var(--warm-divider);
 }
 
 .cartThumbnail {
@@ -1343,7 +1319,7 @@
   height: 36px;
   place-items: center;
   border-radius: 5px;
-  background: #e8e3da;
+  background: var(--md-sys-color-surface-container-high);
   color: var(--muted-text);
   font-size: 0.58rem;
   font-weight: 750;
@@ -1382,7 +1358,7 @@
 }
 
 .cartTotal > strong {
-  font-family: var(--font-editorial), Georgia, serif;
+  font-family: var(--font-ui), Arial, sans-serif;
   font-size: 1.2rem;
   font-weight: 600;
 }
@@ -1398,7 +1374,7 @@
   gap: 9px;
   align-items: start;
   padding: 10px;
-  background: #f0f1eb;
+  background: var(--md-sys-color-surface-container-low);
   color: var(--muted-text);
 }
 
@@ -1407,10 +1383,10 @@
   width: 20px;
   height: 20px;
   place-items: center;
-  border: 1px solid #b9c1ae;
+  border: 1px solid var(--warm-divider);
   border-radius: 50%;
   color: var(--moss);
-  font-family: Georgia, serif;
+  font-family: var(--font-ui), Arial, sans-serif;
   font-size: 0.7rem;
   font-weight: 700;
 }
@@ -1449,14 +1425,20 @@
   min-height: 48px;
   padding: 0 16px;
   border-radius: 7px;
-  background: var(--terracotta);
-  color: white;
+  background: var(--md-sys-color-tertiary);
+  color: var(--md-sys-color-on-tertiary);
   font-size: 0.74rem;
   font-weight: 700;
 }
 
+/* No Material class here: the sheet keeps its two-column price button, so it
+   darkens toward the ink neutral rather than lightening with a state layer. */
 .commerceButton:hover {
-  background: #b76842;
+  background: color-mix(
+    in srgb,
+    var(--md-sys-color-tertiary) 85%,
+    var(--md-sys-color-on-surface)
+  );
 }
 
 .cancelButton {

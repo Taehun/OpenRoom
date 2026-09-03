@@ -266,8 +266,10 @@ export function RoomCanvas({
           <div className={styles.promptGuidance}>
             <p>{PRIMARY_PROMPT}</p>
             <div className={styles.promptSuggestions}>
-              <span>Modern organic, soft neutral textures</span>
-              <span>Mid-century, warm walnut and brass</span>
+              <span className="md-chip">
+                Modern organic, soft neutral textures
+              </span>
+              <span className="md-chip">Mid-century, warm walnut and brass</span>
             </div>
             <div
               aria-label="Native WebMCP status"
@@ -283,7 +285,7 @@ export function RoomCanvas({
             </small>
           </div>
           <button
-            className={styles.agentButton}
+            className={`md-button md-button--filled ${styles.agentButton}`}
             onClick={copyPrompt}
             type="button"
           >
