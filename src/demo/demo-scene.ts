@@ -33,11 +33,11 @@ interface SeedPlacement {
  * mirrored cutout exactly.
  */
 const CALIBRATED_SEED: Readonly<Record<string, SeedPlacement>> = {
-  sofa_01: { x: -0.2, z: -0.8, rotationDeg: 0 },
+  sofa_01: { x: -0.2, z: -0.55, rotationDeg: 0 },
   table_01: { x: -0.2, z: 0.4, rotationDeg: 0 },
   rug_01: { x: -0.2, z: 0.38, rotationDeg: 0 },
-  lamp_01: { x: -1.42, z: -0.75, rotationDeg: 0 },
-  chair_01: { x: 1.02, z: 0.6, rotationDeg: 45 },
+  lamp_01: { x: -1.42, z: -0.5, rotationDeg: 0 },
+  chair_01: { x: 1.0, z: 0.69, rotationDeg: 45 },
   plant_01: { x: 1.3, z: -0.32, rotationDeg: 0 },
 };
 
