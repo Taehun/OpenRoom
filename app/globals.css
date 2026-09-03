@@ -22,9 +22,14 @@ select {
   font: inherit;
 }
 
+/*
+ * The single focus ring for the whole app. Per-element rings are residue:
+ * only a control sitting on the room photograph overrides this, where the
+ * ring needs more weight to stay visible against an arbitrary image.
+ */
 :focus-visible {
   outline: 2px solid var(--md-sys-color-primary);
-  outline-offset: 3px;
+  outline-offset: 2px;
 }
 
 @media (prefers-reduced-motion: reduce) {

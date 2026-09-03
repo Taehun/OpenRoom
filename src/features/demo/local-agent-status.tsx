@@ -60,16 +60,16 @@ export function LocalAgentStatus({ relay }: { relay: LocalMcpRelay }) {
     <div className={styles.localAgent}>
       <span
         aria-label="Local agent connection status"
-        className={`md-chip ${
-          relay.status === "connected" ? "md-chip--selected " : ""
-        }${styles.localAgentChip}`}
+        className={`md-chip md-chip--dense${
+          relay.status === "connected" ? " md-chip--selected" : ""
+        }`}
         role="status"
       >
         {STATUS_LABELS[relay.status]}
       </span>
 
       <button
-        className={`md-button md-button--tonal ${styles.localAgentButton}`}
+        className="md-button md-button--tonal md-button--dense"
         onClick={() => dialogRef.current?.showModal()}
         type="button"
       >
@@ -78,7 +78,7 @@ export function LocalAgentStatus({ relay }: { relay: LocalMcpRelay }) {
 
       {relay.status === "connected" ? (
         <button
-          className={`md-button md-button--text ${styles.localAgentButton}`}
+          className="md-button md-button--text md-button--dense"
           onClick={() => void relay.disconnect()}
           type="button"
         >

@@ -61,11 +61,6 @@
   opacity: var(--md-sys-state-pressed-opacity);
 }
 
-.md-button:focus-visible {
-  outline: 2px solid var(--md-sys-color-primary);
-  outline-offset: 2px;
-}
-
 .md-button:disabled {
   cursor: not-allowed;
   opacity: 0.38;
@@ -86,6 +81,12 @@
 }
 
 .md-button--text {
+  padding-inline: 16px;
+}
+
+/* Dense: for bars with a fixed height budget, such as the composer. */
+.md-button--dense {
+  height: 32px;
   padding-inline: 16px;
 }
 
@@ -138,6 +139,16 @@
   border-color: transparent;
   background: var(--md-sys-color-secondary-container);
   color: var(--md-sys-color-on-secondary-container);
+}
+
+/* Dense: for bars with a fixed height budget, such as the composer. */
+.md-chip--dense {
+  height: 24px;
+  padding-inline: 8px;
+  font-size: var(--md-sys-typescale-label-medium-size);
+  font-weight: var(--md-sys-typescale-label-medium-weight);
+  letter-spacing: var(--md-sys-typescale-label-medium-tracking);
+  line-height: var(--md-sys-typescale-label-medium-line-height);
 }
 
 /* ----------------------------------------------------------- top app bar */

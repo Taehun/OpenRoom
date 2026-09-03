@@ -242,11 +242,11 @@ function ActivityPanel({
         </button>
       </div>
 
-      <p className={styles.agentPrompt}>
+      <p className={`md-card md-card--outlined ${styles.agentPrompt}`}>
         Real agent actions appear through the active agent surface.
       </p>
 
-      <div className={styles.revisionCard}>
+      <div className={`md-card md-card--outlined ${styles.revisionCard}`}>
         <span className={styles.revisionSpark} aria-hidden="true">
           <OpenRoomIcon name="sparkles" size={17} />
         </span>

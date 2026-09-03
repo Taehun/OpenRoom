@@ -266,23 +266,24 @@ export function RoomCanvas({
           <div className={styles.promptGuidance}>
             <p>{PRIMARY_PROMPT}</p>
             <div className={styles.promptSuggestions}>
-              <span className="md-chip">
+              <span className="md-chip md-chip--dense">
                 Modern organic, soft neutral textures
               </span>
-              <span className="md-chip">Mid-century, warm walnut and brass</span>
+              <span className="md-chip md-chip--dense">
+                Mid-century, warm walnut and brass
+              </span>
             </div>
-            <div
-              aria-label="Native WebMCP status"
-              className={styles.webMcpStatus}
-              role="status"
-            >
-              Native WebMCP: {nativeWebMcpAvailable ? "Available" : "Unavailable"}
+            <div className={styles.agentStatusRow}>
+              <div
+                aria-label="Native WebMCP status"
+                className="md-chip md-chip--dense"
+                role="status"
+              >
+                Native WebMCP:{" "}
+                {nativeWebMcpAvailable ? "Available" : "Unavailable"}
+              </div>
+              <LocalAgentStatus relay={localMcp} />
             </div>
-            <LocalAgentStatus relay={localMcp} />
-            <small>
-              Copy this guidance into an active agent surface; this workspace
-              does not simulate agent actions.
-            </small>
           </div>
           <button
             className={`md-button md-button--filled ${styles.agentButton}`}
