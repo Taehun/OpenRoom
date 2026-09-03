@@ -36,6 +36,15 @@ export interface ModelContextToolExecutionOptions {
   signal: AbortSignal;
 }
 
+/**
+ * What a host is actually allowed to hand `execute`. WebMCP hosts in the wild
+ * (the Codex in-app browser, for one) call `execute(input)` with no options at
+ * all, so the public descriptor has to accept that and normalize it.
+ */
+export type HostToolExecutionOptions =
+  | (Partial<ModelContextToolExecutionOptions> & Record<string, unknown>)
+  | undefined;
+
 export interface ModelContextTool {
   name: CoreToolName;
   description: string;
@@ -46,11 +55,32 @@ export interface ModelContextTool {
   };
   execute(
     input: unknown,
-    options: ModelContextToolExecutionOptions,
+    options?: HostToolExecutionOptions,
   ): Promise<ToolResult<unknown>>;
 }
 
-type ToolExecutor = ModelContextTool["execute"];
+/**
+ * Fills in a never-aborting signal when the host omitted one (or handed over
+ * something that is not an `AbortSignal`), so every executor below can keep
+ * requiring a real signal and abort semantics stay exactly as they were.
+ */
+export function normalizeExecutionOptions(
+  options?: HostToolExecutionOptions,
+): ModelContextToolExecutionOptions {
+  const signal = options?.signal;
+  return {
+    ...options,
+    signal:
+      typeof AbortSignal !== "undefined" && signal instanceof AbortSignal
+        ? signal
+        : new AbortController().signal,
+  };
+}
+
+type ToolExecutor = (
+  input: unknown,
+  options: ModelContextToolExecutionOptions,
+) => Promise<ToolResult<unknown>>;
 
 interface ContextSnapshot {
   scene: Scene;
@@ -493,6 +523,7 @@ export function createCoreTools(context: ToolContext): readonly ModelContextTool
   return CORE_TOOL_MANIFEST.map((entry) => ({
     ...entry,
     annotations: { ...entry.annotations },
-    execute: executors[entry.name],
+    execute: (input: unknown, options?: HostToolExecutionOptions) =>
+      executors[entry.name](input, normalizeExecutionOptions(options)),
   }));
 }

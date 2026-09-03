@@ -640,3 +640,106 @@ describe("add_scene_to_cart commerce block", () => {
     expect(JSON.stringify(result)).not.toMatch(/token/i);
   });
 });
+
+// Real hosts are not required to hand `execute` an options bag: the Codex
+// in-app browser calls `execute(input)` with nothing at all. The descriptors
+// must still resolve a result instead of throwing on `signal.throwIfAborted`.
+describe("execution options normalization", () => {
+  function coreTool(name: string) {
+    const store = createSceneStore();
+    const { context, drafts } = createContext(store);
+    const tool = createCoreTools(context).find(
+      (candidate) => candidate.name === name,
+    );
+    if (!tool) throw new Error(`Missing ${name}`);
+    return { tool, store, context, drafts };
+  }
+
+  test("reads the Scene when the host omits the options argument", async () => {
+    const { tool } = coreTool("get_scene");
+    const result = await (tool.execute as (input: unknown) => Promise<
+      Awaited<ReturnType<ModelContextTool["execute"]>>
+    >)({});
+
+    expect(result.structuredContent.ok).toBe(true);
+    expect(result.structuredContent.sceneRevision).toBe(1);
+  });
+
+  test("reads the Scene when the host passes an empty options bag", async () => {
+    const { tool } = coreTool("get_scene");
+    const result = await tool.execute({}, {} as never);
+
+    expect(result.structuredContent.ok).toBe(true);
+  });
+
+  test("reads the Scene when the host passes an undefined signal", async () => {
+    const { tool } = coreTool("get_scene");
+    const result = await tool.execute({}, { signal: undefined } as never);
+
+    expect(result.structuredContent.ok).toBe(true);
+  });
+
+  test("ignores an options bag whose signal is not an AbortSignal", async () => {
+    const { tool } = coreTool("get_scene");
+    const result = await tool.execute({}, { signal: null } as never);
+
+    expect(result.structuredContent.ok).toBe(true);
+  });
+
+  test("applies a mutation when the host omits the options argument", async () => {
+    const { tool, store } = coreTool("move_object");
+    const result = await (tool.execute as (input: unknown) => Promise<
+      Awaited<ReturnType<ModelContextTool["execute"]>>
+    >)({
+      objectId: "lamp_01",
+      expectedRevision: 1,
+      expectedStateVersion: 1,
+      position: { x: 0.4, z: 0.4 },
+    });
+
+    expect(result.structuredContent.ok).toBe(true);
+    expect(store.getState().scene.revision).toBe(2);
+  });
+
+  test("opens cart approval when the host omits the options argument", async () => {
+    const store = createSceneStore();
+    const { context, drafts } = createContext(store);
+    const tools = createCoreTools(context);
+    await execute(tools, "replace_object", {
+      objectId: "table_01",
+      productId: "travertine-plinth-table",
+      expectedRevision: 1,
+      expectedStateVersion: 1,
+    });
+    const cart = tools.find(({ name }) => name === "add_scene_to_cart");
+    if (!cart) throw new Error("Missing add_scene_to_cart");
+    const result = await (cart.execute as (input: unknown) => Promise<
+      Awaited<ReturnType<ModelContextTool["execute"]>>
+    >)({
+      expectedRevision: store.getState().scene.revision,
+      expectedStateVersion: store.getState().stateVersion,
+    });
+
+    expect(result.structuredContent.ok).toBe(true);
+    expect(drafts).toHaveLength(1);
+  });
+
+  test("still aborts when the host does supply an aborted signal", async () => {
+    const { tool, store, context } = coreTool("move_object");
+    const getScene = vi.spyOn(context, "getScene");
+    const controller = new AbortController();
+    controller.abort();
+
+    await expect(tool.execute({
+      objectId: "lamp_01",
+      expectedRevision: 1,
+      expectedStateVersion: 1,
+      position: { x: 0.4, z: 0.4 },
+    }, { signal: controller.signal })).rejects.toMatchObject({
+      name: "AbortError",
+    });
+
+    expect(getScene).not.toHaveBeenCalled();
+    expect(store.getState().scene.revision).toBe(1);
+  });
+});

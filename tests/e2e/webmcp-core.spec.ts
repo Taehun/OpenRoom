@@ -21,7 +21,7 @@ interface BrowserTool {
   description: string;
   execute(
     input: unknown,
-    options: { signal: AbortSignal },
+    options?: { signal?: AbortSignal },
   ): Promise<BrowserToolResult>;
 }
 
@@ -118,6 +118,17 @@ test("completes WebMCP Core 6 against the shared demo Scene", async ({
       (left, right) => left[0].localeCompare(right[0]),
     ),
   );
+
+  // The Codex in-app browser invokes `execute(input)` with no options bag at
+  // all; a descriptor that needed `options.signal` threw before returning.
+  const sceneWithoutOptions = await page.evaluate(() =>
+    window.__webMcpTools.get_scene?.execute({}),
+  );
+  expect(sceneWithoutOptions?.structuredContent).toMatchObject({
+    ok: true,
+    sceneRevision: 1,
+    stateVersion: 1,
+  });
 
   const selection = await page.evaluate(() =>
     window.__webMcpTools.get_selection?.execute(
