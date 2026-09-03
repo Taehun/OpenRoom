@@ -507,3 +507,40 @@ Known follow-ups: lossy re-encode of the 43 lossless cutouts (~25 MB);
 `docs/asset-views.md` category label list; rail initials for the new types are
 dormant until an add-object flow exists; the `webmcp-core.spec.ts` remount race
 noted by the removal task (harden with `expect.poll`).
+
+## 2026-09-04 polish pass (deadline extended)
+
+Owner direction: clean, intuitive design and completeness over new features.
+`output/qa/findings.md` (git-ignored, from the design-QA workflow) is the
+backlog. Landed today, each batch deployed to Workers and Pages:
+
+- **Silhouette-aware sizing** (`4782e72`): `pnpm assets:measure` writes
+  `src/features/photo/photo-silhouettes.generated.ts`; the compositor scales a
+  cutout so its alpha silhouette, not its frame, spans the view's real extent,
+  and a facing within 22.5° of straight-on keeps the room-centre twin.
+- **Cart = room** (`d3ea742`): `src/features/commerce/scene-cart.ts` builds the
+  draft for both `add_scene_to_cart` and the header button; empty rooms open an
+  honest empty state and the badge hides at zero. `CART_ITEMS` is gone.
+- **Keyboard focus follows the selection** (`room-photo-stage.tsx`): selecting
+  from the rail or picking Move/Rotate focuses the selected cutout so the arrows
+  work; never steals focus from a text field; Strict-Mode-safe (`a8ab563`).
+- **Connect recipe** (`5dcd457`): guide cards and the pairing dialog now match
+  `docs/local-mcp.md` — the client launches the companion behind
+  `sh -c '… 2>>"$HOME/openroom-mcp.log"'`, read the code with `tail -f`.
+- **Copy**: inspector shows Size / Faces / On / Style in words
+  (`object-labels.ts`, `describeFacing`); "AI app" and "Open the demo" are the
+  only names; the guide's tool disclosure is in shopper words; the canvas
+  caption chips and the "Selection cleared" pill are removed.
+- **Layout**: header actions column is `max-content`; under 1280px the
+  inspector is 320px, the chips share one wrapping row and the copy button
+  drops below; the width note shows only under 1000px.
+- **Hygiene**: `.claude/worktrees/**` ignored by ESLint and git.
+
+Open (Important, in priority order): hoist `SceneStoreProvider` to
+`app/layout.tsx` and let `scene-context.tsx` inherit (then drop the
+`SCENE_REVISION_CONFLICT` retry loop from `tests/e2e/demo-workspace.spec.ts`,
+`6b10091`); auto-dismiss the approval announcement and reword it ("Demo
+approved — nothing was ordered."); an in-flow gate below 1000px instead of the
+`min-width: 1000px` scroll; keep `--silent` whole in the guide's commands at
+three-column widths; README/docs staleness sweep; re-run the QA panel
+(`Workflow` resume `wf_3bcd85e6-f1c`).
