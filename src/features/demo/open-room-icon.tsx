@@ -1,4 +1,4 @@
-export type OpenInteriorIconName =
+export type OpenRoomIconName =
   | "cart"
   | "check"
   | "close"
@@ -9,12 +9,12 @@ export type OpenInteriorIconName =
   | "sparkles"
   | "undo";
 
-interface OpenInteriorIconProps {
-  name: OpenInteriorIconName;
+interface OpenRoomIconProps {
+  name: OpenRoomIconName;
   size?: number;
 }
 
-export function OpenInteriorIcon({ name, size = 18 }: OpenInteriorIconProps) {
+export function OpenRoomIcon({ name, size = 18 }: OpenRoomIconProps) {
   const common = {
     fill: "none",
     stroke: "currentColor",

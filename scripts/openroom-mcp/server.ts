@@ -2,7 +2,7 @@ import { serveStdio, type StdioServerHandle } from "@modelcontextprotocol/server
 
 import { DEFAULT_RELAY_PORT } from "../../src/local-mcp/relay-protocol";
 import { getCoreToolManifestHash } from "../../src/webmcp/core-tool-manifest";
-import { createOpenInteriorMcpServer } from "./mcp-server";
+import { createOpenRoomMcpServer } from "./mcp-server";
 import { createPairCodeAnnouncer, type PairCodeAnnouncer } from "./pair-code-announcer";
 import { allowedOriginsFromEnv, startRelayHttpServer, type RelayHttpServer } from "./relay-http";
 import { SessionRegistry, startExpirySweep } from "./session-registry";
@@ -17,7 +17,7 @@ import { SessionRegistry, startExpirySweep } from "./session-registry";
  * where Claude Desktop, Claude Code, and Codex CLI show it.
  */
 
-const LOG_PREFIX = "openinterior-mcp:";
+const LOG_PREFIX = "openroom-mcp:";
 
 /** Ports below 1024 need privileges the companion must never ask for. */
 const MIN_USER_PORT = 1024;
@@ -48,7 +48,7 @@ export function parseRelayPort(value: string | undefined): number {
   const raw = value?.trim();
   if (raw === undefined || raw === "") return DEFAULT_RELAY_PORT;
   const invalid = new Error(
-    `Invalid OPENINTERIOR_MCP_PORT: ${raw} (expected 0 or ${MIN_USER_PORT}-${MAX_PORT})`,
+    `Invalid OPENROOM_MCP_PORT: ${raw} (expected 0 or ${MIN_USER_PORT}-${MAX_PORT})`,
   );
   if (!/^[0-9]{1,5}$/.test(raw)) throw invalid;
   const port = Number(raw);
@@ -117,8 +117,8 @@ async function main(): Promise<void> {
   process.stdin.once("end", () => stop("stdin closed"));
   process.stdin.once("close", () => stop("stdin closed"));
 
-  const port = parseRelayPort(process.env.OPENINTERIOR_MCP_PORT);
-  const allowedOrigins = allowedOriginsFromEnv(process.env.OPENINTERIOR_ALLOWED_ORIGINS);
+  const port = parseRelayPort(process.env.OPENROOM_MCP_PORT);
+  const allowedOrigins = allowedOriginsFromEnv(process.env.OPENROOM_ALLOWED_ORIGINS);
   // Pairing is refused unless the page derives this same hash from its own copy
   // of the Core 6 manifest, so a page from a different build cannot attach.
   const manifestHash = await getCoreToolManifestHash();
@@ -158,7 +158,7 @@ async function main(): Promise<void> {
   log(`allowed page origins: ${[...allowedOrigins].join(", ")}`);
   announcer.announce();
 
-  stdio = serveStdio(() => createOpenInteriorMcpServer(registry as SessionRegistry), {
+  stdio = serveStdio(() => createOpenRoomMcpServer(registry as SessionRegistry), {
     onerror: (error) => log(`stdio transport error: ${error.message}`),
   });
   if (stopping) return teardown();

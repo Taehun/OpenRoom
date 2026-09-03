@@ -216,7 +216,7 @@ function DemoWorkspaceContent({
           scene={scene}
         />
         <div className={styles.desktopNotice} role="note">
-          OpenInterior’s room editor is desktop-first. Use a viewport at
+          OpenRoom’s room editor is desktop-first. Use a viewport at
           least 1280px wide for the complete atelier.
         </div>
         <div className={styles.workspaceBody}>

@@ -13,8 +13,8 @@ import { relayCallFailure } from "../../src/local-mcp/page-relay-client";
 import {
   LOCKOUT_REISSUE_BASE_DELAY_MS,
   MAX_LOCKOUT_REISSUES,
-} from "../../scripts/openinterior-mcp/pair-code-announcer";
-import { MAX_PAIR_ATTEMPTS } from "../../scripts/openinterior-mcp/relay-http";
+} from "../../scripts/openroom-mcp/pair-code-announcer";
+import { MAX_PAIR_ATTEMPTS } from "../../scripts/openroom-mcp/relay-http";
 import {
   CORE_TOOL_MANIFEST,
   getCoreToolManifestHash,
@@ -22,7 +22,7 @@ import {
 
 /**
  * End-to-end proof that the companion is a real MCP server: an official
- * `@modelcontextprotocol/client` drives a real spawned `pnpm mcp:openinterior`
+ * `@modelcontextprotocol/client` drives a real spawned `pnpm mcp:openroom`
  * process over stdio, while a fake browser page pairs and answers tool calls
  * over the actual loopback HTTP relay. Nothing here is mocked - not the server,
  * not the transport, not the relay - so a regression in framing, stdout
@@ -253,11 +253,11 @@ describe("local MCP companion", () => {
     manifestHash = await getCoreToolManifestHash();
     transport = new StdioClientTransport({
       command: "pnpm",
-      args: ["--silent", "mcp:openinterior"],
+      args: ["--silent", "mcp:openroom"],
       cwd: REPO_ROOT,
       env: inheritedEnv({
-        OPENINTERIOR_MCP_PORT: "0",
-        OPENINTERIOR_ALLOWED_ORIGINS: PAGE_ORIGIN,
+        OPENROOM_MCP_PORT: "0",
+        OPENROOM_ALLOWED_ORIGINS: PAGE_ORIGIN,
       }),
       stderr: "pipe",
     });
@@ -267,7 +267,7 @@ describe("local MCP companion", () => {
     if (stderr === null) throw new Error("stderr was not piped");
     const announced = readStartup(stderr, stderrLog);
 
-    client = new Client({ name: "openinterior-integration-test", version: "1.0.0" });
+    client = new Client({ name: "openroom-integration-test", version: "1.0.0" });
     await client.connect(transport);
     startup = await announced;
     baseUrl = `http://127.0.0.1:${startup.port}`;
@@ -527,12 +527,12 @@ describe("pair code lockout", () => {
   }> {
     const child: ChildProcess = spawn(
       process.execPath,
-      ["--import", "tsx", "scripts/openinterior-mcp/server.ts"],
+      ["--import", "tsx", "scripts/openroom-mcp/server.ts"],
       {
         cwd: REPO_ROOT,
         env: inheritedEnv({
-          OPENINTERIOR_MCP_PORT: "0",
-          OPENINTERIOR_ALLOWED_ORIGINS: PAGE_ORIGIN,
+          OPENROOM_MCP_PORT: "0",
+          OPENROOM_ALLOWED_ORIGINS: PAGE_ORIGIN,
         }) as NodeJS.ProcessEnv,
         stdio: ["pipe", "pipe", "pipe"],
       },
@@ -602,12 +602,12 @@ describe("pair code lockout", () => {
   it("prints a replacement the operator can pair with", async () => {
     const child: ChildProcess = spawn(
       process.execPath,
-      ["--import", "tsx", "scripts/openinterior-mcp/server.ts"],
+      ["--import", "tsx", "scripts/openroom-mcp/server.ts"],
       {
         cwd: REPO_ROOT,
         env: inheritedEnv({
-          OPENINTERIOR_MCP_PORT: "0",
-          OPENINTERIOR_ALLOWED_ORIGINS: PAGE_ORIGIN,
+          OPENROOM_MCP_PORT: "0",
+          OPENROOM_ALLOWED_ORIGINS: PAGE_ORIGIN,
         }) as NodeJS.ProcessEnv,
         stdio: ["pipe", "pipe", "pipe"],
       },
@@ -656,12 +656,12 @@ describe("companion shutdown", () => {
   it("tears down once and exits zero on SIGINT", async () => {
     const child: ChildProcess = spawn(
       process.execPath,
-      ["--import", "tsx", "scripts/openinterior-mcp/server.ts"],
+      ["--import", "tsx", "scripts/openroom-mcp/server.ts"],
       {
         cwd: REPO_ROOT,
         // The repo augments `ProcessEnv` with required keys; the inherited copy
         // carries them, but only the index signature survives the helper.
-        env: inheritedEnv({ OPENINTERIOR_MCP_PORT: "0" }) as NodeJS.ProcessEnv,
+        env: inheritedEnv({ OPENROOM_MCP_PORT: "0" }) as NodeJS.ProcessEnv,
         stdio: ["pipe", "pipe", "pipe"],
       },
     );

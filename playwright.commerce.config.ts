@@ -16,7 +16,7 @@ export default defineConfig({
     reuseExistingServer: false,
     env: {
       NEXT_PUBLIC_COMMERCE_PROVIDER: "shopify",
-      NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN: "openinterior-placeholder.myshopify.com",
+      NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN: "openroom-placeholder.myshopify.com",
       NEXT_PUBLIC_SHOPIFY_VARIANTS:
         "coffee-table=gid://shopify/ProductVariant/1001,rug=gid://shopify/ProductVariant/1002,oak-frame-table=gid://shopify/ProductVariant/1003",
     },

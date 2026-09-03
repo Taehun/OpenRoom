@@ -1,13 +1,13 @@
 # Local MCP companion
 
-OpenInterior's six tools live in the browser page. Chrome-based agent surfaces
+OpenRoom's six tools live in the browser page. Chrome-based agent surfaces
 that implement WebMCP call them directly through `document.modelContext`; Claude
 Desktop, Claude Code, and Codex CLI cannot, because they speak MCP over stdio and
 have no way into your tab.
 
-The companion closes that gap. `pnpm mcp:openinterior` starts a real MCP stdio
+The companion closes that gap. `pnpm mcp:openroom` starts a real MCP stdio
 server that advertises exactly the Core 6, plus a loopback HTTP relay that a
-paired OpenInterior page long-polls for work. The model asks for `get_scene`,
+paired OpenRoom page long-polls for work. The model asks for `get_scene`,
 the companion hands the call to your open page, the page executes it against the
 live Scene, and the answer comes back unchanged. Nothing about the Scene is
 copied into the companion process, and nothing leaves your machine.
@@ -16,32 +16,32 @@ copied into the companion process, and nothing leaves your machine.
 Claude Desktop / Claude Code / Codex CLI
         │  MCP over stdio
         ▼
-pnpm mcp:openinterior ──── HTTP on 127.0.0.1 only ────► OpenInterior page
-  (tools/list, tools/call)      (pair, long poll, result)   (the live Scene)
+pnpm mcp:openroom ──── HTTP on 127.0.0.1 only ────► OpenRoom page
+  (tools/list, tools/call)  (pair, long poll, result)   (the live Scene)
 ```
 
 ## Prerequisites
 
 - Node.js 24.13.1 and pnpm 10.27.0 (the versions recorded in `package.json` and
   `.node-version`), and `pnpm install --frozen-lockfile` already run.
-- OpenInterior running at an allowed origin. `pnpm dev` serves
+- OpenRoom running at an allowed origin. `pnpm dev` serves
   <http://localhost:3000>, which is allowed out of the box; any other origin has
-  to be listed in `OPENINTERIOR_ALLOWED_ORIGINS`.
+  to be listed in `OPENROOM_ALLOWED_ORIGINS`.
 - **No WebMCP-capable browser is required.** The companion path works in any
   browser that can run the app, because the page executes the tools itself.
 
 ## Lifecycle
 
 1. Start the app: `pnpm dev`, then open <http://localhost:3000/demo>.
-2. Start the companion: `pnpm mcp:openinterior`. Configure your MCP client with
+2. Start the companion: `pnpm mcp:openroom`. Configure your MCP client with
    one of the entries below and it will start the companion for you instead.
 3. Read the banner on **stderr** (stdout carries MCP framing and nothing else):
 
    ```text
-   openinterior-mcp: relay listening on http://127.0.0.1:43110
-   openinterior-mcp: allowed page origins: http://localhost:3000, http://127.0.0.1:3000
-   openinterior-mcp: pairing code 481902 expires 2026-09-03T09:14:53.267Z
-   openinterior-mcp: enter it in OpenInterior's "Pairing code" field, then press "Connect Claude"
+   openroom-mcp: relay listening on http://127.0.0.1:43110
+   openroom-mcp: allowed page origins: http://localhost:3000, http://127.0.0.1:3000
+   openroom-mcp: pairing code 481902 expires 2026-09-03T09:14:53.267Z
+   openroom-mcp: enter it in OpenRoom's "Pairing code" field, then press "Connect Claude"
    ```
 
    Where that text lands depends on the client, because the client owns the
@@ -49,13 +49,13 @@ pnpm mcp:openinterior ──── HTTP on 127.0.0.1 only ────► OpenIn
    and Codex CLI keep it out of the way. For those two, register the companion
    behind the one-line stderr log wrapper under [Client
    configuration](#client-configuration) and read the code from the log file it
-   appends to (`tail -f ~/openinterior-mcp.log`). Starting a second companion in
+   appends to (`tail -f ~/openroom-mcp.log`). Starting a second companion in
    a terminal is not a way to read the code: it either fails with `EADDRINUSE`
    on 43110 or, on another port, prints a code for a relay no MCP client is
    attached to.
 4. In the page, type the six digits into **Pairing code** and press **Connect
    Claude**. The status line changes to `Claude: Connected`. Leave the port field
-   at `43110` unless you changed `OPENINTERIOR_MCP_PORT`.
+   at `43110` unless you changed `OPENROOM_MCP_PORT`.
 5. Ask your model to call a tool — "call get_scene and tell me what is in the
    room" is enough. The call runs in the page you are looking at.
 
@@ -101,7 +101,7 @@ Codex product's own data handling, exactly as it would for any other MCP server.
 
 Every example below uses this repository's absolute path,
 `/Users/taehun/Projects/WebMCP`. **Change it to wherever you cloned
-OpenInterior.** `pnpm --dir <path>` is what lets the client start the companion
+OpenRoom.** `pnpm --dir <path>` is what lets the client start the companion
 from any working directory.
 
 **Reading the pair code.** The client starts the companion, so its stderr is the
@@ -114,19 +114,19 @@ one process and closing the transport still stops it.
 ### Claude Code
 
 ```bash
-claude mcp add --transport stdio openinterior -- sh -c 'exec pnpm --silent --dir /Users/taehun/Projects/WebMCP mcp:openinterior 2>>"$HOME/openinterior-mcp.log"'
+claude mcp add --transport stdio openroom -- sh -c 'exec pnpm --silent --dir /Users/taehun/Projects/WebMCP mcp:openroom 2>>"$HOME/openroom-mcp.log"'
 ```
 
 Then read the code — the port, the pair code, and every session diagnostic land
 there, and nothing else ever does:
 
 ```bash
-tail -f ~/openinterior-mcp.log
+tail -f ~/openroom-mcp.log
 ```
 
 The file only grows by appending; delete it whenever you like. If you would
 rather not keep a log file, register the bare command
-(`-- pnpm --silent --dir /Users/taehun/Projects/WebMCP mcp:openinterior`) and
+(`-- pnpm --silent --dir /Users/taehun/Projects/WebMCP mcp:openroom`) and
 read the same lines from `claude --debug` output instead.
 
 ### Claude Desktop
@@ -136,13 +136,13 @@ Add this to `claude_desktop_config.json` (Settings → Developer → Edit Config
 ```json
 {
   "mcpServers": {
-    "openinterior": {
+    "openroom": {
       "command": "pnpm",
       "args": [
         "--silent",
         "--dir",
         "/Users/taehun/Projects/WebMCP",
-        "mcp:openinterior"
+        "mcp:openroom"
       ]
     }
   }
@@ -154,21 +154,21 @@ Add this to `claude_desktop_config.json` (Settings → Developer → Edit Config
 Either run:
 
 ```bash
-codex mcp add openinterior -- sh -c 'exec pnpm --silent --dir /Users/taehun/Projects/WebMCP mcp:openinterior 2>>"$HOME/openinterior-mcp.log"'
+codex mcp add openroom -- sh -c 'exec pnpm --silent --dir /Users/taehun/Projects/WebMCP mcp:openroom 2>>"$HOME/openroom-mcp.log"'
 ```
 
 or write the equivalent block into `~/.codex/config.toml`:
 
 ```toml
-[mcp_servers.openinterior]
+[mcp_servers.openroom]
 command = "sh"
 args = [
   "-c",
-  "exec pnpm --silent --dir /Users/taehun/Projects/WebMCP mcp:openinterior 2>>\"$HOME/openinterior-mcp.log\"",
+  "exec pnpm --silent --dir /Users/taehun/Projects/WebMCP mcp:openroom 2>>\"$HOME/openroom-mcp.log\"",
 ]
 ```
 
-Read the pair code with `tail -f ~/openinterior-mcp.log`, exactly as for Claude
+Read the pair code with `tail -f ~/openroom-mcp.log`, exactly as for Claude
 Code. Drop the `sh -c` wrapper if your Codex version already surfaces MCP server
 stderr somewhere you can watch.
 
@@ -179,15 +179,15 @@ expects.
 ### ChatGPT desktop and Codex in the ChatGPT browser
 
 No companion needed. Those surfaces call `document.modelContext` natively, so
-opening OpenInterior is the whole setup. See the compatibility matrix in the
+opening OpenRoom is the whole setup. See the compatibility matrix in the
 [README](../README.md#agent-surface-compatibility).
 
 ## Environment variables
 
 | Variable | Default | Meaning |
 | --- | --- | --- |
-| `OPENINTERIOR_MCP_PORT` | `43110` | Loopback port for the relay. `0` asks the kernel for an ephemeral port (used by the tests). Any other value must be `1024`–`65535`. A malformed value aborts startup rather than silently falling back. |
-| `OPENINTERIOR_ALLOWED_ORIGINS` | unset | Extra page origins allowed to pair, comma separated and exact — for example `OPENINTERIOR_ALLOWED_ORIGINS=http://127.0.0.1:4173,https://openinterior.example`. They are added to the built-in `http://localhost:3000` and `http://127.0.0.1:3000`. Wildcards, paths, query strings, and credentials are rejected at startup. |
+| `OPENROOM_MCP_PORT` | `43110` | Loopback port for the relay. `0` asks the kernel for an ephemeral port (used by the tests). Any other value must be `1024`–`65535`. A malformed value aborts startup rather than silently falling back. |
+| `OPENROOM_ALLOWED_ORIGINS` | unset | Extra page origins allowed to pair, comma separated and exact — for example `OPENROOM_ALLOWED_ORIGINS=http://127.0.0.1:4173,https://openroom.example`. They are added to the built-in `http://localhost:3000` and `http://127.0.0.1:3000`. Wildcards, paths, query strings, and credentials are rejected at startup. |
 
 If you change the port, set the page's **Relay port** field to match; the page
 defaults to `43110`.
@@ -209,16 +209,16 @@ on both paths, and `tests/e2e/webmcp-core.spec.ts` asserts that.
 
 | Symptom | Cause and fix |
 | --- | --- |
-| A tool call returns `PAGE_UNAVAILABLE` | No page is paired. Open OpenInterior, enter the code from the companion's stderr, press **Connect Claude**, then retry. |
-| You cannot find the pair code | Your client is keeping the companion's stderr. Register it behind the `sh -c … 2>>"$HOME/openinterior-mcp.log"` wrapper above and `tail -f ~/openinterior-mcp.log`. Starting a second companion in a terminal does not help: it fails with `EADDRINUSE`, or prints a code for a relay no client is attached to. |
+| A tool call returns `PAGE_UNAVAILABLE` | No page is paired. Open OpenRoom, enter the code from the companion's stderr, press **Connect Claude**, then retry. |
+| You cannot find the pair code | Your client is keeping the companion's stderr. Register it behind the `sh -c … 2>>"$HOME/openroom-mcp.log"` wrapper above and `tail -f ~/openroom-mcp.log`. Starting a second companion in a terminal does not help: it fails with `EADDRINUSE`, or prints a code for a relay no client is attached to. |
 | A tool call returns `SESSION_DISCONNECTED` | The page went away mid-call. The companion has already printed a fresh code on stderr — enter it in the page and retry. |
-| Pairing returns 403 | The code, the page origin, or the manifest hash did not match. Retype the code; if the page is not on `http://localhost:3000`, add its exact origin to `OPENINTERIOR_ALLOWED_ORIGINS`; if you are running a different build in the tab than in the terminal, rebuild so both share one manifest. |
+| Pairing returns 403 | The code, the page origin, or the manifest hash did not match. Retype the code; if the page is not on `http://localhost:3000`, add its exact origin to `OPENROOM_ALLOWED_ORIGINS`; if you are running a different build in the tab than in the terminal, rebuild so both share one manifest. |
 | Pairing keeps failing after several tries | Five wrong attempts retire the code. The companion prints a replacement after a short delay that doubles with each lockout (1 s, 2 s, 4 s … up to 60 s) — wait for the `pairing code` line and use that one. |
 | `no pair code reissued after 10 lockouts` | Ten codes have been retired by wrong attempts in this process, which is the ceiling on guessing. Stop the companion and start it again; if you did not mistype ten times, something else on an allowed origin is posting to the relay. |
 | The page shows `Pairing needs HTTPS or localhost.` | The page is in an insecure context, so it cannot hash the manifest. Use `http://localhost:3000` or an HTTPS origin. |
 | The status flips to `Claude: Connection lost` | The long poll stopped reaching the relay (the machine slept, the port changed, or the companion exited). If the companion is still running it has printed a fresh code on stderr; enter that and press **Connect Claude** again. |
-| The companion exits with `EADDRINUSE` | Port 43110 is taken. Set `OPENINTERIOR_MCP_PORT` and update the page's **Relay port** field. |
-| `Invalid OPENINTERIOR_ALLOWED_ORIGINS entry` | An entry is not a bare origin. Use `scheme://host[:port]` with no trailing slash, path, or wildcard. |
+| The companion exits with `EADDRINUSE` | Port 43110 is taken. Set `OPENROOM_MCP_PORT` and update the page's **Relay port** field. |
+| `Invalid OPENROOM_ALLOWED_ORIGINS entry` | An entry is not a bare origin. Use `scheme://host[:port]` with no trailing slash, path, or wildcard. |
 | The client reports a protocol parse error | Something other than the companion wrote to stdout. Keep `--silent` in the `pnpm` invocation; the companion itself only writes to stderr. |
 
 ## Verifying it works
@@ -227,7 +227,7 @@ on both paths, and `tests/e2e/webmcp-core.spec.ts` asserts that.
 pnpm exec vitest run tests/integration/local-mcp-companion.test.ts
 ```
 
-That test spawns the real `pnpm mcp:openinterior` process, drives it with the
+That test spawns the real `pnpm mcp:openroom` process, drives it with the
 official `@modelcontextprotocol/client` over stdio, pairs a fake page over real
 loopback HTTP, and checks the whole path: exact Core 6 in `tools/list`,
 `PAGE_UNAVAILABLE` before pairing, refusal of a wrong origin, code, or manifest

@@ -6,7 +6,7 @@ import { useSceneStore } from "../scene/scene-context";
 import type { Scene } from "../scene/scene-schema";
 import type { DemoAction, DemoState } from "./demo-types";
 import { LocalAgentStatus } from "./local-agent-status";
-import { OpenInteriorIcon } from "./open-interior-icon";
+import { OpenRoomIcon } from "./open-room-icon";
 import styles from "./demo-workspace.module.css";
 
 const ROOM_OBJECTS = [
@@ -116,7 +116,7 @@ export function RoomCanvas({
             title="Select"
             type="button"
           >
-            <OpenInteriorIcon name="select" />
+            <OpenRoomIcon name="select" />
             <span>Select</span>
           </button>
           <button
@@ -129,7 +129,7 @@ export function RoomCanvas({
             title="Move selected object"
             type="button"
           >
-            <OpenInteriorIcon name="move" />
+            <OpenRoomIcon name="move" />
             <span>Move</span>
           </button>
           <button
@@ -144,7 +144,7 @@ export function RoomCanvas({
             title="Rotate selected object"
             type="button"
           >
-            <OpenInteriorIcon name="rotate" />
+            <OpenRoomIcon name="rotate" />
             <span>Rotate</span>
           </button>
         </div>
@@ -243,7 +243,7 @@ export function RoomCanvas({
           {state.toast ? (
             <div className={styles.undoToast} role="status">
               <span className={styles.toastCheck} aria-hidden="true">
-                <OpenInteriorIcon name="check" size={16} />
+                <OpenRoomIcon name="check" size={16} />
               </span>
               <span>{state.toast.message}</span>
               <button
@@ -261,7 +261,7 @@ export function RoomCanvas({
           className={styles.composer}
         >
           <span className={styles.composerIcon} aria-hidden="true">
-            <OpenInteriorIcon name="sparkles" />
+            <OpenRoomIcon name="sparkles" />
           </span>
           <div className={styles.promptGuidance}>
             <p>{PRIMARY_PROMPT}</p>

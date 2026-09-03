@@ -88,7 +88,7 @@ function measuredPlacementProposal(
     return proposer(scene);
   } finally {
     try {
-      performance.measure("openinterior-natural-placement", {
+      performance.measure("openroom-natural-placement", {
         start,
         duration: performance.now() - start,
       });

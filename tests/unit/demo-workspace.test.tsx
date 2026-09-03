@@ -604,7 +604,7 @@ test("offers accessible manual pairing controls beside the native WebMCP status"
   // applies no CSS module rules, which would make `toBeVisible` pass even with
   // the description detached.
   expect(code).toHaveAccessibleDescription(
-    "Start pnpm mcp:openinterior, then enter the code printed in that terminal.",
+    "Start pnpm mcp:openroom, then enter the code printed in that terminal.",
   );
 });
 

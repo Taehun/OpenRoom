@@ -15,7 +15,7 @@ export interface PhotoCalibration {
   maxScale: number;
 }
 
-export const OPENINTERIOR_PHOTO_CALIBRATION: Readonly<PhotoCalibration> = {
+export const OPENROOM_PHOTO_CALIBRATION: Readonly<PhotoCalibration> = {
   version: 1,
   backLeft: { x: 0.24, y: 0.54 },
   backRight: { x: 0.76, y: 0.54 },

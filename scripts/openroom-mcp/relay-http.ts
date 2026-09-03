@@ -151,7 +151,7 @@ export function allowedOriginsFromEnv(value: string | undefined): ReadonlySet<st
       url.password !== "" ||
       url.pathname !== "/"
     ) {
-      throw new Error(`Invalid OPENINTERIOR_ALLOWED_ORIGINS entry: ${candidate}`);
+      throw new Error(`Invalid OPENROOM_ALLOWED_ORIGINS entry: ${candidate}`);
     }
     origins.add(url.origin);
   }

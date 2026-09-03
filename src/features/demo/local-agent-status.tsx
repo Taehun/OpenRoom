@@ -107,7 +107,7 @@ export function LocalAgentStatus({ relay }: { relay: LocalMcpRelay }) {
       {note ? <small className={styles.pairNote}>{note}</small> : null}
 
       <small className={styles.visuallyHidden} id={hintId}>
-        Start pnpm mcp:openinterior, then enter the code printed in that
+        Start pnpm mcp:openroom, then enter the code printed in that
         terminal.
       </small>
     </div>

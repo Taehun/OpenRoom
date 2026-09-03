@@ -16,8 +16,8 @@ const ui = DM_Sans({
 });
 
 export const metadata: Metadata = {
-  title: "OpenInterior",
-  description: "The room becomes the storefront.",
+  title: "OpenRoom",
+  description: "AI Room Planner & Furniture Shopping",
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {

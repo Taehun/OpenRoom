@@ -17,7 +17,7 @@ import {
   SESSION_CLOSED_HEARTBEAT_EXPIRED,
   SessionRegistry,
   startExpirySweep,
-} from "../../scripts/openinterior-mcp/session-registry";
+} from "../../scripts/openroom-mcp/session-registry";
 import type { ToolResult } from "../../src/webmcp/tool-result";
 
 const MANIFEST_HASH = "0123456789abcdef".repeat(4);

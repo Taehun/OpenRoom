@@ -51,7 +51,7 @@ describe("relay protocol constants", () => {
       "http://localhost:3000",
     ]);
     expect(DEFAULT_ALLOWED_ORIGINS.has("http://localhost:3001")).toBe(false);
-    expect(DEFAULT_ALLOWED_ORIGINS.has("https://openinterior.example")).toBe(false);
+    expect(DEFAULT_ALLOWED_ORIGINS.has("https://openroom.example")).toBe(false);
     expect(DEFAULT_ALLOWED_ORIGINS.has("null")).toBe(false);
   });
 });

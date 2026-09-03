@@ -2,7 +2,7 @@ import Link from "next/link";
 import type { Dispatch, RefObject } from "react";
 import type { Scene } from "../scene/scene-schema";
 import type { DemoAction } from "./demo-types";
-import { OpenInteriorIcon } from "./open-interior-icon";
+import { OpenRoomIcon } from "./open-room-icon";
 import styles from "./demo-workspace.module.css";
 
 interface WorkspaceHeaderProps {
@@ -32,8 +32,8 @@ export function WorkspaceHeader({
   return (
     <header className={styles.header}>
       <div className={styles.brandBlock}>
-        <Link className={styles.brand} href="/" aria-label="OpenInterior home">
-          OpenInterior
+        <Link className={styles.brand} href="/" aria-label="OpenRoom home">
+          OpenRoom
         </Link>
         <span className={styles.headerDivider} aria-hidden="true" />
         <div className={styles.roomIdentity}>
@@ -71,7 +71,7 @@ export function WorkspaceHeader({
           title="Undo last scene change (Cmd/Ctrl+Z)"
           type="button"
         >
-          <OpenInteriorIcon name="undo" />
+          <OpenRoomIcon name="undo" />
           <span>Undo</span>
         </button>
         <button
@@ -80,7 +80,7 @@ export function WorkspaceHeader({
           title="Restore the canonical demo room"
           type="button"
         >
-          <OpenInteriorIcon name="reset" />
+          <OpenRoomIcon name="reset" />
           <span>Reset Demo</span>
         </button>
         <button
@@ -90,7 +90,7 @@ export function WorkspaceHeader({
           ref={cartButtonRef}
           type="button"
         >
-          <OpenInteriorIcon name="cart" />
+          <OpenRoomIcon name="cart" />
           <span>View cart</span>
           <span className={styles.cartCount} aria-hidden="true">
             4

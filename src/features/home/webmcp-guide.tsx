@@ -57,7 +57,7 @@ function statusMessage(status: CompatibilityStatus | null): string {
     case "unsupported-browser":
       return `WebMCP is not available in ${status.browser.brand}; use Google Chrome ${WEBMCP_MIN_CHROMIUM} or newer.`;
     case "insecure-context":
-      return "WebMCP is only exposed on secure pages; open OpenInterior over HTTPS or on localhost.";
+      return "WebMCP is only exposed on secure pages; open OpenRoom over HTTPS or on localhost.";
   }
 }
 
@@ -155,14 +155,14 @@ interface WebMcpGuideProps {
 export function WebMcpGuide({ onCheckAgain, status }: WebMcpGuideProps) {
   return (
     <main className={styles.guide}>
-      <section className={styles.hero} aria-labelledby="openinterior-heading">
+      <section className={styles.hero} aria-labelledby="openroom-heading">
         <div className={styles.heroCopy}>
           <p className={styles.eyebrow}>
             Open-source spatial commerce for WebMCP agents
           </p>
-          <h1 id="openinterior-heading">The room becomes the storefront.</h1>
+          <h1 id="openroom-heading">The room becomes the storefront.</h1>
           <p className={styles.intro}>
-            {"OpenInterior turns a room photo into a storefront that both people and AI agents can edit. This browser has not exposed WebMCP yet, so here is how to get it running, and how to try the demo without it."}
+            {"OpenRoom turns a room photo into a storefront that both people and AI agents can edit. This browser has not exposed WebMCP yet, so here is how to get it running, and how to try the demo without it."}
           </p>
         </div>
 
@@ -172,7 +172,7 @@ export function WebMcpGuide({ onCheckAgain, status }: WebMcpGuideProps) {
             fill
             priority
             sizes="(min-width: 900px) 46vw, 100vw"
-            src="/demo/openinterior-room.png"
+            src="/demo/openroom-room.png"
           />
         </figure>
       </section>
@@ -252,7 +252,7 @@ export function WebMcpGuide({ onCheckAgain, status }: WebMcpGuideProps) {
       <section className={styles.panel} aria-labelledby="webmcp-source-heading">
         <h2 id="webmcp-source-heading">Open source</h2>
         <p>
-          {"OpenInterior is MIT-licensed. The source in this repository includes the deterministic solver, the photo compositor, and the WebMCP tools."}
+          {"OpenRoom is MIT-licensed. The source in this repository includes the deterministic solver, the photo compositor, and the WebMCP tools."}
         </p>
       </section>
     </main>

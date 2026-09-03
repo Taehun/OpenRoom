@@ -741,7 +741,7 @@ test("redesigns the whole photo room through Core 6 and preserves human transfor
   ).toEqual([]);
   expect(externalRequestsDuringCart).toEqual([]);
 
-  await page.getByRole("link", { name: "OpenInterior home" }).click();
+  await page.getByRole("link", { name: "OpenRoom home" }).click();
   await expect(page).toHaveURL("/");
   // `/` is the dashboard whenever WebMCP is present, so it remounts the
   // workspace: exactly six registrations stay live. A `/demo` unmount that
@@ -933,7 +933,7 @@ test("keeps natural placement below 16ms p95 in the browser", async ({
 
   // The completion transition already measured one proposal; only the 30 explicit
   // requests below are sampled.
-  await page.evaluate(() => performance.clearMeasures("openinterior-natural-placement"));
+  await page.evaluate(() => performance.clearMeasures("openroom-natural-placement"));
   const arrange = arrangeControl(page);
   const message = placementMessage(page);
   for (let index = 0; index < 30; index += 1) {
@@ -947,7 +947,7 @@ test("keeps natural placement below 16ms p95 in the browser", async ({
 
   const durations = await page.evaluate(() =>
     performance
-      .getEntriesByName("openinterior-natural-placement")
+      .getEntriesByName("openroom-natural-placement")
       .map(({ duration }) => duration)
       .sort((first, second) => first - second),
   );

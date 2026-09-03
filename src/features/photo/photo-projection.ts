@@ -11,7 +11,7 @@ import {
 import type { PointXZ } from "../placement/placement-types";
 import type { NormalizedQuad, PhotoAsset } from "./photo-assets";
 import {
-  OPENINTERIOR_PHOTO_CALIBRATION,
+  OPENROOM_PHOTO_CALIBRATION,
   type NormalizedPoint,
   type PhotoCalibration,
 } from "./photo-calibration";
@@ -65,7 +65,7 @@ const lerp = (from: number, to: number, amount: number) =>
 export function projectRoomPoint(
   position: { x: number; z: number },
   room: SceneRoom,
-  calibration: PhotoCalibration = OPENINTERIOR_PHOTO_CALIBRATION,
+  calibration: PhotoCalibration = OPENROOM_PHOTO_CALIBRATION,
 ): ProjectedPlacement {
   const depth = clamp((position.z + room.depth / 2) / room.depth, 0, 1);
   const horizontal = clamp((position.x + room.width / 2) / room.width, 0, 1);
@@ -91,7 +91,7 @@ export function projectRoomPoint(
 export function unprojectStagePoint(
   point: NormalizedPoint,
   room: SceneRoom,
-  calibration: PhotoCalibration = OPENINTERIOR_PHOTO_CALIBRATION,
+  calibration: PhotoCalibration = OPENROOM_PHOTO_CALIBRATION,
 ): { x: number; z: number } {
   const stageX = clamp(point.x, 0, 1);
   const stageY = clamp(point.y, 0, 1);
@@ -259,13 +259,13 @@ export function projectContactShadow(
       ? CONTACT_SHADOW_PROFILES.unknown
       : CONTACT_SHADOW_PROFILES[object.type];
   const scaleRange =
-    OPENINTERIOR_PHOTO_CALIBRATION.maxScale -
-    OPENINTERIOR_PHOTO_CALIBRATION.minScale;
+    OPENROOM_PHOTO_CALIBRATION.maxScale -
+    OPENROOM_PHOTO_CALIBRATION.minScale;
   const depthAmount =
     scaleRange === 0
       ? 0
       : clamp(
-          (placement.scale - OPENINTERIOR_PHOTO_CALIBRATION.minScale) / scaleRange,
+          (placement.scale - OPENROOM_PHOTO_CALIBRATION.minScale) / scaleRange,
           0,
           1,
         );
