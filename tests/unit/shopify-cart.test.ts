@@ -10,8 +10,10 @@ import type { CartApprovalDraft } from "../../src/webmcp/tool-context";
 import {
   DEMO_COMMERCE,
   FIXTURE_VARIANTS,
+  FIXTURE_VARIANT_IDS,
   PLACEHOLDER_STORE_DOMAIN,
   SHOPIFY_COMMERCE,
+  fixtureGid,
 } from "../helpers/commerce-fixtures";
 
 const DRAFT: CartApprovalDraft = {
@@ -22,7 +24,7 @@ const DRAFT: CartApprovalDraft = {
     {
       objectId: "table_01",
       productId: "oak-frame-table",
-      variantId: "demo-variant-oak-frame-table",
+      demoVariantId: "demo-variant-oak-frame-table",
       title: "Oak Frame Table",
       quantity: 1,
       price: { amountMinor: 16900, currency: "USD" },
@@ -30,7 +32,7 @@ const DRAFT: CartApprovalDraft = {
     {
       objectId: "rug_01",
       productId: "woven-jute-rug",
-      variantId: "demo-variant-woven-jute-rug",
+      demoVariantId: "demo-variant-woven-jute-rug",
       title: "Woven Jute Rug",
       quantity: 1,
       price: { amountMinor: 32900, currency: "USD" },
@@ -38,7 +40,7 @@ const DRAFT: CartApprovalDraft = {
     {
       objectId: "lamp_01",
       productId: "rice-paper-floor-lamp",
-      variantId: "demo-variant-rice-paper-floor-lamp",
+      demoVariantId: "demo-variant-rice-paper-floor-lamp",
       title: "Rice Paper Floor Lamp",
       quantity: 1,
       price: { amountMinor: 14900, currency: "USD" },
@@ -62,8 +64,8 @@ describe("resolveShopifyLines", () => {
     expect(result.lines).toEqual([
       {
         productId: "coffee-table",
-        merchandiseId: "gid://shopify/ProductVariant/1001",
-        variantId: "1001",
+        merchandiseId: fixtureGid("coffee-table"),
+        variantId: FIXTURE_VARIANT_IDS["coffee-table"],
         quantity: 3,
       },
     ]);
@@ -115,6 +117,20 @@ describe("buildCartPermalink", () => {
   it("returns null without lines", () => {
     expect(buildCartPermalink(PLACEHOLDER_STORE_DOMAIN, [])).toBeNull();
   });
+
+  it("carries a realistic full-length variant id through to the permalink", () => {
+    const gid = "gid://shopify/ProductVariant/44352465993";
+    const { lines } = resolveShopifyLines(
+      [{ productId: "sofa", quantity: 2 }],
+      { sofa: gid },
+    );
+    expect(lines).toEqual([
+      { productId: "sofa", merchandiseId: gid, variantId: "44352465993", quantity: 2 },
+    ]);
+    expect(buildCartPermalink(PLACEHOLDER_STORE_DOMAIN, lines)).toBe(
+      `https://${PLACEHOLDER_STORE_DOMAIN}/cart/44352465993:2`,
+    );
+  });
 });
 
 describe("buildCommerceDraft", () => {
@@ -133,10 +149,10 @@ describe("buildCommerceDraft", () => {
       storeDomain: PLACEHOLDER_STORE_DOMAIN,
       mcpEndpoint: `https://${PLACEHOLDER_STORE_DOMAIN}/api/mcp`,
       lines: [
-        { productId: "coffee-table", merchandiseId: "gid://shopify/ProductVariant/1001", quantity: 1 },
+        { productId: "coffee-table", merchandiseId: fixtureGid("coffee-table"), quantity: 1 },
       ],
       skipped: [{ productId: "plant", reason: "unmapped" }],
-      checkoutPermalink: `https://${PLACEHOLDER_STORE_DOMAIN}/cart/1001:1`,
+      checkoutPermalink: `https://${PLACEHOLDER_STORE_DOMAIN}/cart/${FIXTURE_VARIANT_IDS["coffee-table"]}:1`,
     });
   });
 
@@ -164,11 +180,11 @@ describe("enrichCartDraft", () => {
       storeDomain: PLACEHOLDER_STORE_DOMAIN,
       mcpEndpoint: `https://${PLACEHOLDER_STORE_DOMAIN}/api/mcp`,
       lines: [
-        { productId: "oak-frame-table", merchandiseId: "gid://shopify/ProductVariant/1003", quantity: 1 },
-        { productId: "woven-jute-rug", merchandiseId: "gid://shopify/ProductVariant/1004", quantity: 1 },
+        { productId: "oak-frame-table", merchandiseId: fixtureGid("oak-frame-table"), quantity: 1 },
+        { productId: "woven-jute-rug", merchandiseId: fixtureGid("woven-jute-rug"), quantity: 1 },
       ],
       skipped: [{ productId: "rice-paper-floor-lamp", reason: "unmapped" }],
-      checkoutPermalink: `https://${PLACEHOLDER_STORE_DOMAIN}/cart/1003:1,1004:1`,
+      checkoutPermalink: `https://${PLACEHOLDER_STORE_DOMAIN}/cart/${FIXTURE_VARIANT_IDS["oak-frame-table"]}:1,${FIXTURE_VARIANT_IDS["woven-jute-rug"]}:1`,
     });
   });
 });

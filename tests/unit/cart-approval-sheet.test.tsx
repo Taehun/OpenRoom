@@ -2,16 +2,22 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { CommerceContext } from "../../src/features/commerce/commerce-types";
-import { CartApprovalSheet } from "../../src/features/demo/cart-approval-sheet";
+import {
+  CartApprovalSheet,
+  openInNewTab,
+} from "../../src/features/demo/cart-approval-sheet";
 import type { CartApprovalDraft } from "../../src/webmcp/tool-context";
 import {
   DEMO_COMMERCE,
   FIXTURE_VARIANTS,
+  FIXTURE_VARIANT_IDS,
   PLACEHOLDER_STORE_DOMAIN,
   SHOPIFY_COMMERCE,
+  fixtureGid,
 } from "../helpers/commerce-fixtures";
 
-const PERMALINK = `https://${PLACEHOLDER_STORE_DOMAIN}/cart/1001:1,1002:1`;
+const PERMALINK = `https://${PLACEHOLDER_STORE_DOMAIN}/cart/${FIXTURE_VARIANT_IDS["coffee-table"]}:1,${FIXTURE_VARIANT_IDS.rug}:1`;
+const TABLE_PERMALINK = `https://${PLACEHOLDER_STORE_DOMAIN}/cart/${FIXTURE_VARIANT_IDS["oak-frame-table"]}:1`;
 
 afterEach(() => {
   cleanup();
@@ -26,7 +32,7 @@ function agentDraft(): CartApprovalDraft {
       {
         objectId: "table_01",
         productId: "oak-frame-table",
-        variantId: "demo-variant-oak-frame-table",
+        demoVariantId: "demo-variant-oak-frame-table",
         title: "Oak Frame Table",
         quantity: 1,
         price: { amountMinor: 16900, currency: "USD" },
@@ -34,7 +40,7 @@ function agentDraft(): CartApprovalDraft {
       {
         objectId: "lamp_01",
         productId: "rice-paper-floor-lamp",
-        variantId: "demo-variant-rice-paper-floor-lamp",
+        demoVariantId: "demo-variant-rice-paper-floor-lamp",
         title: "Rice Paper Floor Lamp",
         quantity: 1,
         price: { amountMinor: 14900, currency: "USD" },
@@ -48,12 +54,12 @@ function agentDraft(): CartApprovalDraft {
       lines: [
         {
           productId: "oak-frame-table",
-          merchandiseId: "gid://shopify/ProductVariant/1003",
+          merchandiseId: fixtureGid("oak-frame-table"),
           quantity: 1,
         },
       ],
       skipped: [{ productId: "rice-paper-floor-lamp", reason: "unmapped" }],
-      checkoutPermalink: `https://${PLACEHOLDER_STORE_DOMAIN}/cart/1003:1`,
+      checkoutPermalink: TABLE_PERMALINK,
     },
   };
 }
@@ -67,6 +73,12 @@ describe("CartApprovalSheet in demo mode", () => {
     );
     expect(dispatch).toHaveBeenCalledWith({ type: "confirm-demo-cart" });
     expect(screen.queryByText("Not mapped to a Shopify variant")).toBeNull();
+  });
+
+  it("keeps the demo total copy", () => {
+    render(<CartApprovalSheet commerce={DEMO_COMMERCE} dispatch={vi.fn()} />);
+    expect(screen.getByText("Estimated total")).toBeVisible();
+    expect(screen.getByText("Taxes and delivery calculated later")).toBeVisible();
   });
 });
 
@@ -137,13 +149,56 @@ describe("CartApprovalSheet in shopify mode", () => {
     fireEvent.click(
       screen.getByRole("button", { name: "Continue to Shopify · $169" }),
     );
-    expect(openWindow).toHaveBeenCalledWith(
-      `https://${PLACEHOLDER_STORE_DOMAIN}/cart/1003:1`,
-    );
+    expect(openWindow).toHaveBeenCalledWith(TABLE_PERMALINK);
     expect(dispatch).toHaveBeenCalledWith({
       type: "open-external-checkout",
       itemCount: 1,
     });
+  });
+
+  it("calls the total a catalog estimate and defers pricing to Shopify", () => {
+    render(<CartApprovalSheet commerce={SHOPIFY_COMMERCE} dispatch={vi.fn()} />);
+    expect(screen.getByText("Catalog estimate")).toBeVisible();
+    expect(
+      screen.getByText("Shopify shows the store's prices at checkout."),
+    ).toBeVisible();
+    expect(screen.queryByText("Estimated total")).toBeNull();
+  });
+
+  it("announces checkout even when the popup's opener setter throws", () => {
+    const dispatch = vi.fn();
+    // WebKit exposes no cross-origin `opener` setter: assigning to it throws,
+    // which used to abort the click handler before the announcement.
+    const hostile = Object.defineProperty({} as Window, "opener", {
+      configurable: true,
+      get: () => null,
+      set: () => {
+        throw new TypeError("Cannot set property opener");
+      },
+    });
+    const open = vi.spyOn(window, "open").mockReturnValue(hostile);
+    try {
+      render(
+        <CartApprovalSheet
+          commerce={SHOPIFY_COMMERCE}
+          dispatch={dispatch}
+          openWindow={openInNewTab}
+        />,
+      );
+      fireEvent.click(
+        screen.getByRole("button", { name: "Continue to Shopify · $438" }),
+      );
+      expect(open).toHaveBeenCalledWith(PERMALINK, "_blank");
+      expect(dispatch).toHaveBeenCalledWith({
+        type: "open-external-checkout",
+        itemCount: 2,
+      });
+      expect(
+        screen.queryByRole("link", { name: "Open Shopify checkout" }),
+      ).toBeNull();
+    } finally {
+      open.mockRestore();
+    }
   });
 
   it("disables checkout when nothing is mapped", () => {

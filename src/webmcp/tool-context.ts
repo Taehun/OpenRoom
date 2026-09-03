@@ -23,7 +23,11 @@ export type CatalogProduct = z.infer<typeof CatalogProductSchema>;
 export interface CartApprovalItem {
   objectId: string;
   productId: string;
-  variantId: string;
+  /**
+   * The demo catalog's own variant id, never a Shopify merchandise id: only
+   * `commerce.lines[].merchandiseId` may be sent to a store's `update_cart`.
+   */
+  demoVariantId: string;
   title: string;
   quantity: 1;
   price: SceneProduct["price"];

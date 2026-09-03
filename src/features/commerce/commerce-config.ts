@@ -11,7 +11,10 @@ const storeDomainSchema = z
   .regex(/^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/);
 
 export function parseCommerceConfig(env: CommerceEnv): CommerceConfig {
-  const providerValue = env.NEXT_PUBLIC_COMMERCE_PROVIDER?.trim() ?? "";
+  // Case-insensitive: a dashboard variable typed as `Shopify` must not fall
+  // back to demo mode silently.
+  const providerValue =
+    env.NEXT_PUBLIC_COMMERCE_PROVIDER?.trim().toLowerCase() ?? "";
   if (providerValue === "") return { provider: "demo", reason: "default" };
 
   const provider = providerSchema.safeParse(providerValue);

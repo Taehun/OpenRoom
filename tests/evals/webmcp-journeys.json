@@ -33,6 +33,7 @@
     "expectedTools": ["add_scene_to_cart"],
     "assertions": [
       "In shopify mode the draft carries commerce.lines with merchandiseId and quantity plus commerce.mcpEndpoint",
+      "Draft items carry demoVariantId (the demo catalog id); only commerce.lines[].merchandiseId is sent to update_cart",
       "Unmapped products appear in commerce.skipped and are not sent anywhere",
       "OpenRoom makes no external request; the agent calls update_cart and get_cart on the store MCP itself"
     ]

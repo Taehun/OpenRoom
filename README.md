@@ -286,10 +286,14 @@ static mapping from demo product ids to Shopify variant GIDs:
 
 Setup:
 
-1. Find each product's variant GID in Shopify admin (Products → variant →
-   the id in the URL, or the Storefront MCP `search_catalog` tool) and record
-   it in `src/features/commerce/shopify-variants.ts` or
-   `NEXT_PUBLIC_SHOPIFY_VARIANTS`.
+1. Find each product's variant id in Shopify admin (Products → variant → the
+   numeric id at the end of the URL, or the Storefront MCP `search_catalog`
+   tool) and wrap it as `gid://shopify/ProductVariant/<numeric id>` before
+   recording it in `src/features/commerce/shopify-variants.ts`.
+   `NEXT_PUBLIC_SHOPIFY_VARIANTS` also accepts the bare numeric id and wraps it
+   for you, so `rug=44352465993` and
+   `rug=gid://shopify/ProductVariant/44352465993` are equivalent; anything else
+   is reported as `Not mapped to a Shopify variant` and left out of the cart.
 2. Set `NEXT_PUBLIC_COMMERCE_PROVIDER=shopify` and
    `NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN=<your-store>.myshopify.com`, then rebuild.
 3. Run `pnpm run test:e2e:commerce` to exercise the Shopify-mode journey against
@@ -320,6 +324,22 @@ both exist:
 Set them with `gh secret set CLOUDFLARE_API_TOKEN -R Taehun/OpenRoom` (paste
 the token when prompted). A first deploy can also be run locally with
 `pnpm run build && pnpm run deploy:vinext` after `pnpm exec wrangler login`.
+
+Shopify mode is configured with three repository **variables** (not secrets:
+`NEXT_PUBLIC_*` is inlined into the client bundle and is public anyway). The
+deploy job passes them into the vinext build, and a build step then greps
+`dist/client` for the store domain and fails the deploy if it is missing:
+
+| Variable | Purpose | Example |
+| --- | --- | --- |
+| `NEXT_PUBLIC_COMMERCE_PROVIDER` | Selects the commerce path; anything but `shopify` keeps demo mode. | `shopify` |
+| `NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN` | Bare store host the permalink and the Storefront MCP endpoint are built from. | `your-store.myshopify.com` |
+| `NEXT_PUBLIC_SHOPIFY_VARIANTS` | Comma-separated `productId=variant` overrides for the static map. | `rug=44352465993,floor-lamp=gid://shopify/ProductVariant/44352465994` |
+
+Set them with `gh variable set NEXT_PUBLIC_COMMERCE_PROVIDER -R Taehun/OpenRoom
+--body shopify`. Because these values are **inlined at build time**, changing a
+variable has no effect until the next deploy — a Worker runtime variable cannot
+patch a bundle that was already compiled; re-run the workflow after editing one.
 
 ## Contributing
 

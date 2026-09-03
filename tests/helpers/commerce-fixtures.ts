@@ -2,14 +2,38 @@ import type { CommerceContext, ShopifyVariantMap } from "../../src/features/comm
 
 export const PLACEHOLDER_STORE_DOMAIN = "openroom-placeholder.myshopify.com";
 
+// Real Shopify variant ids are 13-14 digits; the fixtures use realistic-length
+// ids so the permalink and the override string are exercised at full width.
+export const FIXTURE_VARIANT_IDS = {
+  "coffee-table": "4435246599371",
+  rug: "4435246599372",
+  "oak-frame-table": "4435246599373",
+  "woven-jute-rug": "4435246599374",
+} as const;
+
+export function fixtureGid(productId: keyof typeof FIXTURE_VARIANT_IDS): string {
+  return `gid://shopify/ProductVariant/${FIXTURE_VARIANT_IDS[productId]}`;
+}
+
 export const FIXTURE_VARIANTS: ShopifyVariantMap = {
-  "coffee-table": "gid://shopify/ProductVariant/1001",
-  rug: "gid://shopify/ProductVariant/1002",
-  "oak-frame-table": "gid://shopify/ProductVariant/1003",
-  "woven-jute-rug": "gid://shopify/ProductVariant/1004",
+  "coffee-table": fixtureGid("coffee-table"),
+  rug: fixtureGid("rug"),
+  "oak-frame-table": fixtureGid("oak-frame-table"),
+  "woven-jute-rug": fixtureGid("woven-jute-rug"),
   "floor-lamp": null,
   plant: null,
 };
+
+/**
+ * The three mappings the Shopify-mode dev server is started with
+ * (`playwright.commerce.config.ts`), so the E2E and the unit fixtures cannot
+ * drift apart.
+ */
+export const FIXTURE_VARIANT_OVERRIDES = (
+  ["coffee-table", "rug", "oak-frame-table"] as const
+)
+  .map((productId) => `${productId}=${fixtureGid(productId)}`)
+  .join(",");
 
 export const DEMO_COMMERCE: CommerceContext = {
   config: { provider: "demo", reason: "default" },
