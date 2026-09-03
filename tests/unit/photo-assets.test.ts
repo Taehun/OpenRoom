@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createDemoScene } from "../../src/demo/demo-scene";
 import { DEMO_PRODUCTS } from "../../src/features/demo/demo-data";
+import { GENERATED_PRODUCT_ASSETS } from "../../src/features/photo/photo-products.generated";
 import {
   OPENROOM_ROOM_BACKGROUND,
   PHOTO_ASSETS,
@@ -149,11 +150,10 @@ describe("photo assets", () => {
 
   it("registers the complete room and cutout asset inventory with matching WebP metadata", () => {
     expect(Object.keys(ROOM_PHOTO_ASSETS)).toHaveLength(2);
-    expect(Object.keys(PHOTO_ASSETS)).toHaveLength(24);
-    expect(
-      Object.keys(ROOM_PHOTO_ASSETS).length + Object.keys(PHOTO_ASSETS).length,
-    )
-      .toBe(26);
+    // 24 hand-registered cutouts plus every product the pipeline generated.
+    expect(Object.keys(PHOTO_ASSETS)).toHaveLength(
+      24 + GENERATED_PRODUCT_ASSETS.length,
+    );
 
     for (const room of Object.values(ROOM_PHOTO_ASSETS)) {
       const metadata = readWebpMetadata(join(process.cwd(), "public", room.src));
@@ -178,11 +178,18 @@ describe("photo assets", () => {
       expect(quad, id).toEqual(EXPECTED_RUG_FLOOR_QUADS[id]);
       expect(isValidFloorQuad(quad!), id).toBe(true);
     }
+    // Generated rugs carry a bounding-box quad; every other asset has none.
+    const generatedRugs = GENERATED_PRODUCT_ASSETS.filter(
+      (asset) => asset.floorQuad !== undefined,
+    );
+    for (const asset of generatedRugs) {
+      expect(isValidFloorQuad(asset.floorQuad!), asset.id).toBe(true);
+    }
     expect(
       Object.values(PHOTO_ASSETS).filter(
         ({ floorQuad }) => floorQuad !== undefined,
       ),
-    ).toHaveLength(4);
+    ).toHaveLength(4 + generatedRugs.length);
   });
 
   it("has at least five stable products for every category", () => {

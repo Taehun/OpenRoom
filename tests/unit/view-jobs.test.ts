@@ -17,10 +17,18 @@ import {
   PHOTO_ASSET_SETS,
 } from "../../src/features/photo/photo-views";
 
+// Three views for every asymmetric set, one side view for every front-back set.
+const EXPECTED_VIEW_JOBS = Object.values(PHOTO_ASSET_SETS).reduce(
+  (total, set) =>
+    total + (set.symmetry === "none" ? 3 : set.symmetry === "front-back" ? 1 : 0),
+  0,
+);
+
 describe("view jobs", () => {
-  it("plans 28 jobs for the demo catalog with an empty manifest", () => {
+  it("plans one job per missing view for the demo catalog with an empty manifest", () => {
     const jobs = planJobs(PHOTO_ASSET_SETS, { version: 1, views: [] }, parseArgs([]));
-    expect(jobs).toHaveLength(28);
+    expect(jobs).toHaveLength(EXPECTED_VIEW_JOBS);
+    expect(EXPECTED_VIEW_JOBS).toBeGreaterThanOrEqual(28);
     expect(
       jobs
         .filter((job) => job.category === "coffee_table")
@@ -50,14 +58,14 @@ describe("view jobs", () => {
     } as const;
     expect(
       planJobs(PHOTO_ASSET_SETS, { version: 1, views: [entry] }, parseArgs([])),
-    ).toHaveLength(27);
+    ).toHaveLength(EXPECTED_VIEW_JOBS - 1);
     expect(
       planJobs(
         PHOTO_ASSET_SETS,
         { version: 1, views: [entry] },
         parseArgs(["--force"]),
       ),
-    ).toHaveLength(28);
+    ).toHaveLength(EXPECTED_VIEW_JOBS);
     expect(
       planJobs(
         PHOTO_ASSET_SETS,
@@ -348,7 +356,7 @@ describe("generate-views shell", () => {
     expect(result).toEqual({ exitCode: 0 });
     expect(fetch).not.toHaveBeenCalled();
     expect(writeFile).not.toHaveBeenCalled();
-    expect(log.mock.calls.flat().join("\n")).toContain("28");
+    expect(log.mock.calls.flat().join("\n")).toContain(String(EXPECTED_VIEW_JOBS));
   });
 
   it("exits 2 without a key and never calls fetch", async () => {
