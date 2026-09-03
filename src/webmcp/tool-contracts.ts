@@ -115,12 +115,14 @@ export type AddSceneToCartInput = z.infer<typeof addSceneToCartInputSchema>;
 
 /**
  * Tool output shapes. Every object a tool returns carries the facing derived
- * from `rotation[1]`; the stored `SceneSchema` stays free of it, so nothing
- * can persist a second source of truth for orientation.
+ * from `rotation[1]` and the id of the object it stands on; the stored
+ * `SceneSchema` stays free of both, so nothing can persist a second source of
+ * truth for orientation or for the support relation.
  */
 export const FacingSchema = z.object({ x: z.number(), z: z.number() }).strict();
 export const ToolSceneObjectSchema = SceneObjectSchema.extend({
   facing: FacingSchema,
+  supportedBy: z.string().min(1).nullable(),
 });
 // `safeExtend` is what Zod 4 requires to overwrite a key on a schema that
 // carries refinements; the Scene's `selectedObjectId` check keeps running.

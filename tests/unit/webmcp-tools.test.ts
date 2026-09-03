@@ -1,6 +1,10 @@
 import { describe, expect, test, vi } from "vitest";
 
 import { DEMO_PRODUCTS } from "../../src/features/demo/demo-data";
+import {
+  footprintInsideRoom,
+  objectFootprint,
+} from "../../src/features/placement/footprint-geometry";
 import { facingOf, roundFacing } from "../../src/features/photo/photo-facing";
 import { createSceneStore } from "../../src/features/scene/scene-store";
 import type { SceneStore } from "../../src/features/scene/scene-store";
@@ -173,17 +177,22 @@ describe("WebMCP Core 6 handlers", () => {
     expect(finalResult.structuredContent.sceneRevision).toBe(7);
     expect(finalResult.structuredContent.stateVersion).toBe(7);
     // The committed Scene comes back in the same shape a read does: stored
-    // fields untouched, plus the derived facing on every object.
+    // fields untouched, plus the derived facing and support on every object.
     expect(data.scene).toEqual({
       ...store.getState().scene,
       objects: store.getState().scene.objects.map((object) => ({
         ...object,
         facing: roundFacing(facingOf(object.rotation[1])),
+        supportedBy: null,
       })),
     });
     expect(ToolSceneSchema.safeParse(data.scene).success).toBe(true);
     expect(
-      store.getState().scene.objects.some((object) => "facing" in object),
+      store
+        .getState()
+        .scene.objects.some(
+          (object) => "facing" in object || "supportedBy" in object,
+        ),
     ).toBe(false);
     expect(data.scene.revision).toBe(7);
     expect(Object.keys(data).sort()).toEqual(["message", "scene"]);
@@ -900,5 +909,102 @@ describe("facing vectors", () => {
     expect(applyCommand).not.toHaveBeenCalled();
     expect(store.getState().scene.revision).toBe(1);
     expect(store.getState().stateVersion).toBe(1);
+  });
+});
+
+describe("supportedBy on tool output", () => {
+  function successData(result: Awaited<ReturnType<typeof execute>>) {
+    if (!result.structuredContent.ok) {
+      throw new Error("Expected a successful tool result");
+    }
+    return result.structuredContent.data;
+  }
+
+  test("reports a lamp moved onto the table, and null everywhere else", async () => {
+    const store = createSceneStore();
+    const tools = createCoreTools(createContext(store).context);
+    const table = store
+      .getState()
+      .scene.objects.find(({ id }) => id === "table_01")!;
+
+    const before = await execute(tools, "get_scene", {});
+    const beforeScene = successData(before) as ToolScene;
+    expect(
+      beforeScene.objects.every((object) => object.supportedBy === null),
+    ).toBe(true);
+
+    const moved = await execute(tools, "move_object", {
+      objectId: "lamp_01",
+      position: { x: table.position[0], z: table.position[2] },
+      expectedRevision: store.getState().scene.revision,
+      expectedStateVersion: store.getState().stateVersion,
+    });
+    expect(moved.structuredContent.ok).toBe(true);
+    const movedData = successData(moved) as {
+      scene: ToolScene;
+      appliedPosition: [number, number, number];
+    };
+    const movedLamp = movedData.scene.objects.find(
+      ({ id }) => id === "lamp_01",
+    )!;
+    expect(movedLamp.supportedBy).toBe("table_01");
+    expect(movedLamp.position[1]).toBeCloseTo(
+      table.dimensionsM.height + movedLamp.dimensionsM.height / 2,
+      9,
+    );
+    expect(movedData.appliedPosition).toEqual(movedLamp.position);
+    expect(ToolSceneSchema.safeParse(movedData.scene).success).toBe(true);
+    // Only the lamp is supported; the table it stands on still is not.
+    expect(
+      movedData.scene.objects.find(({ id }) => id === "table_01")!.supportedBy,
+    ).toBeNull();
+
+    // A read and a selection agree with the committed Scene.
+    const after = await execute(tools, "get_scene", {});
+    expect(
+      (successData(after) as ToolScene).objects.find(
+        ({ id }) => id === "lamp_01",
+      )!.supportedBy,
+    ).toBe("table_01");
+
+    store.getState().selectObject("lamp_01");
+    const selection = await execute(tools, "get_selection", {});
+    expect(successData(selection)).toMatchObject({
+      id: "lamp_01",
+      supportedBy: "table_01",
+    });
+    expect(
+      ToolSceneObjectSchema.safeParse(successData(selection)).success,
+    ).toBe(true);
+
+    // The stored Scene never grows the derived field.
+    expect(
+      store
+        .getState()
+        .scene.objects.some((object) => "supportedBy" in object),
+    ).toBe(false);
+  });
+
+  test("clamps a move so the whole footprint stays on the floor", async () => {
+    const store = createSceneStore();
+    const tools = createCoreTools(createContext(store).context);
+
+    const moved = await execute(tools, "move_object", {
+      objectId: "sofa_01",
+      position: { x: 20, z: 20 },
+      rotationYDegrees: 45,
+      expectedRevision: store.getState().scene.revision,
+      expectedStateVersion: store.getState().stateVersion,
+    });
+    expect(moved.structuredContent.ok).toBe(true);
+    const data = successData(moved) as {
+      scene: ToolScene;
+      adjustedToFit: boolean;
+    };
+    expect(data.adjustedToFit).toBe(true);
+    const sofa = data.scene.objects.find(({ id }) => id === "sofa_01")!;
+    expect(
+      footprintInsideRoom(objectFootprint(sofa), data.scene.room, 0.1),
+    ).toBe(true);
   });
 });

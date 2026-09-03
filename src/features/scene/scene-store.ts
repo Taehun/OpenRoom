@@ -16,6 +16,7 @@ import {
   type ToolMode,
   type Vec3,
 } from "./scene-schema";
+import { settleElevations } from "./support";
 
 const HISTORY_LIMIT = 30;
 
@@ -145,7 +146,9 @@ export function createSceneStore(
   seed: Scene = createDemoScene(),
   options: SceneStoreOptions = {},
 ): SceneStore {
-  const canonicalSeed = cloneScene(seed);
+  // Spec §5: the seed settles once, so a Scene that already ships a lamp on a table
+  // starts at the right elevation; every later commit settles in the command layer.
+  const canonicalSeed = settleElevations(cloneScene(seed));
   const proposer = options.proposePlacement ?? proposeNaturalPlacement;
   const rotationOptionsFor = (scene: Scene) => options.rotationOptions?.(scene);
   const proposePlacement = (scene: Scene, placementOptions?: PlacementOptions) =>
@@ -338,7 +341,7 @@ export function createSceneStore(
           return { ok: true, changed: false, scene: current };
         }
 
-        const nextScene = cloneScene(placement.scene);
+        const nextScene = settleElevations(cloneScene(placement.scene));
         nextScene.revision += 1;
         const committedScene = cloneScene(nextScene);
         installCommit(

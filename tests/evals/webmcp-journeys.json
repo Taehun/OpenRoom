@@ -47,5 +47,16 @@
       "The returned scene's chair facing matches the requested direction within 0.01",
       "rotationYDegrees is not sent together with facing"
     ]
+  },
+  {
+    "id": "lamp-on-side-table",
+    "prompt": "Put the lamp on the side table",
+    "expectedTools": ["get_scene", "move_object"],
+    "assertions": [
+      "move_object is called with the lamp's objectId and the table's XZ centre",
+      "The returned lamp carries supportedBy set to that table's id",
+      "The returned lamp's position[1] is the table height plus half the lamp height, above its floor resting height",
+      "This branch's catalog has no side_table category yet, so the seed's coffee_table table_01 is the supporter the assertions name"
+    ]
   }
 ]

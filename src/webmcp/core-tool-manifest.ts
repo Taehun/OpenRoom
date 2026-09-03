@@ -33,14 +33,14 @@ export const CORE_TOOL_MANIFEST = deepFreeze([
   {
     name: "get_scene",
     description:
-      "Return the current validated Scene; each object includes a derived unit facing vector {x, z} ({x:0,z:1} faces the camera side).",
+      "Return the current validated Scene; each object includes a derived unit facing vector {x, z} ({x:0,z:1} faces the camera side) and supportedBy, the id of the object it stands on or null.",
     inputSchema: GET_SCENE_JSON_SCHEMA,
     annotations: { readOnlyHint: true, untrustedContentHint: true },
   },
   {
     name: "get_selection",
     description:
-      "Return the currently selected Scene object, including its derived unit facing vector {x, z} ({x:0,z:1} faces the camera side).",
+      "Return the currently selected Scene object, including its derived unit facing vector {x, z} ({x:0,z:1} faces the camera side) and supportedBy, the id of the object it stands on or null.",
     inputSchema: GET_SELECTION_JSON_SCHEMA,
     annotations: { readOnlyHint: true, untrustedContentHint: true },
   },
@@ -59,7 +59,7 @@ export const CORE_TOOL_MANIFEST = deepFreeze([
   {
     name: "move_object",
     description:
-      "Move an explicit or selected Scene object; orient it with rotationYDegrees or a facing vector {x, z}.",
+      "Move an explicit or selected Scene object; orient it with rotationYDegrees or a facing vector {x, z}. The position is clamped so the whole footprint stays on the floor, and a lamp moved onto a table is supported by it: it rises onto the table and comes back reported with supportedBy set to that table's id.",
     inputSchema: MOVE_OBJECT_JSON_SCHEMA,
     annotations: { readOnlyHint: false, untrustedContentHint: true },
   },

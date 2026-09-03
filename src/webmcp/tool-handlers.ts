@@ -15,6 +15,7 @@ import {
   type SceneObject,
   type SceneProduct,
 } from "../features/scene/scene-schema";
+import { supportOf } from "../features/scene/support";
 import { CORE_TOOL_MANIFEST } from "./core-tool-manifest";
 import {
   addSceneToCartInputSchema,
@@ -217,17 +218,25 @@ function sceneProduct(product: CatalogProduct): SceneProduct {
 }
 
 /**
- * Orientation reaches the model as a facing vector: `rotation[1]` stays the
- * only stored value, and every object a tool hands back carries the derived
- * unit vector alongside it.
+ * Orientation and support reach the model as derived fields: `rotation[1]` and
+ * the object positions stay the only stored values, and every object a tool
+ * hands back carries the unit facing vector plus the id of the object it stands
+ * on (spec §5) alongside them.
  */
-function withFacing(object: SceneObject): ToolSceneObject {
-  return { ...object, facing: roundFacing(facingOf(object.rotation[1])) };
+function withFacing(scene: Scene, object: SceneObject): ToolSceneObject {
+  return {
+    ...object,
+    facing: roundFacing(facingOf(object.rotation[1])),
+    supportedBy: supportOf(scene, object)?.id ?? null,
+  };
 }
 
-/** Every Scene a tool hands back — read or committed — carries facing. */
+/** Every Scene a tool hands back — read or committed — carries both. */
 function withSceneFacing(scene: Scene): ToolScene {
-  return { ...scene, objects: scene.objects.map(withFacing) };
+  return {
+    ...scene,
+    objects: scene.objects.map((object) => withFacing(scene, object)),
+  };
 }
 
 function draftFor(scene: Scene, objects: readonly SceneObject[]): CartApprovalDraft {
@@ -297,7 +306,7 @@ export function createCoreTools(context: ToolContext): readonly ModelContextTool
       "get_selection",
       snapshot.scene.revision,
       snapshot.stateVersion,
-      withFacing(SceneObjectSchema.parse(selection)),
+      withFacing(snapshot.scene, SceneObjectSchema.parse(selection)),
       "Selection returned.",
     );
   }

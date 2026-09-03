@@ -2,6 +2,7 @@ import type { Dispatch } from "react";
 import { facingOf, roundFacing } from "../photo/photo-facing";
 import { getPhotoAssetSet, selectPhotoView } from "../photo/photo-views";
 import type { Scene, SceneObject } from "../scene/scene-schema";
+import { supportOf } from "../scene/support";
 import { DEMO_PRODUCTS } from "./demo-data";
 import type { DemoAction, DemoState } from "./demo-types";
 import { OpenRoomIcon } from "./open-room-icon";
@@ -67,6 +68,13 @@ function formatFacing(object: SceneObject) {
   return parts.join(" · ");
 }
 
+/** The supporter's product title if it has one, else its seed name, else its type. */
+function supporterName(supporter: SceneObject) {
+  return (
+    supporter.product?.title ?? OBJECT_NAMES[supporter.id] ?? supporter.type
+  );
+}
+
 function InspectorPanel({
   dispatch,
   scene,
@@ -89,6 +97,9 @@ function InspectorPanel({
   }
 
   const selectedName = OBJECT_NAMES[selectedObject.id] ?? "Room object";
+  // Spec §5: a lamp standing on a table reads as such rather than as a lamp with a
+  // surprising Y; unsupported objects keep the panel exactly as it was.
+  const supporter = supportOf(scene, selectedObject);
   const style = selectedObject.product
     ? [selectedObject.product.material, selectedObject.product.color]
         .filter(Boolean)
@@ -122,6 +133,12 @@ function InspectorPanel({
           <dt>Facing</dt>
           <dd>{formatFacing(selectedObject)}</dd>
         </div>
+        {supporter ? (
+          <div>
+            <dt>On</dt>
+            <dd>{supporterName(supporter)}</dd>
+          </div>
+        ) : null}
         <div>
           <dt>Style</dt>
           <dd>{style}</dd>
@@ -194,7 +211,7 @@ function ProductsPanel({
         </button>
       </div>
       <p className={styles.panelIntro}>
-        Three locally cached fixtures, fitted to the selected footprint.
+        Locally cached fixtures, fitted to the selected footprint.
       </p>
 
       <div className={styles.productList}>
