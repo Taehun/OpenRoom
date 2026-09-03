@@ -29,14 +29,14 @@ const STYLE_FAMILIES = ["japandi", "modern-organic", "mid-century"] as const;
 const LEGACY_ENVELOPE_EXCEPTIONS = [
   "geometric-flatweave-rug",
   "linen-dome-lamp",
-  "ceramic-olive-tree",
-  "stone-planter-ficus",
-  "teak-planter-palm",
   // Table-height stand lamps sit inside the floor_lamp category on purpose (spec
   // true-scale §5); their height is a third of the category envelope.
   "linen-drum-table-lamp",
   "ceramic-gourd-table-lamp",
   "brass-stem-table-lamp",
+  "ceramic-olive-tree",
+  "stone-planter-ficus",
+  "teak-planter-palm",
 ] as const;
 
 const CATEGORIES = ProductCategorySchema.options;

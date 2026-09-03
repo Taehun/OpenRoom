@@ -519,7 +519,7 @@ describe("WebMCP Core 6 contracts", () => {
         "lamp-on-side-table",
       ]),
     );
-    expect(journeys).toHaveLength(6);
+    expect(journeys).toHaveLength(7);
     expect(journeys.every((journey) =>
       typeof journey.prompt === "string" &&
       Array.isArray(journey.expectedTools) &&

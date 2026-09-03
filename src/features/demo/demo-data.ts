@@ -28,6 +28,9 @@ export const PRODUCT_IDS_BY_CATEGORY = {
     "brass-globe-lamp",
     "oak-tripod-lamp",
     "ceramic-column-lamp",
+    "linen-drum-table-lamp",
+    "ceramic-gourd-table-lamp",
+    "brass-stem-table-lamp",
   ],
   chair: [
     "ash-lounge-chair",
