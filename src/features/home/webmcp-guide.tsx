@@ -1,6 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
-import { useEffect, useId, useState } from "react";
+import { Fragment, useEffect, useId, useState } from "react";
 import {
   WEBMCP_FLAG_URL,
   WEBMCP_MIN_CHROMIUM,
@@ -292,7 +292,15 @@ function ConnectCard({ card }: { card: ConnectCardContent }) {
               <li key={step.command}>
                 <span className={styles.commandRow}>
                   <code className="md-code" id={`${baseId}-${index}`}>
-                    {step.command}
+                    {/* One span per token so a line never breaks inside
+                        `--silent` or `openroom-mcp.log`; the text is unchanged
+                        and the Copy button still writes the exact command. */}
+                    {step.command.split(" ").map((token, tokenIndex) => (
+                      <Fragment key={tokenIndex}>
+                        {tokenIndex > 0 ? " " : null}
+                        <span className={styles.commandToken}>{token}</span>
+                      </Fragment>
+                    ))}
                   </code>
                   <CopyButton
                     className={`md-button md-button--text md-button--dense ${styles.stepCopy}`}

@@ -20,6 +20,8 @@ import { createInitialDemoState, demoReducer } from "./demo-state";
 import { DEMO_PRODUCTS } from "./demo-data";
 import type { DemoAction } from "./demo-types";
 import { RoomCanvas } from "./room-canvas";
+import Link from "next/link";
+import { OpenRoomIcon } from "./open-room-icon";
 import { WorkspaceHeader } from "./workspace-header";
 import styles from "./demo-workspace.module.css";
 import type { ToolContext } from "../../webmcp/tool-context";
@@ -244,9 +246,6 @@ function DemoWorkspaceContent({
           roomTotalMinor={roomTotalMinor}
           scene={scene}
         />
-        <div className={styles.desktopNotice} role="note">
-          The demo works best in a window at least 1000px wide.
-        </div>
         <div className={styles.workspaceBody}>
           <RoomCanvas
             dispatch={routeAction}
@@ -274,6 +273,17 @@ function DemoWorkspaceContent({
           {selectedObject?.product?.id ?? "placeholder"}
         </output>
       </div>
+
+      {/* Under 1000px the editor cannot lay out; a single in-flow surface
+          replaces it (CSS swaps the two) instead of a sideways-scrolling
+          workspace behind a toast. */}
+      <section aria-label="Window too narrow" className={styles.narrowGate}>
+        <OpenRoomIcon name="sparkles" size={28} />
+        <p>The room editor needs a window at least 1000px wide.</p>
+        <Link className="md-button md-button--tonal" href="/?view=guide">
+          Read the guide
+        </Link>
+      </section>
 
       {state.isCartOpen ? (
         <CartApprovalSheet

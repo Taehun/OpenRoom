@@ -31,11 +31,12 @@ data or DOM placement. A pointer drag previews locally and commits once on
 release, while undo restores the exact previous coordinate and projected visual
 placement.
 
-The local catalog contains exactly eighteen products: three each for sofa,
-coffee table, rug, floor lamp, chair, and plant. Search order is deterministic;
-the second coffee-table result remains `travertine-plinth-table`. Every seed and
-product object maps to an explicit checked-in cutout asset and calibrated floor
-anchor.
+The local catalog holds 43 products across eight categories — sofa, coffee
+table, rug, floor lamp (including three table lamps that can stand on a table),
+chair, plant, side table, and bookshelf — with at least five per category.
+Search order is deterministic; the second coffee-table result remains
+`travertine-plinth-table`. Every seed and product object maps to an explicit
+checked-in cutout asset, a calibrated floor anchor, and a measured silhouette.
 
 WebMCP Core 6 is a feature-detected progressive enhancement registered through
 `document.modelContext.registerTool`: `get_scene`, `get_selection`,
@@ -118,7 +119,7 @@ discovery
 | Room | `public/demo/photo/openroom-room-empty.webp` | Fixed 16:9 background for editing. |
 | Reference | `public/demo/photo/openroom-room-before.webp` | Original mismatched room reference. |
 | Seed cutouts | `public/demo/photo/seed/` | Six transparent WebPs, one for each canonical object. |
-| Catalog cutouts | `public/demo/photo/products/` | Eighteen transparent WebPs, three per category. |
+| Catalog cutouts | `public/demo/photo/products/` | Forty-three transparent cutouts, five or more per category; 25 were generated offline. |
 | Calibration | `src/features/photo/photo-calibration.ts` | Maps room `x/z` to stable stage coordinates. |
 | Projection | `src/features/photo/photo-projection.ts` | Produces perspective scale, width, and layer order. |
 | DOM stage | `src/features/photo/room-photo-stage.tsx` | Six semantic controls; preview then exactly-one commit. |
@@ -135,9 +136,10 @@ Every cutout records the direction its front points in the photo
 in the room (`facing`) from `rotation[1]`, which stays the only stored
 orientation. The compositor picks the registered view whose front vector best
 matches the object's facing and mirrors left/right twins for free; it never
-tilts a cutout with a CSS rotation. The placement solver only turns an object
-toward a direction some registered view can show truthfully, and the stage
-marks a rendered view as approximate when the nearest one is more than 45° off.
+tilts a cutout with a CSS rotation. Rotation options offered to tooling stay
+within the directions some registered view can show truthfully
+(`buildRotationOptions`), and the stage marks a rendered view as approximate
+when the nearest one is more than 45° off.
 
 | Piece | Where |
 | --- | --- |

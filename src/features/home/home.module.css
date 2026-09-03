@@ -210,10 +210,13 @@
  * beside the ordinal instead of dropping to a line of its own; the code box
  * shrinks but never grows, which keeps a short command hugging its text.
  */
+/* The command takes the card's full width and the Copy action sits under it,
+   so even the three-column cards fit every token of a long command whole. */
 .commandRow {
-  display: flex;
-  align-items: flex-start;
-  gap: 6px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  justify-items: end;
+  gap: 2px;
 }
 
 /*
@@ -226,17 +229,23 @@
  * elsewhere in the guide.
  */
 .commandRow code {
-  flex: 0 1 auto;
+  box-sizing: border-box;
+  width: 100%;
   min-width: 0;
-  max-width: 100%;
+  justify-self: stretch;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   word-break: normal;
   line-height: 1.5;
 }
 
+.commandToken {
+  white-space: nowrap;
+}
+
 .stepCopy {
   flex: none;
+  margin-top: -2px;
 }
 
 /* Pulls the text button's 16px of padding back so its label aligns with the

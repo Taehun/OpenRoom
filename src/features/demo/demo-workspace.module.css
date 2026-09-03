@@ -1364,10 +1364,6 @@
   border-left: 3px solid var(--terracotta);
 }
 
-.desktopNotice {
-  display: none;
-}
-
 .visuallyHidden {
   position: absolute;
   width: 1px;
@@ -1415,23 +1411,37 @@
   }
 }
 
-/* The layout holds down to 1000px; below that the workspace scrolls sideways,
-   so the note names the width that works. */
+/* The layout holds down to 1000px; below that the editor steps aside for one
+   surface that says so, and the workspace itself is not laid out at all. */
+.narrowGate {
+  display: none;
+}
+
 @media (max-width: 999px) {
-  .desktopNotice {
-    position: fixed;
-    z-index: 70;
-    right: 14px;
-    bottom: 14px;
-    display: block;
-    max-width: 320px;
-    padding: 10px 13px;
-    border: 1px solid var(--warm-divider);
-    border-radius: var(--md-sys-shape-corner-small);
-    background: var(--paper);
-    color: var(--muted-text);
-    font-size: 0.68rem;
-    line-height: 1.4;
+  .workspace {
+    min-width: 0;
+    min-height: 0;
+  }
+
+  .workspace > :not(.narrowGate) {
+    display: none;
+  }
+
+  .narrowGate {
+    display: grid;
+    justify-items: center;
+    gap: 16px;
+    max-width: 360px;
+    margin: 20vh auto 0;
+    padding: 24px;
+    color: var(--md-sys-color-on-surface);
+    text-align: center;
+  }
+
+  .narrowGate p {
+    margin: 0;
+    font-size: var(--md-sys-typescale-body-large-size);
+    line-height: var(--md-sys-typescale-body-large-line-height);
   }
 }
 

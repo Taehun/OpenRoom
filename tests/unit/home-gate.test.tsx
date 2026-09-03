@@ -83,6 +83,13 @@ afterEach(() => {
   window.history.replaceState({}, "", "/");
 });
 
+
+/** Commands render one span per token, so match the whole `<code>` text. */
+function commandText(command: string) {
+  return (_content: string, node: Element | null) =>
+    node?.tagName === "CODE" && node.textContent === command;
+}
+
 describe("the one-screen guide", () => {
   it("renders the one-screen guide for a flag-required browser", () => {
     renderGuide({
@@ -120,8 +127,8 @@ describe("the one-screen guide", () => {
     expect(
       within(connect).getAllByRole("link", { name: "Open the demo" }),
     ).toHaveLength(3);
-    expect(within(connect).getByText(CONNECT_COMMANDS.claude)).toBeVisible();
-    expect(within(connect).getByText(CONNECT_COMMANDS.codex)).toBeVisible();
+    expect(within(connect).getByText(commandText(CONNECT_COMMANDS.claude))).toBeVisible();
+    expect(within(connect).getByText(commandText(CONNECT_COMMANDS.codex))).toBeVisible();
     // Each CLI card tails the log the registered command appends to.
     expect(within(connect).getAllByText(CONNECT_COMMANDS.log)).toHaveLength(2);
     // The client starts the companion, so the guide never asks the reader to
