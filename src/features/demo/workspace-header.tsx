@@ -53,7 +53,7 @@ export function WorkspaceHeader({
         </div>
       </div>
 
-      <div className={styles.headerStatus} aria-label="Workspace status">
+      <div className={styles.headerStatus}>
         <div className={styles.providerStatus}>
           <span className={styles.statusDot} aria-hidden="true" />
           <span>
@@ -82,7 +82,7 @@ export function WorkspaceHeader({
           className={`md-button md-button--text ${styles.quietButton}`}
           disabled={!canUndo}
           onClick={() => dispatch({ type: "undo" })}
-          title="Undo last scene change (Cmd/Ctrl+Z)"
+          title="Undo the last change (⌘Z / Ctrl+Z)"
           type="button"
         >
           <OpenRoomIcon name="undo" />
@@ -91,11 +91,11 @@ export function WorkspaceHeader({
         <button
           className={`md-button md-button--text ${styles.quietButton}`}
           onClick={() => dispatch({ type: "reset" })}
-          title="Restore the canonical demo room"
+          title="Put the original room back"
           type="button"
         >
           <OpenRoomIcon name="reset" />
-          <span>Reset Demo</span>
+          <span>Reset demo</span>
         </button>
         <button
           aria-label="View cart"

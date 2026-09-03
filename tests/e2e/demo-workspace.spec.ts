@@ -135,7 +135,7 @@ test("completes the deterministic spatial commerce UI journey", async ({
   await expect(
     page.getByRole("status", { name: "Scene diagnostics" }),
   ).toContainText("Revision 1 · table_01 · placeholder");
-  await page.getByRole("button", { name: "Reset Demo" }).click();
+  await page.getByRole("button", { name: "Reset demo" }).click();
   await expect(
     page.getByRole("status", { name: "Scene diagnostics" }),
   ).toContainText("Revision 1 · table_01 · placeholder");

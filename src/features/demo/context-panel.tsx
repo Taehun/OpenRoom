@@ -110,7 +110,7 @@ function InspectorPanel({
         </div>
         {supporter ? (
           <div>
-            <dt>On</dt>
+            <dt>Standing on</dt>
             <dd>{objectDisplayName(supporter)}</dd>
           </div>
         ) : null}
@@ -122,7 +122,7 @@ function InspectorPanel({
 
       <div className={`md-card md-card--outlined ${styles.lockRow}`}>
         <span className={styles.lockMark} aria-hidden="true">
-          〼
+          <OpenRoomIcon name="check" size={16} />
         </span>
         <span>
           <strong>{selectedObject.locked ? "Position locked" : "Stays in place"}</strong>
@@ -161,7 +161,6 @@ function ProductsPanel({
   return (
     <section
       aria-labelledby="products-title"
-      aria-label={categoryHeading}
       className={styles.productsPanel}
     >
       <div className={styles.panelHeadingWithAction}>

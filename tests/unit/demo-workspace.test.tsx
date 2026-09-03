@@ -433,7 +433,7 @@ test("copies prompt guidance without changing Scene revision or state version", 
   );
 
   expect(writeText).toHaveBeenCalledWith(
-    "Redesign this room as a warm minimal Japandi interior. Replace every outdated unlocked item with a coherent catalog result, keep the sofa on the left, and leave a clear path to the windows. Read the latest scene after each change.",
+    "Redesign this room as a warm, minimal Japandi interior. Swap the dated pieces for catalog products that go together, keep the sofa on the left, and leave a clear path to the windows. Read the room again after each change.",
   );
   expect(screen.getByRole("status", { name: "Prompt copy status" }))
     .toHaveTextContent("Prompt copied");
@@ -527,7 +527,7 @@ test("keeps the latest copy result visible when attempts settle in reverse order
     .toHaveTextContent("Prompt copied");
 });
 
-test("Reset Demo restores the canonical inspector state", async () => {
+test("Reset demo restores the canonical inspector state", async () => {
   const user = userEvent.setup();
   render(<DemoWorkspace />);
 
@@ -535,7 +535,7 @@ test("Reset Demo restores the canonical inspector state", async () => {
   await user.click(
     screen.getByRole("button", { name: "Place Oak Frame Table in room" }),
   );
-  await user.click(screen.getByRole("button", { name: "Reset Demo" }));
+  await user.click(screen.getByRole("button", { name: "Reset demo" }));
 
   expect(
     screen.getByRole("heading", { name: "Coffee table" }),
@@ -830,7 +830,7 @@ test("shows an On row only while the selected object is supported", () => {
   const { unmount } = render(
     <ContextPanel dispatch={() => {}} scene={floorScene} state={state} />,
   );
-  expect(screen.queryByText("On")).toBeNull();
+  expect(screen.queryByText("Standing on")).toBeNull();
   unmount();
 
   const stackedScene = createDemoScene();
@@ -844,7 +844,7 @@ test("shows an On row only while the selected object is supported", () => {
   ];
 
   render(<ContextPanel dispatch={() => {}} scene={stackedScene} state={state} />);
-  expect(screen.getByText("On").nextElementSibling).toHaveTextContent(
+  expect(screen.getByText("Standing on").nextElementSibling).toHaveTextContent(
     "Coffee table",
   );
 });

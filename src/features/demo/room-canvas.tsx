@@ -1,4 +1,10 @@
-import { type Dispatch, useRef, useState, useSyncExternalStore } from "react";
+import {
+  type Dispatch,
+  useEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import type { LocalMcpRelay } from "../../local-mcp/use-local-mcp-relay";
 import { getDocumentModelContext } from "../../webmcp/register-tools";
 import { RoomPhotoStage } from "../photo/room-photo-stage";
@@ -19,8 +25,11 @@ const ROOM_OBJECTS = [
   { id: "plant_01", type: "plant" },
 ] as const satisfies readonly { id: string; type: SceneObjectType }[];
 
+/** How long the copy confirmation stays on screen. */
+const COPY_STATUS_MS = 2500;
+
 const PRIMARY_PROMPT =
-  "Redesign this room as a warm minimal Japandi interior. Replace every outdated unlocked item with a coherent catalog result, keep the sofa on the left, and leave a clear path to the windows. Read the latest scene after each change.";
+  "Redesign this room as a warm, minimal Japandi interior. Swap the dated pieces for catalog products that go together, keep the sofa on the left, and leave a clear path to the windows. Read the room again after each change.";
 
 export { OBJECT_ABBREVIATIONS, OBJECT_LABELS } from "./object-labels";
 
@@ -66,6 +75,12 @@ export function RoomCanvas({
     getServerNativeWebMcpSnapshot,
   );
   const [copyStatus, setCopyStatus] = useState<CopyStatus>(null);
+  // "Prompt copied" is a confirmation, not a state: it leaves on its own.
+  useEffect(() => {
+    if (!copyStatus) return;
+    const timer = window.setTimeout(() => setCopyStatus(null), COPY_STATUS_MS);
+    return () => window.clearTimeout(timer);
+  }, [copyStatus]);
   const copyRequestId = useRef(0);
   const selectedObject = scene.objects.find(
     ({ id }) => id === scene.selectedObjectId,
@@ -116,7 +131,7 @@ export function RoomCanvas({
               toolMode === "move" ? styles.toolButtonActive : styles.toolButton
             }
             onClick={() => setToolMode("move")}
-            title="Move selected object"
+            title="Move the selected piece (arrow keys; hold Shift for bigger steps)"
             type="button"
           >
             <OpenRoomIcon name="move" />
@@ -131,7 +146,7 @@ export function RoomCanvas({
                 : styles.toolButton
             }
             onClick={() => setToolMode("rotate")}
-            title="Rotate selected object"
+            title="Turn the selected piece (← → keys; hold Shift for bigger steps)"
             type="button"
           >
             <OpenRoomIcon name="rotate" />

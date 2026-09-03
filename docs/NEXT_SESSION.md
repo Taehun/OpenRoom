@@ -1,4 +1,4 @@
-# Nook Next Session Handoff
+# OpenRoom Next Session Handoff
 
 > **2026-09-04 — Natural placement is unwired (owner decision).** The
 > "Arrange naturally" control, the `Undo placement` affordance, the placement
