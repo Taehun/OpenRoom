@@ -25,6 +25,17 @@ export const GENERATED_PRODUCT_ASSETS: GeneratedProductAsset[] = [
     "generatedAt": "2026-09-03T17:13:46.826Z"
   },
   {
+    "id": "brass-stem-table-lamp",
+    "src": "/demo/photo/products/brass-stem-table-lamp.webp",
+    "intrinsicWidth": 848,
+    "intrinsicHeight": 1264,
+    "anchorX": 0.3384,
+    "anchorY": 0.9201,
+    "provider": "gemini",
+    "model": "gemini-3.1-flash-image",
+    "generatedAt": "2026-09-03T17:44:51.617Z"
+  },
+  {
     "id": "cane-back-teak-sofa",
     "src": "/demo/photo/products/cane-back-teak-sofa.webp",
     "intrinsicWidth": 1264,
@@ -45,6 +56,17 @@ export const GENERATED_PRODUCT_ASSETS: GeneratedProductAsset[] = [
     "provider": "gemini",
     "model": "gemini-3.1-flash-image",
     "generatedAt": "2026-09-03T17:12:38.914Z"
+  },
+  {
+    "id": "ceramic-gourd-table-lamp",
+    "src": "/demo/photo/products/ceramic-gourd-table-lamp.webp",
+    "intrinsicWidth": 848,
+    "intrinsicHeight": 1264,
+    "anchorX": 0.5961,
+    "anchorY": 0.9082,
+    "provider": "gemini",
+    "model": "gemini-3.1-flash-image",
+    "generatedAt": "2026-09-03T17:44:41.924Z"
   },
   {
     "id": "charcoal-border-rug",
@@ -86,6 +108,17 @@ export const GENERATED_PRODUCT_ASSETS: GeneratedProductAsset[] = [
     "provider": "gemini",
     "model": "gemini-3.1-flash-image",
     "generatedAt": "2026-09-03T17:17:22.512Z"
+  },
+  {
+    "id": "linen-drum-table-lamp",
+    "src": "/demo/photo/products/linen-drum-table-lamp.webp",
+    "intrinsicWidth": 848,
+    "intrinsicHeight": 1264,
+    "anchorX": 0.5012,
+    "anchorY": 0.9011,
+    "provider": "gemini",
+    "model": "gemini-3.1-flash-image",
+    "generatedAt": "2026-09-03T17:41:00.983Z"
   },
   {
     "id": "oak-drum-side-table",
