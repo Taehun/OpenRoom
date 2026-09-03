@@ -1805,20 +1805,18 @@ function accessoryCandidates(
   }
 
   const lead = leadsWithIncumbent ? context.incumbent : null;
-  const staged =
+  const seatSides = (
     object.type === "floor_lamp"
       ? sofaEndCandidates(scene, object, state)
       : object.type === "side_table"
         ? sideTableSeatCandidates(scene, object, state)
-        : [];
-  const ends = staged.filter((placement) =>
-    isFree(placementFootprint(object, placement)),
-  );
-  if (ends.length > 0) {
-    // The sofa ends come ahead of the ring and are kept even when the ring alone could
+        : []
+  ).filter((placement) => isFree(placementFootprint(object, placement)));
+  if (seatSides.length > 0) {
+    // The seat sides come ahead of the ring and are kept even when the ring alone could
     // fill the cap; the ring gets whatever the cap has left. Both lists are handed to the
-    // millimetre dedupe, which drops an end that repeats the incumbent or a ring twin.
-    const head = lead === null ? ends : [lead, ...ends];
+    // millimetre dedupe, which drops a seat side that repeats the incumbent or a ring twin.
+    const head = lead === null ? seatSides : [lead, ...seatSides];
     const flattened = flattenPerimeterLanes(
       lanes,
       null,
@@ -2120,14 +2118,14 @@ function admitsPlacement(
     );
   }
 
-  const settledAccessories = settledOf(state).filter(avoidsSeatingHull);
-  if (settledAccessories.length === 0) return true;
+  const hullAvoiders = settledOf(state).filter(avoidsSeatingHull);
+  if (hullAvoiders.length === 0) return true;
   const hull = primarySeatingHull([
     ...settledOf(state),
     withPlacement(object, placement),
   ]);
-  return !settledAccessories.some((accessory) =>
-    pointInsideConvexHull(objectCenter(accessory), hull),
+  return !hullAvoiders.some((avoider) =>
+    pointInsideConvexHull(objectCenter(avoider), hull),
   );
 }
 
