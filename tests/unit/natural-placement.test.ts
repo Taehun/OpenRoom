@@ -11,6 +11,7 @@ import {
   openingClearanceZones,
 } from "../../src/features/placement/footprint-geometry";
 import {
+  chairCandidates,
   flattenPerimeterLanes,
   proposeNaturalPlacement,
   resolvePlacementSearch,
@@ -1494,6 +1495,54 @@ describe("rotation options", () => {
     });
     if (offTable.kind === "failed") throw new Error(`failed: ${offTable.reason}`);
     expect(offTable.diagnostics.currentScore).toBeLessThan(currentScoreAt(0));
+  });
+
+  it("offers a chair family whose turn folds onto the option at half a turn", () => {
+    // With the full generated set every 45-degree step is registered, and the registry
+    // folds them into (-pi, pi] - so half a turn is stored once, as +pi. A family whose
+    // required turn works out to -pi asks for that same orientation under its other name.
+    const generated: readonly RotationOption[] = Array.from(
+      { length: 8 },
+      (_, index) => ({
+        rotationY: (index - 3) * (Math.PI / 4),
+        fidelity: index === 3 ? 1 : 0.8,
+      }),
+    );
+    expect(generated.map(({ rotationY }) => rotationY)).toContain(Math.PI);
+    expect(generated.map(({ rotationY }) => rotationY)).not.toContain(-Math.PI);
+
+    const scene = keepObjects(
+      completedProductScene(),
+      "sofa_01",
+      "table_01",
+      "chair_01",
+    );
+    scene.id = "generated-view-options";
+    scene.source = "upload";
+    scene.room = { width: 6, height: 2.5, depth: 6 };
+    scene.openings = [];
+    const sofa = scene.objects.find(({ id }) => id === "sofa_01")!;
+    const table = scene.objects.find(({ id }) => id === "table_01")!;
+    const chair = scene.objects.find(({ id }) => id === "chair_01")!;
+    // Three quarter turns anticlockwise: the chair's left-end flank needs
+    // sofaYaw - 45 degrees, which lands exactly on -180.
+    sofa.position = [0, sofa.position[1], 0];
+    sofa.rotation[1] = (-3 * Math.PI) / 4;
+    table.position = [0.8, table.position[1], -0.8];
+
+    const candidates = chairCandidates(scene, chair, scene.objects, {
+      rotationOptions: { chair_01: generated },
+    });
+
+    expect(candidates.some(({ rotationY }) => rotationY === Math.PI)).toBe(true);
+    // Both flank ends are offered, not just the one whose turn needed no fold.
+    expect(candidates.some(({ rotationY }) => rotationY === -Math.PI / 2)).toBe(true);
+    // Every candidate still carries an option's own value, half a turn included.
+    for (const { rotationY } of candidates) {
+      expect(
+        generated.some((option) => Math.abs(option.rotationY - rotationY) < 1e-9),
+      ).toBe(true);
+    }
   });
 
   it("rejects a proposal whose rotation is outside the object's options", () => {

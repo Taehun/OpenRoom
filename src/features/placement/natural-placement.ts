@@ -1264,8 +1264,12 @@ function tableCandidates(
  * - flank, across, side of table - each emitted only when the rotation it needs is one of
  * the chair's options, then the legacy across-the-table sweep at whatever rotation the
  * chair already has, which is the whole list for a caller that passes no options.
+ *
+ * Exported for the same reason `sofaCandidates` is: which family a search settles on is
+ * otherwise only visible through the whole scored layout, so a family that is silently
+ * never offered looks exactly like one that was offered and lost.
  */
-function chairCandidates(
+export function chairCandidates(
   scene: Scene,
   object: SceneObject,
   objects: readonly SceneObject[],
@@ -1303,11 +1307,17 @@ function chairCandidates(
       ),
     );
   };
-  /** The option matching a family's required turn, folded the way the table is. */
+  /**
+   * The option a family's required turn stands for, matched as an angle. Folding the turn
+   * and then comparing values would miss the one grid angle that has two names: a turn of
+   * -180 degrees folds to -pi while the registry stores +pi, so the family would be
+   * dropped for the very orientation it asks for.
+   */
   const optionFor = (rotationY: number): number | null => {
-    const folded = foldAngle(rotationY);
     for (const option of choices) {
-      if (Math.abs(option.rotationY - folded) <= ROTATION_OPTION_EPSILON) {
+      if (
+        Math.abs(foldAngle(option.rotationY - rotationY)) <= ROTATION_OPTION_EPSILON
+      ) {
         return option.rotationY;
       }
     }
