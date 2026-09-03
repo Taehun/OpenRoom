@@ -912,8 +912,41 @@ describe("RoomPhotoStage", () => {
     expect(object.style.width).toBe("100%");
     expect(object.style.transform).toBe("none");
     expect(handle.style.left).toBe("50.07%");
-    expect(handle.style.top).toBe("0px");
+    // The handle sits on the silhouette's top edge, not the image box's.
+    const tableView = selectPhotoView(
+      objectFromStore(store, "table_01"),
+      getPhotoAssetSet(objectFromStore(store, "table_01"))!,
+    );
+    const tableBox = tableView.view.contentBox!;
+    expect(handle.style.top).toBe(`${tableBox.top * 100}%`);
     expect(handle.style.transform).toBe("translate(-50%, -100%)");
+  });
+
+  // Minor QA finding: the selection used to wrap the padded image box. With a
+  // measured content box the outline hugs the furniture, and a mirrored twin
+  // flips the box with the pixels.
+  test("outlines the selected silhouette and mirrors the box with the view", () => {
+    const store = fixtureStore();
+    renderStage(store);
+
+    const table = objectFromStore(store, "table_01");
+    const tableBox = selectPhotoView(table, getPhotoAssetSet(table)!).view
+      .contentBox!;
+    const outline = screen.getByTestId("photo-silhouette-table_01");
+    expect(outline.style.left).toBe(`${tableBox.left * 100}%`);
+    expect(outline.style.top).toBe(`${tableBox.top * 100}%`);
+    expect(outline.style.width).toBe(`${(tableBox.right - tableBox.left) * 100}%`);
+    expect(outline.style.height).toBe(`${(tableBox.bottom - tableBox.top) * 100}%`);
+    expect(screen.queryByTestId("photo-silhouette-chair_01")).toBeNull();
+
+    act(() => store.getState().selectObject("chair_01"));
+    const chair = objectFromStore(store, "chair_01");
+    const chairView = selectPhotoView(chair, getPhotoAssetSet(chair)!);
+    expect(chairView.mirrored).toBe(true);
+    const chairBox = chairView.view.contentBox!;
+    const chairOutline = screen.getByTestId("photo-silhouette-chair_01");
+    expect(chairOutline.style.left).toBe(`${(1 - chairBox.right) * 100}%`);
+    expect(chairOutline.style.width).toBe(`${(chairBox.right - chairBox.left) * 100}%`);
   });
 
   // Spec §3: a cutout's width is its real width scaled by the calibrated floor width

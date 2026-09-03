@@ -375,6 +375,29 @@
   outline-offset: 4px;
 }
 
+/*
+ * With a measured silhouette the selection hugs the furniture, not the image's
+ * transparent margins: the button's own outline yields to a span sized to the
+ * alpha content box, and the keyboard focus ring moves onto that span too.
+ */
+.photoObjectSilhouetted.photoObjectSelected,
+.photoObjectSilhouetted.photoObjectSelected:focus-visible {
+  outline: none;
+}
+
+.photoSilhouetteOutline {
+  position: absolute;
+  border-radius: 2px;
+  outline: 3px solid var(--moss);
+  outline-offset: 4px;
+  pointer-events: none;
+  transition: outline-color 140ms ease;
+}
+
+.photoObjectSilhouetted:focus-visible ~ .photoSilhouetteOutline {
+  outline-color: var(--md-sys-color-primary);
+}
+
 .photoRugLayer {
   position: absolute;
   inset: 0;

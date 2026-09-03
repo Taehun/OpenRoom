@@ -542,6 +542,10 @@ Also landed later the same morning: one Scene store per tab
 the approval announcement reads "Demo approved — nothing was ordered." and
 clears after four seconds; an in-flow gate replaces the workspace under
 1000px; guide commands render one nowrap span per token with Copy beneath.
+Later still: the selection outline and rotation handle follow the measured
+silhouette (`photoSilhouetteOutline`, mirrored with the twin); tooltips,
+the redesign prompt, and "Standing on" read plainly; "Prompt copied" clears
+after 2.5 s.
 
 Open: README/docs staleness sweep beyond the catalog counts (check
 `docs/local-mcp.md` lifecycle wording and `docs/asset-views.md` category list);

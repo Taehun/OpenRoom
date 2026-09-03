@@ -99,9 +99,26 @@ export function PhotoObjectLayer({
     top: anchorYPercent,
     transform: "translate(-50%, -50%)",
   } as CSSProperties;
+  // The measured silhouette (alpha content box) of the drawn view, flipped
+  // with a mirrored twin, so the selection hugs the furniture rather than the
+  // image's transparent margins and the rotation handle sits on its top edge.
+  const box = view?.view.contentBox ?? null;
+  const silhouette = box
+    ? view?.mirrored
+      ? { left: 1 - box.right, right: 1 - box.left, top: box.top, bottom: box.bottom }
+      : box
+    : null;
+  const silhouetteStyle = silhouette
+    ? ({
+        left: `${silhouette.left * 100}%`,
+        top: `${silhouette.top * 100}%`,
+        width: `${(silhouette.right - silhouette.left) * 100}%`,
+        height: `${(silhouette.bottom - silhouette.top) * 100}%`,
+      } as CSSProperties)
+    : null;
   const rotationHandleStyle = {
     left: anchorXPercent,
-    top: 0,
+    top: silhouette ? `${silhouette.top * 100}%` : 0,
     transform: "translate(-50%, -100%)",
   } as CSSProperties;
 
@@ -120,6 +137,7 @@ export function PhotoObjectLayer({
         className={[
           selected ? styles.photoObjectSelected : styles.photoObject,
           view?.mirrored ? styles.photoMirrored : null,
+          silhouette ? styles.photoObjectSilhouetted : null,
         ]
           .filter(Boolean)
           .join(" ")}
@@ -152,6 +170,15 @@ export function PhotoObjectLayer({
           </span>
         ) : null}
       </button>
+
+      {selected && silhouetteStyle ? (
+        <span
+          aria-hidden="true"
+          className={styles.photoSilhouetteOutline}
+          data-testid={`photo-silhouette-${object.id}`}
+          style={silhouetteStyle}
+        />
+      ) : null}
 
       {view && !view.exact ? (
         <span
