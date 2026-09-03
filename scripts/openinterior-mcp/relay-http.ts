@@ -99,7 +99,11 @@ export interface RelayHttpServer {
    * retired code can never be revived by a stale counter.
    */
   issuePairCode(): { code: string; expiresAt: number };
-  /** Stops accepting, ends every long poll, and waits for the socket to close. */
+  /**
+   * Terminal shutdown: stops accepting, ends every long poll, waits for the
+   * socket to close, and shuts the registry down. Idempotent; the relay and its
+   * registry are both unusable afterwards.
+   */
   close(): Promise<void>;
 }
 
@@ -242,6 +246,8 @@ export async function startRelayHttpServer(options: RelayHttpServerOptions): Pro
    */
   let activeToken: string | null = null;
   let failedPairAttempts = 0;
+  /** Non-null from the first `close()` call onwards; also makes `close()` idempotent. */
+  let closing: Promise<void> | null = null;
 
   const activePolls = new Set<AbortController>();
   const inFlight = new Set<ServerResponse>();
@@ -382,10 +388,18 @@ export async function startRelayHttpServer(options: RelayHttpServerOptions): Pro
     const deadline = setTimeout(abort, longPollMs);
 
     activePolls.add(controller);
+    // A held poll is proof of life to the registry, so an abandoned one would
+    // keep the session alive forever. Both streams emit `close` when the client
+    // hangs up, and neither fires early on a bodyless GET.
     res.on("close", abort);
+    req.on("close", abort);
+    // A poll that slips in on a keep-alive connection during shutdown must not
+    // wait out the deadline; it is answered 204 straight away.
+    if (closing !== null) abort();
     try {
-      // `poll` refreshes the heartbeat before it waits, so even a 204 keeps the
-      // session alive; the abort is what turns the deadline into that 204.
+      // `poll` refreshes the heartbeat before it waits and again when it ends,
+      // so even a 204 keeps the session alive; the abort is what turns the
+      // deadline, a client hang-up, or shutdown into that 204.
       const call = await registry.poll(token, controller.signal);
       if (call === null) respond.empty(204);
       else respond.json(200, call);
@@ -393,6 +407,7 @@ export async function startRelayHttpServer(options: RelayHttpServerOptions): Pro
       clearTimeout(deadline);
       activePolls.delete(controller);
       res.off("close", abort);
+      req.off("close", abort);
     }
   }
 
@@ -536,8 +551,6 @@ export async function startRelayHttpServer(options: RelayHttpServerOptions): Pro
     });
   }
 
-  let closing: Promise<void> | null = null;
-
   return {
     port: address.port,
     address: address.address,
@@ -553,6 +566,10 @@ export async function startRelayHttpServer(options: RelayHttpServerOptions): Pro
         });
         for (const controller of activePolls) controller.abort();
         await whenDrained();
+        // Terminal: the registry is unreachable once the socket is gone, so it
+        // is torn down here rather than left holding calls until they time out.
+        registry.shutdown();
+        activeToken = null;
         server.closeAllConnections();
         await closed;
       })();

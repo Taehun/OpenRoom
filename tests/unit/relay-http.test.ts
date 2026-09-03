@@ -33,6 +33,7 @@ let clock = 1_700_000_000_000;
 let diagnostics: string[] = [];
 let registry: SessionRegistry;
 let relay: RelayHttpServer;
+let relays: RelayHttpServer[] = [];
 let teardown: Array<() => void> = [];
 
 interface Probe {
@@ -129,10 +130,11 @@ function expectPairRejected(probe: Probe, secrets: string[] = []): void {
   expectHardened(probe);
 }
 
-beforeEach(async () => {
-  clock = 1_700_000_000_000;
-  diagnostics = [];
-  teardown = [];
+/**
+ * Each relay gets its own registry because `close()` is terminal: it shuts the
+ * registry down, so a test that needs a second server needs a second registry.
+ */
+async function startRelay(longPollMs = TEST_LONG_POLL_MS): Promise<RelayHttpServer> {
   registry = new SessionRegistry({
     manifestHash: MANIFEST_HASH,
     allowedOrigins: ALLOWED_ORIGINS,
@@ -144,15 +146,42 @@ beforeEach(async () => {
     registry,
     port: 0,
     allowedOrigins: ALLOWED_ORIGINS,
-    longPollMs: TEST_LONG_POLL_MS,
+    longPollMs,
     onDiagnostic: (message) => diagnostics.push(message),
   });
+  relays.push(relay);
+  return relay;
+}
+
+/** Opens a poll and hangs up on it, the way a closed tab or a killed page does. */
+async function abandonPoll(token: string): Promise<void> {
+  const hangUp = new AbortController();
+  const abandoned = fetch(`http://127.0.0.1:${relay.port}/v1/calls`, {
+    method: "GET",
+    headers: authHeaders(token),
+    signal: hangUp.signal,
+  }).catch(() => undefined);
+
+  await new Promise((resolve) => setTimeout(resolve, 30));
+  hangUp.abort();
+  await abandoned;
+  // Let the server observe the socket closing before the test asserts on it.
+  await new Promise((resolve) => setTimeout(resolve, 30));
+}
+
+beforeEach(async () => {
+  clock = 1_700_000_000_000;
+  diagnostics = [];
+  teardown = [];
+  relays = [];
+  await startRelay();
 });
 
 afterEach(async () => {
   for (const abort of teardown) abort();
   teardown = [];
-  await relay.close();
+  for (const started of relays) await started.close();
+  relays = [];
 });
 
 describe("startRelayHttpServer binding", () => {
@@ -167,6 +196,13 @@ describe("startRelayHttpServer binding", () => {
     await expect(fetch(`http://127.0.0.1:${port}/v1/calls`)).rejects.toThrow();
     // The afterEach close must stay idempotent.
     await relay.close();
+  });
+
+  it("shuts the registry down so nothing can pair afterwards", async () => {
+    await relay.close();
+
+    expect(diagnostics).toContain("relay shut down");
+    expect(() => registry.issuePairCode()).toThrow("SESSION_DISCONNECTED");
   });
 
   it("keeps the long poll deadline below the heartbeat timeout", () => {
@@ -486,6 +522,37 @@ describe("GET /v1/calls long poll", () => {
 
     clock += HEARTBEAT_TIMEOUT_MS - 5_000;
     expect((await call("/v1/calls", { method: "GET", headers: authHeaders(token) })).status).toBe(204);
+  });
+
+  it("releases the held poll when the client hangs up", async () => {
+    await relay.close();
+    // Long enough that only the hang-up, never the deadline, can free the poll.
+    await startRelay(2_000);
+    const { token } = await pairPage();
+    await abandonPoll(token);
+
+    // A waiter left registered would swallow this call and the next poll would
+    // wait out the full deadline and answer 204.
+    const pending = forward();
+    const response = await call("/v1/calls", { method: "GET", headers: authHeaders(token) });
+
+    expect(response.status).toBe(200);
+    expect(RelayToolCallSchema.parse(response.body).toolName).toBe("get_scene");
+    void pending;
+  });
+
+  it("lets the heartbeat expire a session whose poll was abandoned", async () => {
+    await relay.close();
+    await startRelay(2_000);
+    const { token } = await pairPage();
+    await abandonPoll(token);
+
+    // A held poll counts as liveness, so an unreleased waiter would keep this
+    // session alive forever instead of letting the heartbeat reap it.
+    clock += HEARTBEAT_TIMEOUT_MS + 1;
+    const response = await call("/v1/calls", { method: "GET", headers: authHeaders(token) });
+
+    expect(response.status).toBe(401);
   });
 
   it("ends an in-flight long poll when the server closes", async () => {
