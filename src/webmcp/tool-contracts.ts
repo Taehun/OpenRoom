@@ -154,7 +154,16 @@ export const SEARCH_PRODUCTS_JSON_SCHEMA = {
   properties: {
     category: {
       type: "string",
-      enum: ["sofa", "coffee_table", "rug", "floor_lamp", "chair", "plant"],
+      enum: [
+        "sofa",
+        "coffee_table",
+        "rug",
+        "floor_lamp",
+        "chair",
+        "plant",
+        "side_table",
+        "bookshelf",
+      ],
     },
     query: { type: "string", minLength: 1, maxLength: 80, pattern: "\\S" },
     limit: { type: "integer", minimum: 1, maximum: 3, default: 3 },

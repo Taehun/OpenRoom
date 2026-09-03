@@ -60,6 +60,8 @@ export const PHOTO_VIEW_SYMMETRY: Readonly<
   floor_lamp: "radial",
   plant: "radial",
   rug: "radial",
+  side_table: "radial",
+  bookshelf: "front-back",
   unknown: "none",
 });
 

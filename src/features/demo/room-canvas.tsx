@@ -3,33 +3,48 @@ import type { LocalMcpRelay } from "../../local-mcp/use-local-mcp-relay";
 import { getDocumentModelContext } from "../../webmcp/register-tools";
 import { RoomPhotoStage } from "../photo/room-photo-stage";
 import { useSceneStore } from "../scene/scene-context";
-import type { Scene } from "../scene/scene-schema";
+import type { Scene, SceneObjectType } from "../scene/scene-schema";
 import type { DemoAction, DemoState } from "./demo-types";
 import { LocalAgentStatus } from "./local-agent-status";
 import { OpenRoomIcon } from "./open-room-icon";
 import styles from "./demo-workspace.module.css";
 
 const ROOM_OBJECTS = [
-  { id: "sofa_01", label: "Sofa", abbreviation: "SO" },
-  { id: "table_01", label: "Coffee table", abbreviation: "CT" },
-  { id: "rug_01", label: "Rug", abbreviation: "RG" },
-  { id: "lamp_01", label: "Floor lamp", abbreviation: "FL" },
-  { id: "chair_01", label: "Chair", abbreviation: "CH" },
-  { id: "plant_01", label: "Plant", abbreviation: "PL" },
-] as const;
+  { id: "sofa_01", type: "sofa" },
+  { id: "table_01", type: "coffee_table" },
+  { id: "rug_01", type: "rug" },
+  { id: "lamp_01", type: "floor_lamp" },
+  { id: "chair_01", type: "chair" },
+  { id: "plant_01", type: "plant" },
+] as const satisfies readonly { id: string; type: SceneObjectType }[];
 
 const PRIMARY_PROMPT =
   "Redesign this room as a warm minimal Japandi interior. Replace every outdated unlocked item with a coherent catalog result, keep the sofa on the left, and leave a clear path to the windows. Read the latest scene after each change.";
 
-const OBJECT_LABELS = {
+export const OBJECT_LABELS: Readonly<Record<SceneObjectType, string>> = {
   sofa: "Sofa",
   coffee_table: "Coffee table",
   rug: "Rug",
   floor_lamp: "Floor lamp",
   chair: "Chair",
   plant: "Plant",
+  side_table: "Side table",
+  bookshelf: "Bookshelf",
   unknown: "Object",
-} as const;
+};
+
+/** The object rail shows initials, one pair per Scene object type. */
+export const OBJECT_ABBREVIATIONS: Readonly<Record<SceneObjectType, string>> = {
+  sofa: "SO",
+  coffee_table: "CT",
+  rug: "RG",
+  floor_lamp: "FL",
+  chair: "CH",
+  plant: "PL",
+  side_table: "SI",
+  bookshelf: "BS",
+  unknown: "OB",
+};
 
 type CopyStatus =
   | { kind: "success"; message: "Prompt copied" }
@@ -154,11 +169,12 @@ export function RoomCanvas({
           <ul className={styles.objectList}>
             {ROOM_OBJECTS.map((object) => {
               const isSelected = scene.selectedObjectId === object.id;
+              const label = OBJECT_LABELS[object.type];
 
               return (
                 <li key={object.id}>
                   <button
-                    aria-label={object.label}
+                    aria-label={label}
                     aria-pressed={isSelected}
                     className={
                       isSelected
@@ -169,10 +185,10 @@ export function RoomCanvas({
                       dispatch({ type: "select-object", objectId: object.id });
                       dispatch({ type: "show-inspector" });
                     }}
-                    title={object.label}
+                    title={label}
                     type="button"
                   >
-                    {object.abbreviation}
+                    {OBJECT_ABBREVIATIONS[object.type]}
                   </button>
                 </li>
               );

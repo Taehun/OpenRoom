@@ -23,6 +23,8 @@ export const CATEGORY_DIMENSIONS: Record<SceneObjectType, DimensionsM> = {
   floor_lamp: { width: 0.35, height: 1.6, depth: 0.35 },
   chair: { width: 0.8, height: 0.85, depth: 0.8 },
   plant: { width: 0.55, height: 1.2, depth: 0.55 },
+  side_table: { width: 0.45, height: 0.55, depth: 0.45 },
+  bookshelf: { width: 0.9, height: 1.8, depth: 0.35 },
   unknown: { width: 1, height: 1, depth: 1 },
 };
 
@@ -33,6 +35,8 @@ const ID_PREFIX: Record<SceneObjectType, string> = {
   floor_lamp: "lamp",
   chair: "chair",
   plant: "plant",
+  side_table: "side",
+  bookshelf: "shelf",
   unknown: "unknown",
 };
 

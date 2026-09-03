@@ -934,6 +934,8 @@ const TERM_DEPENDENCIES: Readonly<Record<SceneObjectType, readonly number[]>> = 
   chair: [TERM_CHAIR, TERM_COMPOSITION],
   floor_lamp: [TERM_COMPOSITION],
   plant: [TERM_COMPOSITION],
+  side_table: [TERM_COMPOSITION],
+  bookshelf: [TERM_COMPOSITION],
   unknown: [],
 };
 
@@ -1857,6 +1859,10 @@ function candidatesFor(
     case "floor_lamp":
     case "plant":
       return accessoryCandidates(scene, object, state, accessory!, limit);
+    // Task 4 gives both types their own candidate families; until then they
+    // behave like `unknown` and the solver leaves them where they stand.
+    case "side_table":
+    case "bookshelf":
     case "unknown":
       candidates = [];
       break;

@@ -170,6 +170,8 @@ function ProductsPanel({
         floor_lamp: "Floor lamps for your room",
         chair: "Chairs for your room",
         plant: "Plants for your room",
+        side_table: "Side tables for your room",
+        bookshelf: "Bookshelves and storage for your room",
         unknown: "Products for your room",
       }[selectedObject.type]
     : "Products for your room";
