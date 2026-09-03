@@ -1,5 +1,7 @@
 import Link from "next/link";
 import type { Dispatch, RefObject } from "react";
+import { GitHubMark } from "../home/github-mark";
+import { REPOSITORY_URL } from "../home/repository";
 import type { Scene } from "../scene/scene-schema";
 import type { DemoAction } from "./demo-types";
 import { OpenRoomIcon } from "./open-room-icon";
@@ -99,6 +101,16 @@ export function WorkspaceHeader({
             4
           </span>
         </button>
+        <a
+          aria-label="OpenRoom on GitHub"
+          className={`md-icon-button ${styles.repoLink}`}
+          href={REPOSITORY_URL}
+          rel="noopener noreferrer"
+          target="_blank"
+          title="View on GitHub"
+        >
+          <GitHubMark />
+        </a>
       </div>
     </header>
   );

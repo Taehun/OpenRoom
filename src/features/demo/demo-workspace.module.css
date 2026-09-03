@@ -144,6 +144,15 @@
   padding-inline: 16px 12px;
 }
 
+/*
+ * The repository link centres a 20px mark in a 40px target, so it carries
+ * 10px of optical inset the labelled controls do not; pull it back so the
+ * mark ends on the same right edge as the cart button's pill.
+ */
+.headerActions .repoLink {
+  margin-right: -6px;
+}
+
 .cartCount {
   display: grid;
   width: 22px;

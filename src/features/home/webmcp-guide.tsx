@@ -8,13 +8,14 @@ import {
   type CompatibilityStatus,
 } from "../../webmcp/browser-compatibility";
 import { CORE_TOOL_MANIFEST } from "../../webmcp/core-tool-manifest";
+import { GitHubMark } from "./github-mark";
+import { REPOSITORY_URL } from "./repository";
 import styles from "./home.module.css";
 
 const HERO_HEADING_ID = "openroom-heading";
 /** The bar's jump target; `.connect` carries the sticky bar's scroll margin. */
 const CONNECT_SECTION_ID = "connect-an-ai-app";
 const CONNECT_HEADING_ID = "connect-an-ai-app-heading";
-const REPO_URL = "https://github.com/Taehun/OpenRoom";
 
 /**
  * The commands a reader copies to reach the local companion. `<repo>` is
@@ -308,12 +309,24 @@ export function WebMcpGuide({ onCheckAgain, status }: WebMcpGuideProps) {
       >
         <div className={styles.appBarInner}>
           <span className="md-wordmark">OpenRoom</span>
-          <a
-            className="md-button md-button--text"
-            href={`#${CONNECT_SECTION_ID}`}
-          >
-            Connect an AI app
-          </a>
+          <div className={styles.appBarActions}>
+            <a
+              className="md-button md-button--text"
+              href={`#${CONNECT_SECTION_ID}`}
+            >
+              Connect an AI app
+            </a>
+            <a
+              aria-label="OpenRoom on GitHub"
+              className="md-icon-button"
+              href={REPOSITORY_URL}
+              rel="noopener noreferrer"
+              target="_blank"
+              title="View on GitHub"
+            >
+              <GitHubMark />
+            </a>
+          </div>
         </div>
       </header>
 
@@ -387,7 +400,7 @@ export function WebMcpGuide({ onCheckAgain, status }: WebMcpGuideProps) {
             </p>
             <a
               className={styles.textLink}
-              href={`${REPO_URL}#commerce-integration`}
+              href={`${REPOSITORY_URL}#commerce-integration`}
               rel="noreferrer"
               target="_blank"
             >
@@ -402,7 +415,7 @@ export function WebMcpGuide({ onCheckAgain, status }: WebMcpGuideProps) {
             </p>
             <a
               className={styles.textLink}
-              href={REPO_URL}
+              href={REPOSITORY_URL}
               rel="noreferrer"
               target="_blank"
             >

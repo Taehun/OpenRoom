@@ -127,6 +127,15 @@ describe("the one-screen guide", () => {
       "href",
       "/demo",
     );
+
+    const repoLink = screen.getByRole("link", { name: "OpenRoom on GitHub" });
+    expect(repoLink).toHaveAttribute(
+      "href",
+      "https://github.com/Taehun/OpenRoom",
+    );
+    expect(repoLink).toHaveAttribute("target", "_blank");
+    expect(repoLink.getAttribute("rel")).toContain("noopener");
+
     for (const group of screen.getAllByRole("group"))
       expect(group).not.toHaveAttribute("open");
   });
