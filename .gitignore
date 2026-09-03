@@ -15,6 +15,7 @@
 /coverage
 /playwright-report/
 /test-results/
+/test-results-commerce/
 /output/
 
 # local agent workflow scratch
