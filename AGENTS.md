@@ -17,3 +17,4 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 - Run `pnpm build` or `pnpm build:next` only for build/runtime changes, and `pnpm test:e2e` only for browser-visible flows.
 - Never deploy, call live providers, or perform external cart writes unless the user explicitly requests it.
 - Preserve unrelated user changes and do not edit generated output in `.next/`, `dist/`, or `.vinext/`.
+- Commerce stays token-free and server-free: `demo` is the default, Shopify works only through cart permalinks and the store's Storefront MCP endpoint, and no access token, server cart route, or external request may be added without a new approved spec. When the `commerce` block of `add_scene_to_cart` changes, update `tool-context.ts`, `tool-handlers.ts`, the unit tests, and `tests/evals/webmcp-journeys.json` together.

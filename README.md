@@ -42,11 +42,15 @@ post-mount availability event, so this package intentionally does not poll,
 monkey-patch, or dynamically re-register; unsupported documents keep the human
 editor.
 
-Cart operations open a visible, local approval sheet. The original human
-four-item `$626 USD` fixture and product-backed WebMCP Scene drafts both emit no
-external cart write or network request. The planned local Claude MCP companion
-is not implemented in this branch. Shopify/Tripo/R2/D1 integrations, upload,
-analysis, persistence, and external cart writes remain future work.
+Cart operations open a visible, local approval sheet. In the default `demo`
+mode the original human four-item `$626 USD` fixture and product-backed WebMCP
+Scene drafts both emit no external cart write or network request. Shopify
+checkout is available through cart permalinks and the store's Storefront MCP
+endpoint, with no server route, no access token, and no request made by Nook
+itself; see [Commerce integration](#commerce-integration). The planned local
+Claude MCP companion is not implemented in this branch. Tripo/R2/D1
+integrations, upload, analysis, persistence, and server-side cart writes remain
+future work.
 
 ## Photo architecture and assets
 
@@ -95,7 +99,8 @@ local environment file; never commit them.
 | `pnpm lint` | Run ESLint. |
 | `pnpm test` | Run the Vitest suite once. |
 | `pnpm test:watch` | Run Vitest in watch mode. |
-| `pnpm test:e2e` | Run Playwright end-to-end tests. |
+| `pnpm test:e2e` | Run the Playwright demo-mode end-to-end tests (port 3000). |
+| `pnpm test:e2e:commerce` | Run the Playwright Shopify-mode journeys (port 3001). |
 | `pnpm cf-typegen` | Generate Cloudflare Worker types. |
 | `pnpm dev:vinext` | Start vinext locally on port 3001. |
 | `pnpm build:vinext` | Build the vinext Cloudflare Workers target. |
@@ -116,13 +121,18 @@ Before running `pnpm test:e2e`, install the project’s Chromium browser once:
 pnpm exec playwright install chromium
 ```
 
+`pnpm test:e2e` and `pnpm test:e2e:commerce` use separate Playwright configs and
+separate dev servers, but they share the same `.next` build directory, so never
+run the two concurrently.
+
 The release verification sequence is:
 
 ```bash
 pnpm test
-pnpm run test:e2e
 pnpm run typecheck
 pnpm run lint
+pnpm run test:e2e
+pnpm run test:e2e:commerce
 pnpm run build
 pnpm run build:next
 git diff --check
@@ -131,10 +141,50 @@ git status --short
 
 ## Environment variables
 
-Copy `.env.example` to `.env.local` and set only the values needed for the work
-you are doing. `COMMERCE_PROVIDER=demo` and `ASSET_PROVIDER=cached` are safe
-defaults that avoid live-provider assumptions. The remaining provider values are
-intentionally empty until their future integrations are implemented.
+Copy `.env.example` to `.env.local` and set only what you need. Every variable is
+public and inlined at build time (`NEXT_PUBLIC_*`), so rebuild after changing
+one. Nook never needs a Shopify access token.
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `NEXT_PUBLIC_COMMERCE_PROVIDER` | `demo` | `demo` keeps cart approval local with zero requests; `shopify` enables checkout on your store. |
+| `NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN` | empty | Bare store host such as `your-store.myshopify.com`. Required in `shopify` mode; a missing or invalid value falls back to demo mode, recorded in `CommerceConfig` as `not-configured` or `invalid-domain`, and the approval sheet stays in its demo form. |
+| `NEXT_PUBLIC_SHOPIFY_VARIANTS` | empty | Optional comma-separated `productId=gid://shopify/ProductVariant/<id>` pairs that override `src/features/commerce/shopify-variants.ts`. |
+| `ASSET_PROVIDER` | `cached` | Assets are cached; no live generation exists. |
+
+The remaining values in `.env.example` are reserved placeholders for future
+integrations and are unused by any code today.
+
+## Commerce integration
+
+Nook has no backend and stores no credentials. Two paths use one static mapping
+from demo product ids to Shopify variant GIDs:
+
+1. **Human checkout.** In `shopify` mode, `Continue to Shopify` in the approval
+   sheet opens a cart permalink (`https://<store>/cart/<variantId>:<qty>,...`)
+   in a new tab. Products without a mapping are listed as
+   `Not mapped to a Shopify variant` and left out; if nothing is mapped the
+   button is disabled.
+2. **Agent checkout.** `add_scene_to_cart` returns `draft.commerce` with
+   `lines` (`productId`, `merchandiseId`, `quantity`), `skipped`,
+   `checkoutPermalink`, and `mcpEndpoint` (`https://<store>/api/mcp`). Connect
+   Claude, ChatGPT, or any MCP client to that endpoint (Shopify's Storefront MCP
+   needs no authentication), let it call `update_cart` with the returned
+   `merchandise_id` lines, then `get_cart` for the checkout URL. Nook itself
+   makes no request.
+
+Setup:
+
+1. Find each product's variant GID in Shopify admin (Products → variant →
+   the id in the URL, or the Storefront MCP `search_catalog` tool) and record
+   it in `src/features/commerce/shopify-variants.ts` or
+   `NEXT_PUBLIC_SHOPIFY_VARIANTS`.
+2. Set `NEXT_PUBLIC_COMMERCE_PROVIDER=shopify` and
+   `NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN=<your-store>.myshopify.com`, then rebuild.
+3. Run `pnpm run test:e2e:commerce` to exercise the Shopify-mode journey against
+   a placeholder store; it stubs the store domain and makes no real request.
+
+Demo mode remains the default and is byte-for-byte unchanged.
 
 ## Contributing
 
