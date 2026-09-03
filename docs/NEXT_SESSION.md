@@ -536,11 +536,14 @@ backlog. Landed today, each batch deployed to Workers and Pages:
   drops below; the width note shows only under 1000px.
 - **Hygiene**: `.claude/worktrees/**` ignored by ESLint and git.
 
-Open (Important, in priority order): hoist `SceneStoreProvider` to
-`app/layout.tsx` and let `scene-context.tsx` inherit (then drop the
-`SCENE_REVISION_CONFLICT` retry loop from `tests/e2e/demo-workspace.spec.ts`,
-`6b10091`); auto-dismiss the approval announcement and reword it ("Demo
-approved — nothing was ordered."); an in-flow gate below 1000px instead of the
-`min-width: 1000px` scroll; keep `--silent` whole in the guide's commands at
-three-column widths; README/docs staleness sweep; re-run the QA panel
-(`Workflow` resume `wf_3bcd85e6-f1c`).
+Also landed later the same morning: one Scene store per tab
+(`SceneStoreProvider` in `app/layout.tsx`, nested providers inherit; the
+`webmcp-core` retry loop is gone and an E2E covers the wordmark round trip);
+the approval announcement reads "Demo approved — nothing was ordered." and
+clears after four seconds; an in-flow gate replaces the workspace under
+1000px; guide commands render one nowrap span per token with Copy beneath.
+
+Open: README/docs staleness sweep beyond the catalog counts (check
+`docs/local-mcp.md` lifecycle wording and `docs/asset-views.md` category list);
+re-run the QA panel (`Workflow` resume `wf_3bcd85e6-f1c`) for a fresh
+findings file; the remaining Minor items in `output/qa/findings.md`.
