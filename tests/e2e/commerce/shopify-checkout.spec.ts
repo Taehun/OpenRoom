@@ -1,8 +1,15 @@
 import { expect, test, type Page } from "@playwright/test";
 
-const STORE = "openroom-placeholder.myshopify.com";
+import {
+  FIXTURE_VARIANT_IDS,
+  PLACEHOLDER_STORE_DOMAIN,
+  fixtureGid,
+} from "../../helpers/commerce-fixtures";
+
+const STORE = PLACEHOLDER_STORE_DOMAIN;
 const APP_ORIGIN = "http://127.0.0.1:3001";
-const FIXTURE_PERMALINK = `https://${STORE}/cart/1001:1,1002:1`;
+const FIXTURE_PERMALINK = `https://${STORE}/cart/${FIXTURE_VARIANT_IDS["coffee-table"]}:1,${FIXTURE_VARIANT_IDS.rug}:1`;
+const TABLE_PERMALINK = `https://${STORE}/cart/${FIXTURE_VARIANT_IDS["oak-frame-table"]}:1`;
 // app/globals.css:10 — --terracotta: #c8784e
 // --md-sys-color-tertiary (#8A5A3C), the role skipped lines are painted with.
 const TERTIARY = "rgb(138, 90, 60)";
@@ -119,6 +126,10 @@ test("opens a Shopify cart permalink in a new tab without any request from OpenR
   const skipped = dialog.getByText("Not mapped to a Shopify variant");
   await expect(skipped).toHaveCount(2);
   await expect(dialog.getByText("$438 USD")).toBeVisible();
+  await expect(dialog.getByText("Catalog estimate")).toBeVisible();
+  await expect(
+    dialog.getByText("Shopify shows the store's prices at checkout."),
+  ).toBeVisible();
 
   // Guards the `.cartItemCopy small.cartSkipped` specificity fix (ec23001):
   // jsdom cannot observe the cascade, so the marker must be verified as
@@ -191,8 +202,17 @@ test("returns Shopify lines and the store MCP endpoint from add_scene_to_cart", 
   });
   expect(cart.structuredContent.ok).toBe(true);
   const { draft } = cart.structuredContent.data as {
-    draft: { commerce?: unknown };
+    draft: { commerce?: unknown; items: Array<Record<string, unknown>> };
   };
+  // The demo catalog's id travels as `demoVariantId`, so an agent cannot mistake
+  // it for something `update_cart` would accept.
+  expect(draft.items).toEqual([
+    expect.objectContaining({
+      productId: "oak-frame-table",
+      demoVariantId: "demo-variant-oak-frame-table",
+    }),
+  ]);
+  expect(draft.items[0]).not.toHaveProperty("variantId");
   expect(draft.commerce).toEqual({
     provider: "shopify",
     storeDomain: STORE,
@@ -200,12 +220,12 @@ test("returns Shopify lines and the store MCP endpoint from add_scene_to_cart", 
     lines: [
       {
         productId: "oak-frame-table",
-        merchandiseId: "gid://shopify/ProductVariant/1003",
+        merchandiseId: fixtureGid("oak-frame-table"),
         quantity: 1,
       },
     ],
     skipped: [],
-    checkoutPermalink: `https://${STORE}/cart/1003:1`,
+    checkoutPermalink: TABLE_PERMALINK,
   });
 
   const dialog = page.getByRole("dialog", { name: "Review your room" });

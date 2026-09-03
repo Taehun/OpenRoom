@@ -21,9 +21,23 @@ interface CartApprovalSheetProps {
   openWindow?: (url: string) => Window | null;
 }
 
+/**
+ * The `noopener` window feature is deliberately not used: per spec it makes
+ * `window.open` return null, which the caller cannot tell apart from a blocked
+ * popup, so the fallback anchor would appear on every successful checkout.
+ * Nulling `opener` is best-effort instead — WebKit has no cross-origin
+ * `opener` setter and throws, which used to abort the click handler before
+ * `open-external-checkout` was ever dispatched.
+ */
 export function openInNewTab(url: string): Window | null {
   const opened = window.open(url, "_blank");
-  if (opened) opened.opener = null;
+  if (opened) {
+    try {
+      opened.opener = null;
+    } catch {
+      // Cross-origin target in WebKit: the tab is open, just keep going.
+    }
+  }
   return opened;
 }
 
@@ -224,10 +238,10 @@ export function CartApprovalSheet({
 
         <div className={styles.cartTotal}>
           <span>
-            <strong>Estimated total</strong>
+            <strong>{isShopify ? "Catalog estimate" : "Estimated total"}</strong>
             <small>
               {isShopify
-                ? "Mapped items only · taxes and delivery calculated by Shopify"
+                ? "Shopify shows the store's prices at checkout."
                 : "Taxes and delivery calculated later"}
             </small>
           </span>

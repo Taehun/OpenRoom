@@ -1,5 +1,10 @@
 import { defineConfig, devices } from "@playwright/test";
 
+import {
+  FIXTURE_VARIANT_OVERRIDES,
+  PLACEHOLDER_STORE_DOMAIN,
+} from "./tests/helpers/commerce-fixtures";
+
 // Runs the Shopify-mode journeys against a second dev server. NEXT_PUBLIC_*
 // values are inlined at compile time, so this config owns its own server and
 // port; never run it concurrently with playwright.config.ts (both use .next).
@@ -16,9 +21,8 @@ export default defineConfig({
     reuseExistingServer: false,
     env: {
       NEXT_PUBLIC_COMMERCE_PROVIDER: "shopify",
-      NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN: "openroom-placeholder.myshopify.com",
-      NEXT_PUBLIC_SHOPIFY_VARIANTS:
-        "coffee-table=gid://shopify/ProductVariant/1001,rug=gid://shopify/ProductVariant/1002,oak-frame-table=gid://shopify/ProductVariant/1003",
+      NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN: PLACEHOLDER_STORE_DOMAIN,
+      NEXT_PUBLIC_SHOPIFY_VARIANTS: FIXTURE_VARIANT_OVERRIDES,
     },
   },
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],

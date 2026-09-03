@@ -14,7 +14,7 @@ const AGENT_CART_DRAFT: CartApprovalDraft = {
     {
       objectId: "table_01",
       productId: "travertine-plinth-table",
-      variantId: "demo-variant-travertine-plinth-table",
+      demoVariantId: "demo-variant-travertine-plinth-table",
       title: "Travertine Plinth Table",
       quantity: 1,
       price: { amountMinor: 24900, currency: "USD" },

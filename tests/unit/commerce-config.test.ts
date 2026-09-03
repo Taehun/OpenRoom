@@ -53,6 +53,23 @@ describe("parseCommerceConfig", () => {
     ).toEqual({ provider: "demo", reason: "invalid-domain" });
   });
 
+  it("matches the provider case-insensitively", () => {
+    expect(
+      parseCommerceConfig({
+        NEXT_PUBLIC_COMMERCE_PROVIDER: "Shopify",
+        NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN: "store.myshopify.com",
+      }),
+    ).toEqual({
+      provider: "shopify",
+      storeDomain: "store.myshopify.com",
+      mcpEndpoint: "https://store.myshopify.com/api/mcp",
+    });
+    expect(parseCommerceConfig({ NEXT_PUBLIC_COMMERCE_PROVIDER: "DEMO" })).toEqual({
+      provider: "demo",
+      reason: "default",
+    });
+  });
+
   it("accepts a bare store host, normalizes it, and derives the MCP endpoint", () => {
     expect(
       parseCommerceConfig({

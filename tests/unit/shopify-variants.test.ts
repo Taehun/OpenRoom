@@ -63,6 +63,32 @@ describe("parseVariantOverrides", () => {
     expect(parseVariantOverrides(undefined)).toEqual({});
     expect(parseVariantOverrides("")).toEqual({});
   });
+
+  it("accepts the bare numeric id Shopify admin shows and both spellings agree", () => {
+    expect(parseVariantOverrides("a=44352465993")).toEqual({
+      a: "gid://shopify/ProductVariant/44352465993",
+    });
+    expect(parseVariantOverrides("a=44352465993")).toEqual(
+      parseVariantOverrides("a=gid://shopify/ProductVariant/44352465993"),
+    );
+    expect(
+      validateShopifyVariants(parseVariantOverrides("a=44352465993")).issues,
+    ).toEqual([]);
+  });
+
+  it("leaves anything else untouched so the validator still rejects it", () => {
+    const overrides = parseVariantOverrides(
+      "a=gid://shopify/ProductVariant/44352465993?x=1,b=44352465993abc",
+    );
+    expect(overrides).toEqual({
+      a: "gid://shopify/ProductVariant/44352465993?x=1",
+      b: "44352465993abc",
+    });
+    expect(validateShopifyVariants(overrides).issues).toEqual([
+      { productId: "a", issue: "invalid-gid" },
+      { productId: "b", issue: "invalid-gid" },
+    ]);
+  });
 });
 
 describe("loadShopifyVariants", () => {

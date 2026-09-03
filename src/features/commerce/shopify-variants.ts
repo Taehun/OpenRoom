@@ -60,6 +60,19 @@ export function validateShopifyVariants(map: ShopifyVariantMap): ValidatedVarian
   return { variants, issues };
 }
 
+const BARE_VARIANT_ID_PATTERN = /^\d+$/;
+
+/**
+ * Shopify admin shows a variant's numeric id in the URL, so both spellings are
+ * accepted here and normalised to the GID form the validator expects. Anything
+ * else is passed through untouched and rejected later as `invalid-gid`.
+ */
+export function normalizeVariantId(value: string): string {
+  return BARE_VARIANT_ID_PATTERN.test(value)
+    ? `gid://shopify/ProductVariant/${value}`
+    : value;
+}
+
 export function parseVariantOverrides(value: string | undefined): ShopifyVariantMap {
   if (value === undefined) return {};
   const entries: Record<string, string> = {};
@@ -69,7 +82,7 @@ export function parseVariantOverrides(value: string | undefined): ShopifyVariant
     const productId = pair.slice(0, separator).trim();
     const gid = pair.slice(separator + 1).trim();
     if (productId === "" || gid === "") continue;
-    entries[productId] = gid;
+    entries[productId] = normalizeVariantId(gid);
   }
   return entries;
 }

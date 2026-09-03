@@ -19,7 +19,12 @@ import type {
   ToolContext,
 } from "../../src/webmcp/tool-context";
 import type { CommerceContext } from "../../src/features/commerce/commerce-types";
-import { DEMO_COMMERCE, SHOPIFY_COMMERCE } from "../helpers/commerce-fixtures";
+import {
+  DEMO_COMMERCE,
+  FIXTURE_VARIANT_IDS,
+  SHOPIFY_COMMERCE,
+  fixtureGid,
+} from "../helpers/commerce-fixtures";
 
 function createContext(
   store: SceneStore,
@@ -498,7 +503,7 @@ describe("WebMCP Core 6 handlers", () => {
           items: [{
             objectId: "table_01",
             productId: "travertine-plinth-table",
-            variantId: "demo-variant-travertine-plinth-table",
+            demoVariantId: "demo-variant-travertine-plinth-table",
             title: "Travertine Plinth Table",
             quantity: 1,
             price: { amountMinor: 24900, currency: "USD" },
@@ -645,12 +650,12 @@ describe("add_scene_to_cart commerce block", () => {
       lines: [
         {
           productId: "oak-frame-table",
-          merchandiseId: "gid://shopify/ProductVariant/1003",
+          merchandiseId: fixtureGid("oak-frame-table"),
           quantity: 1,
         },
       ],
       skipped: [],
-      checkoutPermalink: "https://openroom-placeholder.myshopify.com/cart/1003:1",
+      checkoutPermalink: `https://openroom-placeholder.myshopify.com/cart/${FIXTURE_VARIANT_IDS["oak-frame-table"]}:1`,
     });
     expect(drafts).toHaveLength(1);
     expect(drafts[0]!.commerce).toEqual(draft.commerce);

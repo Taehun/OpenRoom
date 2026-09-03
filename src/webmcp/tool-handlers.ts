@@ -236,7 +236,7 @@ function draftFor(scene: Scene, objects: readonly SceneObject[]): CartApprovalDr
     return [{
       objectId: object.id,
       productId: object.product.id,
-      variantId: object.product.variantId,
+      demoVariantId: object.product.variantId,
       title: object.product.title,
       quantity: 1 as const,
       price: object.product.price,
