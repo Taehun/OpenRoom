@@ -322,6 +322,15 @@ Demo mode remains the default and is byte-for-byte unchanged.
 
 ## CI and deployment
 
+Two Cloudflare targets exist. The Worker (`openroom.taehun.workers.dev`) is the
+primary deploy (`pnpm build && pnpm deploy:vinext`). A fully static export also
+runs on Cloudflare Pages at <https://openroom-y20.pages.dev>: `pnpm build:pages`
+writes `out/` (both routes are prerendered; `NEXT_OUTPUT=export` switches the Next
+config to `output: "export"` with unoptimised images) and `pnpm deploy:pages`
+uploads it. The `openroom.pages.dev` subdomain belongs to another account, so
+the project subdomain is `openroom-y20`.
+
+
 `.github/workflows/ci.yml` runs on every push and pull request to `main`:
 typecheck, lint, unit and integration tests, the Playwright smoke suites
 (demo and Shopify-mode journeys), and both builds (`next build` and
