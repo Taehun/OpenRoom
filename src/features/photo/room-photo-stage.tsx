@@ -5,6 +5,7 @@ import {
   type MouseEvent,
   type PointerEvent,
   useCallback,
+  useEffect,
   useLayoutEffect,
   useMemo,
   useRef,
@@ -69,8 +70,36 @@ const ROTATE_STEP_RADIANS = (5 * Math.PI) / 180;
 const ROTATE_SHIFT_STEP_RADIANS = (15 * Math.PI) / 180;
 const TRANSFORM_EPSILON = 1e-9;
 
+/** `input` types that are buttons or sliders rather than places to type. */
+const NON_TEXT_INPUT_TYPES = new Set([
+  "button",
+  "checkbox",
+  "radio",
+  "range",
+  "reset",
+  "submit",
+]);
+
 function objectLabel(object: SceneObject) {
   return object.product?.title ?? OBJECT_LABELS[object.type];
+}
+
+/**
+ * True for anything holding a caret or a typed value. Focus follows the
+ * selection into the room, but it is never taken away from someone typing.
+ */
+function isTextEntry(element: HTMLElement) {
+  if (
+    element instanceof HTMLTextAreaElement ||
+    element instanceof HTMLSelectElement
+  ) {
+    return true;
+  }
+  if (element instanceof HTMLInputElement) {
+    return !NON_TEXT_INPUT_TYPES.has(element.type);
+  }
+  const editable = element.getAttribute("contenteditable");
+  return editable === "" || editable === "true";
 }
 
 function capturePointer(element: HTMLElement, pointerId: number) {
@@ -104,8 +133,10 @@ function pointerAngle(point: NormalizedPoint, anchor: NormalizedPoint) {
 export function RoomPhotoStage() {
   const scene = useSceneStore((state) => state.scene);
   const toolMode = useSceneStore((state) => state.toolMode);
+  const selectedObjectId = scene.selectedObjectId;
   const sceneStore = useSceneStoreApi();
   const stageRef = useRef<HTMLElement>(null);
+  const hasTrackedSelectionRef = useRef(false);
   const transformPreviewRef = useRef<TransformPreview | null>(null);
   const previewListenersRef = useRef(new Set<() => void>());
   const subscribeToTransformPreview = useCallback((listener: () => void) => {
@@ -150,6 +181,33 @@ export function RoomPhotoStage() {
     observer.observe(stage);
     return () => observer.disconnect();
   }, []);
+
+  // Arrow-key move and rotate are handled by the cutout itself, so a keyboard
+  // user who selects from the object rail and then picks Move or Rotate would
+  // be left pressing arrows at the rail. Focus follows the selection into the
+  // room instead, and follows a tool change too, so the arrows work at once.
+  useEffect(() => {
+    // The first run is the mount: nothing has changed for the user yet, and
+    // pulling focus into the room on load would skip the header and the rail.
+    if (!hasTrackedSelectionRef.current) {
+      hasTrackedSelectionRef.current = true;
+      return;
+    }
+    if (!selectedObjectId) return;
+
+    const selector = `[data-object-id="${CSS.escape(selectedObjectId)}"]`;
+    const active = document.activeElement;
+    if (active instanceof HTMLElement) {
+      // Focus already on this object's cutout, or in a field being typed in:
+      // either way it stays put. Another object's cutout does not count — the
+      // arrow keys only reach the object that is selected.
+      if (active.closest(selector)) return;
+      if (isTextEntry(active)) return;
+    }
+
+    const cutout = stageRef.current?.querySelector<HTMLButtonElement>(selector);
+    cutout?.focus({ preventScroll: true });
+  }, [selectedObjectId, toolMode]);
 
   function startTransform(
     object: SceneObject,
