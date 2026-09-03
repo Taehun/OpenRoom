@@ -2,7 +2,10 @@ import { createStore, type StoreApi } from "zustand/vanilla";
 
 import { createDemoScene } from "../../demo/demo-scene";
 import { proposeNaturalPlacement } from "../placement/natural-placement";
-import type { PlacementFailureReason } from "../placement/placement-types";
+import type {
+  PlacementFailureReason,
+  PlacementOptions,
+} from "../placement/placement-types";
 import { validateAndApplyPlacement } from "./natural-placement-command";
 import { applySceneCommand } from "./scene-commands";
 import {
@@ -38,6 +41,12 @@ export interface SceneCommitEvent {
 export interface SceneStoreOptions {
   onCommit?: (event: SceneCommitEvent) => void;
   proposePlacement?: typeof proposeNaturalPlacement;
+  /**
+   * The orientations the solver may turn each object to, built from the photo view
+   * registry (spec 8.1). A store created without it keeps every rotation as it is, which
+   * is what a Scene with no registered views would produce anyway.
+   */
+  rotationOptions?: (scene: Scene) => PlacementOptions["rotationOptions"];
 }
 
 export type ArrangeNaturallyResult =
@@ -82,10 +91,11 @@ function cloneScene(scene: Scene) {
 function measuredPlacementProposal(
   proposer: typeof proposeNaturalPlacement,
   scene: Scene,
+  options?: PlacementOptions,
 ) {
   const start = performance.now();
   try {
-    return proposer(scene);
+    return proposer(scene, options);
   } finally {
     try {
       performance.measure("openinterior-natural-placement", {
@@ -137,8 +147,9 @@ export function createSceneStore(
 ): SceneStore {
   const canonicalSeed = cloneScene(seed);
   const proposer = options.proposePlacement ?? proposeNaturalPlacement;
-  const proposePlacement: typeof proposeNaturalPlacement = (scene) =>
-    measuredPlacementProposal(proposer, scene);
+  const rotationOptionsFor = (scene: Scene) => options.rotationOptions?.(scene);
+  const proposePlacement = (scene: Scene, placementOptions?: PlacementOptions) =>
+    measuredPlacementProposal(proposer, scene, placementOptions);
   let nextNoticeId = 1;
 
   function notice(
@@ -218,9 +229,11 @@ export function createSceneStore(
         let placementNotice: PlacementNotice | undefined;
         if (completesUnlockedRedesign(before, applied.scene, request)) {
           try {
+            const rotationOptions = rotationOptionsFor(applied.scene);
             const placement = validateAndApplyPlacement(
               applied.scene,
-              proposePlacement(cloneScene(applied.scene)),
+              proposePlacement(cloneScene(applied.scene), { rotationOptions }),
+              rotationOptions,
             );
             if (placement.ok && placement.changed) {
               result = {
@@ -280,9 +293,10 @@ export function createSceneStore(
 
       arrangeNaturally() {
         const current = get().scene;
+        const rotationOptions = rotationOptionsFor(current);
         let proposal;
         try {
-          proposal = proposePlacement(cloneScene(current));
+          proposal = proposePlacement(cloneScene(current), { rotationOptions });
         } catch {
           const placementNotice = notice(
             "manual-failed",
@@ -297,7 +311,11 @@ export function createSceneStore(
           };
         }
 
-        const placement = validateAndApplyPlacement(current, proposal);
+        const placement = validateAndApplyPlacement(
+          current,
+          proposal,
+          rotationOptions,
+        );
         if (!placement.ok) {
           const placementNotice = notice(
             "manual-failed",

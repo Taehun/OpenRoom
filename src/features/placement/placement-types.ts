@@ -1,6 +1,6 @@
 import type { Scene, Vec3 } from "../scene/scene-schema";
 
-export const PLACEMENT_PROFILE_VERSION = 1 as const;
+export const PLACEMENT_PROFILE_VERSION = 2 as const;
 
 export interface PointXZ {
   x: number;
@@ -29,6 +29,15 @@ export interface OpeningClearanceZone extends Footprint2D {
 export interface RotationOption {
   rotationY: number;
   fidelity: number;
+}
+
+/**
+ * What the caller knows about the orientations each object can be shown in. An object
+ * with no entry keeps the rotation it came with, at fidelity 1, which is the behaviour
+ * of every caller that passes nothing. Rugs ignore the table (spec 8.1).
+ */
+export interface PlacementOptions {
+  rotationOptions?: Readonly<Record<string, readonly RotationOption[]>>;
 }
 
 export interface ProposedPlacement {

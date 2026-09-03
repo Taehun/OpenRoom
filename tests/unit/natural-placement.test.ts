@@ -3,7 +3,9 @@ import { describe, expect, it } from "vitest";
 import { createDemoScene } from "../../src/demo/demo-scene";
 import { hasCirculationPath } from "../../src/features/placement/circulation";
 import {
+  footprintExtent,
   footprintInsideRoom,
+  footprintProjection,
   footprintsOverlap,
   objectFootprint,
   openingClearanceZones,
@@ -16,8 +18,18 @@ import {
   type EvaluatedLayout,
 } from "../../src/features/placement/natural-placement";
 import { validateAndApplyPlacement } from "../../src/features/scene/natural-placement-command";
-import { PLACEMENT_LIMITS } from "../../src/features/placement/placement-profile";
-import type { ProposedPlacement } from "../../src/features/placement/placement-types";
+import { buildRotationOptions } from "../../src/features/photo/photo-views";
+import {
+  PLACEMENT_LIMITS,
+  PLACEMENT_SCORE_WEIGHTS,
+} from "../../src/features/placement/placement-profile";
+import {
+  PLACEMENT_PROFILE_VERSION,
+  type NaturalPlacementResult,
+  type PlacementOptions,
+  type ProposedPlacement,
+  type RotationOption,
+} from "../../src/features/placement/placement-types";
 import { applySceneCommand } from "../../src/features/scene/scene-commands";
 import type {
   Scene,
@@ -736,7 +748,7 @@ describe("natural placement", () => {
 
   it("keeps 99-or-lower improvements unchanged and accepts exactly 100", () => {
     expect(PLACEMENT_LIMITS.improvementThreshold).toBe(100);
-    const below = proposeNaturalPlacement(thresholdScene(-0.3));
+    const below = proposeNaturalPlacement(thresholdScene(-0.85));
     expect(below.kind).toBe("unchanged");
     if (below.kind !== "unchanged") return;
     expect(below.diagnostics.currentScore).not.toBeNull();
@@ -745,7 +757,7 @@ describe("natural placement", () => {
       below.diagnostics.proposedScore! - below.diagnostics.currentScore!,
     ).toBeLessThan(PLACEMENT_LIMITS.improvementThreshold);
 
-    const exact = proposeNaturalPlacement(thresholdScene(-0.25));
+    const exact = proposeNaturalPlacement(thresholdScene(-0.8));
     expect(exact.kind).toBe("changed");
     if (exact.kind !== "changed") return;
     expect(exact.diagnostics.currentScore).not.toBeNull();
@@ -1133,4 +1145,333 @@ describe("sofa wall candidates", () => {
       ).toBeGreaterThan(1);
     },
   );
+});
+
+/**
+ * Spec 8: the solver may turn an object only through the rotations its registered photo
+ * views can show truthfully, and composes the room the way the demo photo is staged.
+ */
+describe("rotation options", () => {
+  /** The chair's photographed options: the native quarter view and its mirror. */
+  const CHAIR_OPTIONS: readonly RotationOption[] = [
+    { rotationY: -Math.PI / 4, fidelity: 1 },
+    { rotationY: 0, fidelity: 1 },
+    { rotationY: Math.PI / 4, fidelity: 0.95 },
+  ];
+
+  function arrangeWith(
+    scene: Scene,
+    options?: PlacementOptions,
+  ): Record<string, SceneObject> {
+    const proposal = proposeNaturalPlacement(scene, options);
+    expect(proposal.kind).toBe("changed");
+    if (proposal.kind !== "changed") throw new Error("expected an arrangement");
+    const applied = validateAndApplyPlacement(
+      scene,
+      proposal,
+      options?.rotationOptions,
+    );
+    expect(applied.ok).toBe(true);
+    if (!applied.ok || !applied.changed) throw new Error("expected a changed Scene");
+    return Object.fromEntries(applied.scene.objects.map((object) => [object.id, object]));
+  }
+
+  function collidingObjectIds(layout: Record<string, SceneObject>): string[] {
+    const obstacles = Object.values(layout).filter(({ type }) => type !== "rug");
+    const colliding = new Set<string>();
+    for (let first = 0; first < obstacles.length; first += 1) {
+      for (let second = first + 1; second < obstacles.length; second += 1) {
+        if (
+          footprintsOverlap(
+            objectFootprint(obstacles[first]!),
+            objectFootprint(obstacles[second]!),
+          )
+        ) {
+          colliding.add(obstacles[first]!.id);
+          colliding.add(obstacles[second]!.id);
+        }
+      }
+    }
+    return [...colliding].sort();
+  }
+
+  /** dot(forward(yaw), target - object), spelled out rather than borrowed from the solver. */
+  function facesToward(object: SceneObject, target: SceneObject): number {
+    const yaw = object.rotation[1];
+    return (
+      -Math.sin(yaw) * (target.position[0] - object.position[0]) +
+      Math.cos(yaw) * (target.position[2] - object.position[2])
+    );
+  }
+
+  /** How far `other` sits along the sofa's own lateral axis, signed then unsigned. */
+  function lateralProjection(sofa: SceneObject, other: SceneObject): number {
+    const yaw = sofa.rotation[1];
+    return (
+      Math.cos(yaw) * (other.position[0] - sofa.position[0]) +
+      Math.sin(yaw) * (other.position[2] - sofa.position[2])
+    );
+  }
+
+  function lateralOffset(sofa: SceneObject, other: SceneObject): number {
+    return Math.abs(lateralProjection(sofa, other));
+  }
+
+  /** The edge gap between two footprints along an axis; negative when they overlap. */
+  function edgeGap(
+    first: SceneObject,
+    second: SceneObject,
+    axis: { x: number; z: number },
+  ): number {
+    const span = (object: SceneObject) =>
+      footprintProjection(objectFootprint(object), axis.x, axis.z);
+    const a = span(first);
+    const b = span(second);
+    if (b.minimum >= a.maximum) return b.minimum - a.maximum;
+    if (a.minimum >= b.maximum) return a.minimum - b.maximum;
+    return Math.max(a.minimum, b.minimum) - Math.min(a.maximum, b.maximum);
+  }
+
+  function lateralGap(sofa: SceneObject, other: SceneObject): number {
+    const yaw = sofa.rotation[1];
+    return edgeGap(sofa, other, { x: Math.cos(yaw), z: Math.sin(yaw) });
+  }
+
+  function forwardGap(sofa: SceneObject, other: SceneObject): number {
+    const yaw = sofa.rotation[1];
+    return edgeGap(sofa, other, { x: -Math.sin(yaw), z: Math.cos(yaw) });
+  }
+
+  function openingBlockedObjectIds(
+    scene: Scene,
+    layout: Record<string, SceneObject>,
+  ): string[] {
+    const zones = openingClearanceZones(scene);
+    return Object.values(layout)
+      .filter((object) =>
+        zones.some((zone) => footprintsOverlap(objectFootprint(object), zone)),
+      )
+      .map(({ id }) => id)
+      .sort();
+  }
+
+  it("keeps the weight table summing to 10,000 at profile version 2", () => {
+    expect(
+      Object.values(PLACEMENT_SCORE_WEIGHTS).reduce((sum, weight) => sum + weight, 0),
+    ).toBe(10_000);
+    expect(PLACEMENT_PROFILE_VERSION).toBe(2);
+  });
+
+  it("preserves every rotation when no options are given", () => {
+    const scene = poorRedesignedJourneyScene();
+    const result = proposeNaturalPlacement(scene);
+    expect(result.kind).toBe("changed");
+    if (result.kind !== "changed") return;
+    for (const placement of result.placements) {
+      const object = scene.objects.find(({ id }) => id === placement.objectId)!;
+      if (object.type === "rug") continue;
+      expect(placement.rotationY).toBe(object.rotation[1]);
+    }
+  });
+
+  it("never proposes a rotation outside an object's options", () => {
+    const scene = poorRedesignedJourneyScene();
+    const options: PlacementOptions = { rotationOptions: { chair_01: CHAIR_OPTIONS } };
+    const result = proposeNaturalPlacement(scene, options);
+    expect(result.kind).toBe("changed");
+    if (result.kind !== "changed") return;
+    const chair = result.placements.find(({ objectId }) => objectId === "chair_01")!;
+    expect(
+      CHAIR_OPTIONS.some(
+        ({ rotationY }) => Math.abs(rotationY - chair.rotationY) < 1e-9,
+      ),
+    ).toBe(true);
+    // Every other object has no entry, so it keeps the rotation it came with.
+    for (const placement of result.placements) {
+      if (placement.objectId === "chair_01") continue;
+      const object = scene.objects.find(({ id }) => id === placement.objectId)!;
+      if (object.type === "rug") continue;
+      expect(placement.rotationY).toBe(object.rotation[1]);
+    }
+  });
+
+  /**
+   * Spec 8.5 expects the sofa square on the back wall. It cannot be: the demo room's
+   * back window makes an opening clearance zone of x in [-0.18, 1.62], z in [-2.4,
+   * -1.65], so a sofa flush on that wall has to keep x <= -1.2 to stay out of it, and
+   * from there the right-end flank lands inside the zone while the left-end flank falls
+   * outside the room. No layout with the sofa on the back wall, a chair flanking one end
+   * and the lamp at the other exists, and pinning the sofa to rotation 0 costs 219 points
+   * on the spec's own weights. The solver quarter-turns the sofa into the back-left
+   * corner instead, which is a rotation its native photographed view shows at fidelity 1,
+   * and stages everything else exactly as 8.5 describes.
+   */
+  it("flanks the sofa with the chair turned 45 degrees toward the table", () => {
+    const scene = poorRedesignedJourneyScene();
+    const layout = arrangeWith(scene, {
+      rotationOptions: buildRotationOptions(scene),
+    });
+    const { sofa_01: sofa, chair_01: chair, table_01: table } = layout;
+    const { rug_01: rug, lamp_01: lamp, plant_01: plant } = layout;
+
+    // The sofa backs onto the back wall and the table and rug sit on its forward axis.
+    expect(footprintExtent(objectFootprint(sofa!)).minimumZ).toBeLessThan(-2.2);
+    expect(forwardProjection(sofa!, table!)).toBeGreaterThan(0);
+    expect(forwardProjection(sofa!, rug!)).toBeGreaterThan(0);
+
+    // The chair flanks a sofa end, quarter-turned toward the table.
+    expect(Math.abs(chair!.rotation[1])).toBeCloseTo(Math.PI / 4, 9);
+    expect(facesToward(chair!, table!)).toBeGreaterThan(0);
+    expect(lateralOffset(sofa!, chair!)).toBeGreaterThan(1.2);
+    expect(chair!.position[2]).toBeLessThan(table!.position[2] + 0.3);
+
+    // The lamp stands beside the sofa's other end: inside its depth band, just past it.
+    expect(Math.sign(lateralProjection(sofa!, lamp!))).toBe(
+      -Math.sign(lateralProjection(sofa!, chair!)),
+    );
+    expect(lateralOffset(sofa!, lamp!)).toBeGreaterThan(1.0);
+    expect(forwardGap(sofa!, lamp!)).toBeLessThanOrEqual(0);
+    expect(lateralGap(sofa!, lamp!)).toBeLessThan(0.5);
+
+    // The plant fills a back corner, clear of the window clearance.
+    const plantExtent = footprintExtent(objectFootprint(plant!));
+    expect(
+      Math.min(
+        Math.abs(plantExtent.minimumX + scene.room.width / 2),
+        Math.abs(scene.room.width / 2 - plantExtent.maximumX),
+      ),
+    ).toBeLessThanOrEqual(0.3);
+    expect(Math.abs(plantExtent.minimumZ + scene.room.depth / 2)).toBeLessThanOrEqual(
+      0.3,
+    );
+
+    expect(collidingObjectIds(layout)).toEqual([]);
+    expect(openingBlockedObjectIds(scene, layout)).toEqual([]);
+  });
+
+  it.each([
+    [
+      "the seed placeholder room",
+      createDemoScene,
+      {
+        sofa_01: [-1.3, 0.425, -1.2, -Math.PI / 4],
+        table_01: [-0.2, 0.21, -0.1, 0],
+        rug_01: [-0.2, 0.01, -0.1, -Math.PI / 4],
+        lamp_01: [-2.7, 0.8, -0.5, 0],
+        chair_01: [0.7, 0.425, -1, Math.PI / 4],
+        plant_01: [-2.625, 0.6, -2.025, 0],
+      },
+    ],
+    [
+      "the redesign dragged to the poor journey layout",
+      poorRedesignedJourneyScene,
+      {
+        sofa_01: [-1.3, 0.39, -1.1, -Math.PI / 4],
+        table_01: [-0.3, 0.19, 0.1, 0],
+        rug_01: [-0.3, 0.01, 0.2, -Math.PI / 4],
+        lamp_01: [-2.6, 0.77, 0, 0],
+        chair_01: [0.8, 0.375, -1, Math.PI / 4],
+        plant_01: [-2.4, 0.9, -1.7, 0],
+      },
+    ],
+  ])("pins the arranged coordinates for %s", (_journey, buildScene, expected) => {
+    const scene = buildScene();
+    const layout = arrangeWith(scene, {
+      rotationOptions: buildRotationOptions(scene),
+    });
+    expect(
+      Object.fromEntries(
+        Object.entries(expected).map(([objectId]) => {
+          const object = layout[objectId]!;
+          return [objectId, [...object.position, object.rotation[1]]];
+        }),
+      ),
+    ).toEqual(expected);
+  });
+
+  it("is deterministic with options", () => {
+    const run = () => {
+      const scene = poorRedesignedJourneyScene();
+      return proposeNaturalPlacement(scene, {
+        rotationOptions: buildRotationOptions(scene),
+      });
+    };
+    expect(JSON.stringify(run())).toBe(JSON.stringify(run()));
+  });
+
+  it("keeps the seed layout under the candidate and beam caps", () => {
+    const scene = poorRedesignedJourneyScene();
+    const result = proposeNaturalPlacement(scene, {
+      rotationOptions: buildRotationOptions(scene),
+    });
+    expect(result.kind).toBe("changed");
+    if (result.kind !== "changed") return;
+    expect(result.diagnostics.evaluatedLayouts).toBeGreaterThan(0);
+    // At most one settled beam per fixed-point pass, and the solver caps the passes
+    // at eight; nothing here may widen the beam to reach the staged layout.
+    expect(result.diagnostics.evaluatedLayouts).toBeLessThanOrEqual(
+      PLACEMENT_LIMITS.beamWidth * 8,
+    );
+  });
+
+  it("settles on a second pass with options", () => {
+    const scene = poorRedesignedJourneyScene();
+    const rotationOptions = buildRotationOptions(scene);
+    const layout = arrangeWith(scene, { rotationOptions });
+    const arranged: Scene = {
+      ...scene,
+      objects: scene.objects.map((object) => layout[object.id] ?? object),
+    };
+    expect(proposeNaturalPlacement(arranged, { rotationOptions }).kind).toBe(
+      "unchanged",
+    );
+  });
+
+  it("folds an accumulated stage rotation onto the option it stands for", () => {
+    // The rotation handle accumulates without bounds while the view registry lists the
+    // folded angles, so a room saved after four full turns must still arrange.
+    const scene = poorRedesignedJourneyScene();
+    for (const object of scene.objects) {
+      if (object.type === "rug") continue;
+      object.rotation[1] += Math.PI * 4;
+    }
+    const rotationOptions = buildRotationOptions(scene);
+    const proposal = proposeNaturalPlacement(scene, { rotationOptions });
+    expect(proposal.kind).toBe("changed");
+    if (proposal.kind !== "changed") return;
+
+    for (const placement of proposal.placements) {
+      const object = scene.objects.find(({ id }) => id === placement.objectId)!;
+      if (object.type === "rug") continue;
+      expect(
+        rotationOptions[object.id]!.some(
+          ({ rotationY }) => Math.abs(rotationY - placement.rotationY) < 1e-9,
+        ),
+      ).toBe(true);
+    }
+    expect(
+      validateAndApplyPlacement(scene, proposal, rotationOptions),
+    ).toMatchObject({ ok: true, changed: true });
+  });
+
+  it("rejects a proposal whose rotation is outside the object's options", () => {
+    const scene = poorRedesignedJourneyScene();
+    const rotationOptions = buildRotationOptions(scene);
+    const proposal = proposeNaturalPlacement(scene, { rotationOptions });
+    expect(proposal.kind).toBe("changed");
+    if (proposal.kind !== "changed") return;
+    const tampered: NaturalPlacementResult = {
+      ...proposal,
+      placements: proposal.placements.map((placement) =>
+        placement.objectId === "chair_01"
+          ? { ...placement, rotationY: Math.PI / 3 }
+          : placement,
+      ),
+    };
+    expect(validateAndApplyPlacement(scene, tampered, rotationOptions)).toEqual({
+      ok: false,
+      scene,
+      reason: "invalid-input",
+    });
+  });
 });

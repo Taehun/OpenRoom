@@ -830,20 +830,23 @@ test("arranges the room explicitly, settles, and restores it with one undo", asy
   expect(reachesOpening(arrangedScene)).toBe(true);
   expect(placementSignature(arrangedScene)).not.toEqual(savedPlacement);
 
-  // Only the photographed front-quarter pair is registered today and the solver does
-  // not turn objects yet, so the arranged chair shows the mirrored cutout exactly
-  // when it sits at or right of the room centre, facing the room. Task 4 teaches the
-  // solver to turn the chair and tightens this to its pinned flanking rotation.
+  // The solver turns the chair a quarter turn to flank the sofa's right end and face the
+  // table (spec 8.5). Only the photographed front-quarter pair is registered, whose
+  // native front is turned to the viewer's right, so a chair facing the other way is
+  // shown by that same cutout mirrored - never by a CSS rotation.
   const arrangedChair = arrangedScene.objects.find(
     (object) => object.id === "chair_01",
   );
-  if (!arrangedChair) throw new Error("Missing chair_01 after arranging");
-  expect(arrangedChair.rotation[1]).toBe(0);
-  const chairFrame = page.getByTestId("photo-object-frame-chair_01");
-  await expect(chairFrame).toHaveAttribute(
-    "data-photo-mirrored",
-    String(arrangedChair.position[0] >= 0),
+  const arrangedSofa = arrangedScene.objects.find(
+    (object) => object.id === "sofa_01",
   );
+  if (!arrangedChair || !arrangedSofa) {
+    throw new Error("Missing chair_01 or sofa_01 after arranging");
+  }
+  expect(arrangedChair.rotation[1]).toBeCloseTo(Math.PI / 4, 9);
+  expect(arrangedChair.position[0]).toBeGreaterThan(arrangedSofa.position[0] + 1.2);
+  const chairFrame = page.getByTestId("photo-object-frame-chair_01");
+  await expect(chairFrame).toHaveAttribute("data-photo-mirrored", "true");
   await expect(chairFrame).toHaveAttribute("data-photo-view", "front-quarter");
   const arrangedTransforms = await objectFrameTransforms(page);
   expect(arrangedTransforms).toHaveLength(5);

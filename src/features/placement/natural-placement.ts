@@ -18,8 +18,10 @@ import type {
   Footprint2D,
   NaturalPlacementResult,
   PlacementDiagnostics,
+  PlacementOptions,
   PointXZ,
   ProposedPlacement,
+  RotationOption,
 } from "./placement-types";
 import {
   SceneSchema,
@@ -58,6 +60,7 @@ interface SearchState {
   terms: TermScores;
   movementTotal: number;
   accessoryTotal: number;
+  viewFidelityTotal: number;
   parent: SearchState | null;
   placedIndex: number;
   placedTemplate: SceneObject | null;
@@ -292,6 +295,61 @@ function localAxes(rotationY: number): { lateral: PointXZ; forward: PointXZ } {
     lateral: { x: Math.cos(rotationY), z: Math.sin(rotationY) },
     forward: { x: -Math.sin(rotationY), z: Math.cos(rotationY) },
   };
+}
+
+/** Two option rotations closer than this stand for the same orientation (spec 8.4). */
+const ROTATION_OPTION_EPSILON = 1e-9;
+
+/** `rotationYOf(facingOf(r))`: the angle folded into (-pi, pi], so 2pi meets 0. */
+function foldAngle(rotationY: number): number {
+  return Math.atan2(Math.sin(rotationY), Math.cos(rotationY));
+}
+
+/**
+ * The orientations an object may be proposed in. An object with no table entry keeps the
+ * rotation it came with at fidelity 1, which is what every caller that passes no options
+ * gets for every object (spec 8.1).
+ */
+function optionsFor(
+  object: SceneObject,
+  options: PlacementOptions | undefined,
+): readonly RotationOption[] {
+  const table = options?.rotationOptions?.[object.id];
+  return table === undefined || table.length === 0
+    ? [{ rotationY: object.rotation[1], fidelity: 1 }]
+    : table;
+}
+
+/**
+ * The option an incumbent rotation stands for. Options are folded into (-pi, pi] while
+ * the stage accumulates rotations without bounds, so an incumbent is matched by angle
+ * and adopts the option's own value: every candidate this module emits is then exactly
+ * an option, which is what the command adapter re-validates (spec 8.4).
+ */
+function nearestOption(
+  rotationY: number,
+  choices: readonly RotationOption[],
+): RotationOption {
+  let best = choices[0]!;
+  let bestDistance = Number.POSITIVE_INFINITY;
+  for (const option of choices) {
+    const distance = Math.abs(foldAngle(option.rotationY - rotationY));
+    if (distance < bestDistance - ROTATION_OPTION_EPSILON) {
+      bestDistance = distance;
+      best = option;
+    }
+  }
+  return best;
+}
+
+/** The object's current placement, snapped onto the option its rotation stands for. */
+function incumbentPlacement(
+  object: SceneObject,
+  choices: readonly RotationOption[],
+): ProposedPlacement {
+  const placement = placementFor(object);
+  const { rotationY } = nearestOption(placement.rotationY, choices);
+  return placement.rotationY === rotationY ? placement : { ...placement, rotationY };
 }
 
 function edgeGapAlongAxis(
@@ -530,47 +588,188 @@ function rugRelationScore(objects: readonly SceneObject[]): number {
   return Math.round((containsTable * 7 + centered * 3) / 10);
 }
 
+/**
+ * Spec 8.3: how the chair reads in the conversation group - whether it is turned toward
+ * the table (5), sits a conversation gap from it (3), and is off the sofa's centre axis
+ * or beyond the table rather than planted in the middle of the shot (2).
+ */
 function chairRelationScore(objects: readonly SceneObject[]): number {
   const sofa = firstObject(objects, "sofa");
   const table = firstObject(objects, "coffee_table");
   const chair = firstObject(objects, "chair");
   if (!sofa || !table || !chair) return 1000;
-  const { forward, lateral: lateralAxis } = localAxes(sofa.rotation[1]);
-  const tableDirection = Math.sign(
-    axisProjection(
-      {
-        x: table.position[0] - sofa.position[0],
-        z: table.position[2] - sofa.position[2],
-      },
-      forward,
-    ),
-  ) || 1;
-  const chairDirection = Math.sign(
-    axisProjection(
-      {
-        x: chair.position[0] - table.position[0],
-        z: chair.position[2] - table.position[2],
-      },
-      forward,
-    ),
+
+  const toTable: PointXZ = {
+    x: table.position[0] - chair.position[0],
+    z: table.position[2] - chair.position[2],
+  };
+  const separation = Math.hypot(toTable.x, toTable.z);
+  const { forward, lateral } = localAxes(sofa.rotation[1]);
+  if (separation < 1e-6) {
+    // Concentric with the table: no direction to face and no gap to close.
+    return Math.round((1000 * 5 + 0 * 3 + 0 * 2) / 10);
+  }
+
+  const direction: PointXZ = {
+    x: toTable.x / separation,
+    z: toTable.z / separation,
+  };
+  const chairForward = localAxes(chair.rotation[1]).forward;
+  const facing = clamp(
+    Math.round(axisProjection(chairForward, direction) * 1000),
+    0,
+    1000,
   );
-  const opposite = chairDirection === tableDirection ? 1000 : 0;
-  const lateralScore = proximityScore(
-    millimetres(
-      Math.abs(
-        axisProjection(
-          {
-            x: chair.position[0] - table.position[0],
-            z: chair.position[2] - table.position[2],
-          },
-          lateralAxis,
-        ),
+  const gap = proximityScore(
+    millimetres(edgeGapAlongAxis(chair, table, direction)),
+    450,
+    600,
+  );
+
+  const tableDirection =
+    Math.sign(
+      axisProjection(
+        {
+          x: table.position[0] - sofa.position[0],
+          z: table.position[2] - sofa.position[2],
+        },
+        forward,
+      ),
+    ) || 1;
+  const beyondTable =
+    Math.sign(axisProjection({ x: -toTable.x, z: -toTable.z }, forward)) ===
+    tableDirection;
+  const lateralOffsetMm = millimetres(
+    Math.abs(
+      axisProjection(
+        {
+          x: chair.position[0] - sofa.position[0],
+          z: chair.position[2] - sofa.position[2],
+        },
+        lateral,
       ),
     ),
-    0,
-    1400,
   );
-  return Math.round((opposite * 7 + lateralScore * 3) / 10);
+  const spread =
+    beyondTable || lateralOffsetMm >= millimetres(sofa.dimensionsM.width * 0.3)
+      ? 1000
+      : 0;
+
+  return Math.round((facing * 5 + gap * 3 + spread * 2) / 10);
+}
+
+/**
+ * Spec 8.3: how truthfully a registered view can show the rotation this object was given.
+ * An object with no options entry is unconstrained and counts as fully truthful.
+ */
+function fidelityContribution(
+  objectId: string,
+  rotationY: number,
+  options: PlacementOptions | undefined,
+): number {
+  const table = options?.rotationOptions?.[objectId];
+  if (table === undefined || table.length === 0) return 1000;
+  for (const option of table) {
+    if (Math.abs(option.rotationY - rotationY) <= ROTATION_OPTION_EPSILON) {
+      return clamp(Math.round(option.fidelity * 1000), 0, 1000);
+    }
+  }
+  return 0;
+}
+
+/** Which objects the averaged view-fidelity and composition terms are taken over. */
+function isComposed(object: SceneObject): boolean {
+  return isMovable(object) && object.type !== "rug";
+}
+
+function viewFidelityScore(
+  objects: readonly SceneObject[],
+  options: PlacementOptions | undefined,
+): number {
+  let total = 0;
+  let count = 0;
+  for (const object of objects) {
+    if (!isComposed(object)) continue;
+    total += fidelityContribution(object.id, object.rotation[1], options);
+    count += 1;
+  }
+  return count === 0 ? 1000 : Math.round(total / count);
+}
+
+/**
+ * Spec 8.3: how far back in the shot the object stands. Full marks up to a metre from
+ * the camera wall, falling to nothing as it reaches the inset itself.
+ */
+function foregroundTerm(scene: Scene, footprint: Footprint2D): number {
+  const depthMm = millimetres(footprintExtent(footprint).maximumZ);
+  const fullMm = millimetres(scene.room.depth / 2 - 1);
+  const zeroMm = millimetres(scene.room.depth / 2 - 0.1);
+  if (depthMm <= fullMm) return 1000;
+  if (depthMm >= zeroMm || zeroMm <= fullMm) return 0;
+  return clamp(
+    Math.round(((zeroMm - depthMm) * 1000) / (zeroMm - fullMm)),
+    0,
+    1000,
+  );
+}
+
+/** Spec 8.3: a floor lamp reads as staged when it stands just beyond a sofa end. */
+function lampAdjacencyTerm(
+  objects: readonly SceneObject[],
+  lamp: SceneObject,
+): number {
+  const sofa = firstObject(objects, "sofa");
+  if (!sofa) return 0;
+  const { forward, lateral } = localAxes(sofa.rotation[1]);
+  // Outside the sofa's own depth band the lamp is somewhere else in the room, however
+  // close its lateral gap happens to read.
+  if (edgeGapAlongAxis(sofa, lamp, forward) > 0) return 0;
+  const lateralGap = edgeGapAlongAxis(sofa, lamp, lateral);
+  return proximityScore(millimetres(Math.max(lateralGap, 0)), 150, 500);
+}
+
+/** Spec 8.3: a plant reads as staged when it fills a corner rather than a wall. */
+function plantCornerTerm(scene: Scene, footprint: Footprint2D): number {
+  const { minimumX, maximumX, minimumZ, maximumZ } = footprintExtent(footprint);
+  const gapX = Math.min(
+    Math.abs(minimumX + scene.room.width / 2),
+    Math.abs(scene.room.width / 2 - maximumX),
+  );
+  const gapZ = Math.min(
+    Math.abs(minimumZ + scene.room.depth / 2),
+    Math.abs(scene.room.depth / 2 - maximumZ),
+  );
+  const corners =
+    (millimetres(gapX) <= 300 ? 1 : 0) + (millimetres(gapZ) <= 300 ? 1 : 0);
+  return corners === 2 ? 1000 : corners === 1 ? 500 : 0;
+}
+
+function compositionContribution(
+  scene: Scene,
+  objects: readonly SceneObject[],
+  object: SceneObject,
+): number {
+  if (object.type === "floor_lamp") return lampAdjacencyTerm(objects, object);
+  const footprint = objectFootprint(object);
+  const foreground = foregroundTerm(scene, footprint);
+  return object.type === "plant"
+    ? Math.round((foreground + plantCornerTerm(scene, footprint)) / 2)
+    : foreground;
+}
+
+/** Spec 8.3: how the arrangement reads as a staged photograph. */
+function compositionScore(
+  scene: Scene,
+  objects: readonly SceneObject[],
+): number {
+  let total = 0;
+  let count = 0;
+  for (const object of objects) {
+    if (!isComposed(object)) continue;
+    total += compositionContribution(scene, objects, object);
+    count += 1;
+  }
+  return count === 0 ? 1000 : Math.round(total / count);
 }
 
 function isAccessory({ type }: SceneObject): boolean {
@@ -650,7 +849,9 @@ const TERM_RUG = 2;
 const TERM_CHAIR = 3;
 const TERM_ACCESSORIES = 4;
 const TERM_MOVEMENT = 5;
-const TERM_COUNT = 6;
+const TERM_VIEW_FIDELITY = 6;
+const TERM_COMPOSITION = 7;
+const TERM_COUNT = 8;
 
 const TERM_WEIGHTS: readonly number[] = [
   PLACEMENT_SCORE_WEIGHTS.sofaWallAndSide,
@@ -659,11 +860,14 @@ const TERM_WEIGHTS: readonly number[] = [
   PLACEMENT_SCORE_WEIGHTS.chairRelation,
   PLACEMENT_SCORE_WEIGHTS.accessories,
   PLACEMENT_SCORE_WEIGHTS.movement,
+  PLACEMENT_SCORE_WEIGHTS.viewFidelity,
+  PLACEMENT_SCORE_WEIGHTS.composition,
 ];
 
 const TERM_SCORERS: readonly ((
   scene: Scene,
   objects: readonly SceneObject[],
+  options: PlacementOptions | undefined,
 ) => number)[] = [
   sofaWallAndSideScore,
   (_scene, objects) => tableRelationScore(objects),
@@ -671,12 +875,18 @@ const TERM_SCORERS: readonly ((
   (_scene, objects) => chairRelationScore(objects),
   accessoriesScore,
   movementScore,
+  (_scene, objects, options) => viewFidelityScore(objects, options),
+  (scene, objects) => compositionScore(scene, objects),
 ];
 
-function layoutTerms(scene: Scene, objects: readonly SceneObject[]): TermScores {
+function layoutTerms(
+  scene: Scene,
+  objects: readonly SceneObject[],
+  options: PlacementOptions | undefined,
+): TermScores {
   const terms = new Int32Array(TERM_COUNT);
   for (let term = 0; term < TERM_COUNT; term += 1) {
-    terms[term] = TERM_SCORERS[term]!(scene, objects);
+    terms[term] = TERM_SCORERS[term]!(scene, objects, options);
   }
   return terms;
 }
@@ -695,8 +905,9 @@ function aggregateScore(
   scene: Scene,
   objects: readonly SceneObject[],
   circulation: number,
+  options: PlacementOptions | undefined,
 ): number {
-  return weightedScore(layoutTerms(scene, objects), circulation);
+  return weightedScore(layoutTerms(scene, objects, options), circulation);
 }
 
 /**
@@ -704,18 +915,19 @@ function aggregateScore(
  * movement terms are kept as running totals instead, so they are absent here.
  */
 const TERM_DEPENDENCIES: Readonly<Record<SceneObjectType, readonly number[]>> = {
-  sofa: [TERM_SOFA_WALL, TERM_TABLE, TERM_RUG, TERM_CHAIR],
+  sofa: [TERM_SOFA_WALL, TERM_TABLE, TERM_RUG, TERM_CHAIR, TERM_COMPOSITION],
   rug: [TERM_RUG],
-  coffee_table: [TERM_TABLE, TERM_RUG, TERM_CHAIR],
-  chair: [TERM_CHAIR],
-  floor_lamp: [],
-  plant: [],
+  coffee_table: [TERM_TABLE, TERM_RUG, TERM_CHAIR, TERM_COMPOSITION],
+  chair: [TERM_CHAIR, TERM_COMPOSITION],
+  floor_lamp: [TERM_COMPOSITION],
+  plant: [TERM_COMPOSITION],
   unknown: [],
 };
 
 function evaluateCompleteLayout(
   scene: Scene,
   placements: readonly ProposedPlacement[],
+  options: PlacementOptions | undefined,
 ): EvaluatedLayout {
   const objects = layoutObjects(scene, placements);
   const circulates = hasCirculationPath(
@@ -726,7 +938,7 @@ function evaluateCompleteLayout(
   const valid = respectsHardConstraints(scene, objects, circulates);
   return {
     valid,
-    score: aggregateScore(scene, objects, circulates ? 1000 : 0),
+    score: aggregateScore(scene, objects, circulates ? 1000 : 0, options),
     placements: placements.map((placement) => ({
       ...placement,
       position: [...placement.position],
@@ -864,34 +1076,57 @@ function usableSofaWalls(rotationY: number): readonly RoomWall[] {
 export function sofaCandidates(
   scene: Scene,
   object: SceneObject,
+  options?: PlacementOptions,
 ): readonly ProposedPlacement[] {
-  const result: ProposedPlacement[] = [placementFor(object)];
+  const choices = optionsFor(object, options);
+  const result: ProposedPlacement[] = [incumbentPlacement(object, choices)];
   const sign = Math.sign(object.position[0]) || -1;
-  const rotationY = object.rotation[1];
-  const range = usableCenterRange(scene, object, rotationY);
-  const [minimumX, maximumX] = inwardGridRange(
-    range.minimumX,
-    range.maximumX,
-    PLACEMENT_LIMITS.gridM,
-  );
-  const [minimumZ, maximumZ] = inwardGridRange(
-    range.minimumZ,
-    range.maximumZ,
-    PLACEMENT_LIMITS.gridM,
-  );
 
-  for (const wall of usableSofaWalls(rotationY)) {
-    if (wall.axis === "z") {
-      const z = wall.inward === 1 ? minimumZ : maximumZ;
-      // Along a back wall the sofa keeps to the room side it was already on.
-      const sweep = gridSweep(minimumX, maximumX, object.position[0], (value) =>
-        Math.sign(value) === sign,
-      );
-      for (const x of sweep) result.push(candidate(object, x, z, rotationY));
-    } else {
-      const x = wall.inward === 1 ? minimumX : maximumX;
-      const sweep = gridSweep(minimumZ, maximumZ, object.position[2], () => true);
-      for (const z of sweep) result.push(candidate(object, x, z, rotationY));
+  // One sweep list per option, drawn round-robin below. The per-object cap is a fixed 48
+  // however many orientations the views allow, so a single option's walls would otherwise
+  // spend the whole budget and the others would never be seen (spec 8.2).
+  const sweeps: ProposedPlacement[][] = [];
+  for (const option of choices) {
+    const rotationY = option.rotationY;
+    const range = usableCenterRange(scene, object, rotationY);
+    const [minimumX, maximumX] = inwardGridRange(
+      range.minimumX,
+      range.maximumX,
+      PLACEMENT_LIMITS.gridM,
+    );
+    const [minimumZ, maximumZ] = inwardGridRange(
+      range.minimumZ,
+      range.maximumZ,
+      PLACEMENT_LIMITS.gridM,
+    );
+    const sweep: ProposedPlacement[] = [];
+    for (const wall of usableSofaWalls(rotationY)) {
+      if (wall.axis === "z") {
+        const z = wall.inward === 1 ? minimumZ : maximumZ;
+        // Along a back wall the sofa keeps to the room side it was already on.
+        for (const x of gridSweep(
+          minimumX,
+          maximumX,
+          object.position[0],
+          (value) => Math.sign(value) === sign,
+        )) {
+          sweep.push(candidate(object, x, z, rotationY));
+        }
+      } else {
+        const x = wall.inward === 1 ? minimumX : maximumX;
+        for (const z of gridSweep(minimumZ, maximumZ, object.position[2], () => true)) {
+          sweep.push(candidate(object, x, z, rotationY));
+        }
+      }
+    }
+    sweeps.push(sweep);
+  }
+
+  const deepest = sweeps.reduce((longest, sweep) => Math.max(longest, sweep.length), 0);
+  for (let depth = 0; depth < deepest; depth += 1) {
+    for (const sweep of sweeps) {
+      const placement = sweep[depth];
+      if (placement !== undefined) result.push(placement);
     }
   }
   return result;
@@ -906,12 +1141,15 @@ export function sofaCandidates(
 function idealTablePosition(
   scene: Scene,
   objects: readonly SceneObject[],
+  options: PlacementOptions | undefined,
 ): { x: number; z: number; rotationY: number } | null {
   const sofa = firstObject(objects, "sofa");
   const table = firstObject(objects, "coffee_table");
   if (!sofa || !table) return null;
   const { forward } = localAxes(sofa.rotation[1]);
-  const rotationY = table.rotation[1];
+  // The table is never turned (spec 8.2), but its held rotation still has to be one of
+  // its options: the stage accumulates rotations while the table lists the folded angles.
+  const rotationY = incumbentPlacement(table, optionsFor(table, options)).rotationY;
   const range = usableCenterRange(scene, table, rotationY);
   const distance =
     footprintRadiusAlongAxis(sofa, forward) +
@@ -942,9 +1180,12 @@ function rugCandidates(
   scene: Scene,
   object: SceneObject,
   objects: readonly SceneObject[],
+  options: PlacementOptions | undefined,
 ): readonly ProposedPlacement[] {
+  // Rugs keep their own floor-plane rotation logic and ignore the options table entirely
+  // (spec 8.1); the command adapter exempts them for the same reason.
   const result: ProposedPlacement[] = [placementFor(object)];
-  const ideal = idealTablePosition(scene, objects);
+  const ideal = idealTablePosition(scene, objects, options);
   const sofa = firstObject(objects, "sofa");
   if (!ideal && !sofa) return result;
   const target = ideal ?? { x: sofa!.position[0], z: sofa!.position[2] };
@@ -969,10 +1210,13 @@ function tableCandidates(
   scene: Scene,
   object: SceneObject,
   objects: readonly SceneObject[],
+  options: PlacementOptions | undefined,
 ): readonly ProposedPlacement[] {
-  const result: ProposedPlacement[] = [placementFor(object)];
+  const result: ProposedPlacement[] = [
+    incumbentPlacement(object, optionsFor(object, options)),
+  ];
   const sofa = firstObject(objects, "sofa");
-  const ideal = idealTablePosition(scene, objects);
+  const ideal = idealTablePosition(scene, objects, options);
   if (!sofa || !ideal) return result;
   const { forward, lateral } = localAxes(sofa.rotation[1]);
   const range = usableCenterRange(scene, object, ideal.rotationY);
@@ -1008,49 +1252,144 @@ function tableCandidates(
   return result;
 }
 
+/**
+ * The chair's candidates (spec 8.2). The incumbent leads, then the three staged families
+ * - flank, across, side of table - each emitted only when the rotation it needs is one of
+ * the chair's options, then the legacy across-the-table sweep at whatever rotation the
+ * chair already has, which is the whole list for a caller that passes no options.
+ */
 function chairCandidates(
   scene: Scene,
   object: SceneObject,
   objects: readonly SceneObject[],
+  options?: PlacementOptions,
 ): readonly ProposedPlacement[] {
-  const result: ProposedPlacement[] = [placementFor(object)];
+  const choices = optionsFor(object, options);
+  const result: ProposedPlacement[] = [incumbentPlacement(object, choices)];
   const sofa = firstObject(objects, "sofa");
   const table = firstObject(objects, "coffee_table");
   if (!sofa || !table) return result;
-  // The chair closes the conversation area from beyond the table, on the side of it the
-  // sofa faces - the same forward axis the table itself is measured along.
-  const { forward, lateral } = localAxes(sofa.rotation[1]);
-  const rotationY = object.rotation[1];
-  const range = usableCenterRange(scene, object, rotationY);
-  for (const gap of [0.4, 0.5, 0.6, 0.7]) {
-    for (const deltaX of [0, -0.1, 0.1, -0.2, 0.2]) {
+
+  // The staged families need to know which orientations the views can show. A caller
+  // that lists none for this chair gets the untuned across-the-table sweep alone, which
+  // is the arrangement the solver made before it could turn anything.
+  const staged = options?.rotationOptions?.[object.id] !== undefined;
+  const sofaYaw = sofa.rotation[1];
+  const { forward, lateral } = localAxes(sofaYaw);
+  const ranges = new Map<number, ReturnType<typeof usableCenterRange>>();
+  const rangeFor = (rotationY: number) => {
+    let range = ranges.get(rotationY);
+    if (range === undefined) {
+      range = usableCenterRange(scene, object, rotationY);
+      ranges.set(rotationY, range);
+    }
+    return range;
+  };
+  const push = (x: number, z: number, rotationY: number) => {
+    const range = rangeFor(rotationY);
+    result.push(
+      candidate(
+        object,
+        quantize(clamp(x, range.minimumX, range.maximumX), PLACEMENT_LIMITS.gridM),
+        quantize(clamp(z, range.minimumZ, range.maximumZ), PLACEMENT_LIMITS.gridM),
+        rotationY,
+      ),
+    );
+  };
+  /** The option matching a family's required turn, folded the way the table is. */
+  const optionFor = (rotationY: number): number | null => {
+    const folded = foldAngle(rotationY);
+    for (const option of choices) {
+      if (Math.abs(option.rotationY - folded) <= ROTATION_OPTION_EPSILON) {
+        return option.rotationY;
+      }
+    }
+    return null;
+  };
+  /** The chair's own reach along an axis once it has been turned to `rotationY`. */
+  const reach = (rotationY: number, axis: PointXZ) =>
+    footprintRadiusAlongAxis(
+      withPlacement(object, candidate(object, 0, 0, rotationY)),
+      axis,
+    );
+
+  // 1. Flank: beside a sofa end, quarter-turned toward the table. The left end (negative
+  // lateral) turns right, the right end turns left. The offsets are measured from the
+  // turned chair's own reach so `gap` is the clearance it names.
+  for (const side of staged ? ([1, -1] as const) : []) {
+    const rotationY = optionFor(sofaYaw + (side * Math.PI) / 4);
+    if (rotationY === null) continue;
+    const lateralReach =
+      footprintRadiusAlongAxis(sofa, lateral) + reach(rotationY, lateral);
+    // Spec 8.2 lists 0.2 and 0.5. A sofa backed onto a wall that carries an opening
+    // leaves both inside that opening's clearance zone - the demo room's window is
+    // exactly this case - so the family also offers the offset that clears a 0.75m zone.
+    for (const gap of [0.3, 0.15]) {
+      for (const ahead of [0.2, 0.5, 0.8]) {
+        const offset = side * (lateralReach + gap);
+        push(
+          sofa.position[0] + lateral.x * offset + forward.x * ahead,
+          sofa.position[2] + lateral.z * offset + forward.z * ahead,
+          rotationY,
+        );
+      }
+    }
+  }
+
+  // 2. Across: beyond the table on the sofa's forward axis, turned back toward the sofa.
+  const acrossRotation = staged ? optionFor(sofaYaw + Math.PI) : null;
+  if (acrossRotation !== null) {
+    for (const gap of [0.4, 0.55, 0.7]) {
       const distance =
         footprintRadiusAlongAxis(table, forward) +
-        footprintRadiusAlongAxis(object, forward) +
+        reach(acrossRotation, forward) +
         gap;
-      const x = quantize(
-        clamp(
-          table.position[0] + forward.x * distance + lateral.x * deltaX,
-          range.minimumX,
-          range.maximumX,
-        ),
-        PLACEMENT_LIMITS.gridM,
+      for (const offset of [0, -0.3, 0.3]) {
+        push(
+          table.position[0] + forward.x * distance + lateral.x * offset,
+          table.position[2] + forward.z * distance + lateral.z * offset,
+          acrossRotation,
+        );
+      }
+    }
+  }
+
+  // 3. Side of table: on either lateral side of the table, quarter-turned to face it. The
+  // turn that faces the table is confirmed against the chair's own forward axis rather
+  // than assumed from the sign.
+  for (const side of staged ? ([1, -1] as const) : []) {
+    const facingTurn = [sofaYaw + Math.PI / 2, sofaYaw - Math.PI / 2].find(
+      (turn) => {
+        const chairForward = localAxes(turn).forward;
+        return axisProjection(chairForward, lateral) * side < 0;
+      },
+    );
+    if (facingTurn === undefined) continue;
+    const rotationY = optionFor(facingTurn);
+    if (rotationY === null) continue;
+    for (const gap of [0.3, 0.5]) {
+      const offset =
+        side *
+        (footprintRadiusAlongAxis(table, lateral) + reach(rotationY, lateral) + gap);
+      push(
+        table.position[0] + lateral.x * offset,
+        table.position[2] + lateral.z * offset,
+        rotationY,
       );
-      const z = quantize(
-        clamp(
-          table.position[2] + forward.z * distance + lateral.z * deltaX,
-          range.minimumZ,
-          range.maximumZ,
-        ),
-        PLACEMENT_LIMITS.gridM,
-      );
-      result.push(
-        candidate(
-          object,
-          x,
-          z,
-          rotationY,
-        ),
+    }
+  }
+
+  // 4. The chair closes the conversation area from beyond the table without being turned -
+  // the only family a caller that passes no rotation options can use.
+  const held = incumbentPlacement(object, choices).rotationY;
+  for (const gap of [0.4, 0.5, 0.6, 0.7]) {
+    const distance =
+      footprintRadiusAlongAxis(table, forward) + reach(held, forward) + gap;
+    for (const offset of [0, -0.1, 0.1, -0.2, 0.2]) {
+      push(
+        table.position[0] + forward.x * distance + lateral.x * offset,
+        table.position[2] + forward.z * distance + lateral.z * offset,
+        held,
       );
     }
   }
@@ -1159,7 +1498,71 @@ const laneScratch: ProposedPlacement[][] = PERIMETER_SIDES.map(
   () => [] as ProposedPlacement[],
 );
 
+/**
+ * Lamp positions beside the settled sofa's ends (spec 8.2). The staged photo stands the
+ * lamp at a sofa end rather than out on the perimeter, and the sofa is only settled
+ * inside the search, so these cannot be hoisted into the per-scene accessory context.
+ * They are emitted already inside the room and clear of the openings, exactly as the ring
+ * positions are, because the search trusts accessory candidates on that point.
+ */
+function sofaEndCandidates(
+  scene: Scene,
+  object: SceneObject,
+  state: SearchState,
+): readonly ProposedPlacement[] {
+  const sofa = firstObject(settledOf(state), "sofa");
+  if (!sofa) return [];
+  const rotationY = object.rotation[1];
+  const { forward, lateral } = localAxes(sofa.rotation[1]);
+  const range = usableCenterRange(scene, object, rotationY);
+  const clearances = openingClearanceZones(scene);
+  const lateralReach =
+    footprintRadiusAlongAxis(sofa, lateral) + footprintRadiusAlongAxis(object, lateral);
+  // Aligned with the sofa's centre, and again with its back edge: both read as "beside
+  // the sofa" and the second is what a room with a deep sofa leaves space for.
+  const alignments = [
+    0,
+    -(footprintRadiusAlongAxis(sofa, forward) -
+      footprintRadiusAlongAxis(object, forward)),
+  ];
+  const result: ProposedPlacement[] = [];
+  for (const side of [-1, 1] as const) {
+    for (const gap of [0.1, 0.25]) {
+      for (const along of alignments) {
+        const offset = side * (lateralReach + gap);
+        const x = quantize(
+          clamp(
+            sofa.position[0] + lateral.x * offset + forward.x * along,
+            range.minimumX,
+            range.maximumX,
+          ),
+          PLACEMENT_LIMITS.gridM,
+        );
+        const z = quantize(
+          clamp(
+            sofa.position[2] + lateral.z * offset + forward.z * along,
+            range.minimumZ,
+            range.maximumZ,
+          ),
+          PLACEMENT_LIMITS.gridM,
+        );
+        const placement = candidate(object, x, z, rotationY);
+        const footprint = objectFootprint(withPlacement(object, placement));
+        if (
+          !footprintInsideRoom(footprint, scene.room, PLACEMENT_LIMITS.roomInsetM) ||
+          clearances.some((zone) => footprintsOverlap(footprint, zone))
+        ) {
+          continue;
+        }
+        result.push(placement);
+      }
+    }
+  }
+  return result;
+}
+
 function accessoryCandidates(
+  scene: Scene,
   object: SceneObject,
   state: SearchState,
   context: AccessoryContext,
@@ -1218,6 +1621,29 @@ function accessoryCandidates(
   }
 
   const lead = leadsWithIncumbent ? context.incumbent : null;
+  const ends =
+    object.type === "floor_lamp"
+      ? sofaEndCandidates(scene, object, state).filter((placement) =>
+          isFree(placementFootprint(object, placement)),
+        )
+      : [];
+  if (ends.length > 0) {
+    // The sofa ends come ahead of the ring and are kept even when the ring alone could
+    // fill the cap; the ring gets whatever the cap has left. Both lists are handed to the
+    // millimetre dedupe, which drops an end that repeats the incumbent or a ring twin.
+    const head = lead === null ? ends : [lead, ...ends];
+    const flattened = flattenPerimeterLanes(
+      lanes,
+      null,
+      null,
+      context.distinct ? Math.max(limit - head.length, 0) : Number.POSITIVE_INFINITY,
+    );
+    const combined = uniqueCandidates([...head, ...flattened.candidates], limit);
+    return {
+      candidates: combined.candidates,
+      truncated: combined.truncated || flattened.truncated,
+    };
+  }
   if (!context.distinct) {
     // A ring that repeats a position needs the millimetre dedupe, so the whole perimeter
     // is flattened and handed to it.
@@ -1389,24 +1815,25 @@ function candidatesFor(
   state: SearchState,
   accessory: AccessoryContext | null,
   limit: number,
+  options: PlacementOptions | undefined,
 ): CandidateSet {
   let candidates: readonly ProposedPlacement[];
   switch (object.type) {
     case "sofa":
-      candidates = sofaCandidates(scene, object);
+      candidates = sofaCandidates(scene, object, options);
       break;
     case "rug":
-      candidates = rugCandidates(scene, object, layoutOf(state));
+      candidates = rugCandidates(scene, object, layoutOf(state), options);
       break;
     case "coffee_table":
-      candidates = tableCandidates(scene, object, layoutOf(state));
+      candidates = tableCandidates(scene, object, layoutOf(state), options);
       break;
     case "chair":
-      candidates = chairCandidates(scene, object, layoutOf(state));
+      candidates = chairCandidates(scene, object, layoutOf(state), options);
       break;
     case "floor_lamp":
     case "plant":
-      return accessoryCandidates(object, state, accessory!, limit);
+      return accessoryCandidates(scene, object, state, accessory!, limit);
     case "unknown":
       candidates = [];
       break;
@@ -1550,6 +1977,7 @@ function partialBlocksCirculation(scene: Scene, state: SearchState): boolean {
 function searchLayouts(
   scene: Scene,
   limits: typeof PLACEMENT_LIMITS,
+  options: PlacementOptions | undefined,
 ): LayoutSearch {
   const movable = scene.objects
     .filter(isMovable)
@@ -1561,7 +1989,8 @@ function searchLayouts(
     (object) => object.locked || object.type === "unknown",
   );
   const accessoryCount = scene.objects.filter(isAccessory).length;
-  const baseTerms = layoutTerms(scene, scene.objects);
+  const composedCount = movable.filter(isComposed).length;
+  const baseTerms = layoutTerms(scene, scene.objects, options);
   const root: SearchState = {
     candidateIndex: -1,
     objectIds: [],
@@ -1583,6 +2012,13 @@ function searchLayouts(
       .filter(isAccessory)
       .reduce(
         (sum, object) => sum + accessoryContribution(scene, objectFootprint(object)),
+        0,
+      ),
+    viewFidelityTotal: movable
+      .filter(isComposed)
+      .reduce(
+        (sum, object) =>
+          sum + fidelityContribution(object.id, object.rotation[1], options),
         0,
       ),
   };
@@ -1609,6 +2045,10 @@ function searchLayouts(
     const baseAccessory = isAccessory(object)
       ? accessoryContribution(scene, objectFootprint(object))
       : 0;
+    const composed = isComposed(object);
+    const baseFidelity = composed
+      ? fidelityContribution(object.id, object.rotation[1], options)
+      : 0;
     const affected = TERM_DEPENDENCIES[object.type];
     const expanded: SearchState[] = [];
     for (const state of beam) {
@@ -1618,6 +2058,7 @@ function searchLayouts(
         state,
         accessory,
         limits.candidatesPerObject,
+        options,
       );
       if (candidateSet.truncated) truncatedCandidates = true;
       const objectIds = [...state.objectIds, object.id];
@@ -1644,7 +2085,7 @@ function searchLayouts(
           patched[sceneIndex] = placed;
           objects = patched;
           for (const term of affected) {
-            terms[term] = TERM_SCORERS[term]!(scene, patched);
+            terms[term] = TERM_SCORERS[term]!(scene, patched, options);
           }
         }
         const movementTotal =
@@ -1658,6 +2099,16 @@ function searchLayouts(
             accessoryTotal - baseAccessory + accessoryContribution(scene, footprint);
           terms[TERM_ACCESSORIES] = Math.round(accessoryTotal / accessoryCount);
         }
+        // Only the object being placed can change its own rotation, so the averaged
+        // fidelity term is a running total rather than a rescan of the layout.
+        let viewFidelityTotal = state.viewFidelityTotal;
+        if (composed) {
+          viewFidelityTotal =
+            viewFidelityTotal -
+            baseFidelity +
+            fidelityContribution(object.id, placement.rotationY, options);
+          terms[TERM_VIEW_FIDELITY] = Math.round(viewFidelityTotal / composedCount);
+        }
 
         expanded.push({
           candidateIndex,
@@ -1666,6 +2117,7 @@ function searchLayouts(
           terms,
           movementTotal,
           accessoryTotal,
+          viewFidelityTotal,
           parent: state,
           placedIndex: sceneIndex,
           placedTemplate: object,
@@ -1712,7 +2164,7 @@ function searchLayouts(
     if (best !== null) continue;
     const evaluated =
       movable.length === 0
-        ? evaluateCompleteLayout(scene, placementsOf(state))
+        ? evaluateCompleteLayout(scene, placementsOf(state), options)
         : evaluateSettledState(scene, state);
     if (evaluated.valid) best = evaluated;
   }
@@ -1783,10 +2235,13 @@ export function resolvePlacementSearch(
   };
 }
 
-function proposeSinglePass(scene: Scene): NaturalPlacementResult {
+function proposeSinglePass(
+  scene: Scene,
+  options: PlacementOptions | undefined,
+): NaturalPlacementResult {
   return resolvePlacementSearch(
-    evaluateCompleteLayout(scene, currentPlacements(scene)),
-    searchLayouts(scene, PLACEMENT_LIMITS),
+    evaluateCompleteLayout(scene, currentPlacements(scene), options),
+    searchLayouts(scene, PLACEMENT_LIMITS, options),
   );
 }
 
@@ -1819,7 +2274,14 @@ function placementSignature(scene: Scene): string {
   );
 }
 
-export function proposeNaturalPlacement(scene: Scene): NaturalPlacementResult {
+/**
+ * Spec 8.1: the solver turns an object only through the rotations `options` allows for it,
+ * and preserves the rotation of every object the table says nothing about.
+ */
+export function proposeNaturalPlacement(
+  scene: Scene,
+  options?: PlacementOptions,
+): NaturalPlacementResult {
   if (
     !SceneSchema.safeParse(scene).success ||
     hasUnlockedUnknown(scene) ||
@@ -1828,20 +2290,20 @@ export function proposeNaturalPlacement(scene: Scene): NaturalPlacementResult {
     return { kind: "failed", reason: "invalid-input" };
   }
 
-  const original = evaluateCompleteLayout(scene, currentPlacements(scene));
+  const original = evaluateCompleteLayout(scene, currentPlacements(scene), options);
   let working = scene;
   let evaluatedLayouts = 0;
   let changed = false;
   const visited = new Set([placementSignature(scene)]);
 
   for (let pass = 0; pass < MAX_FIXED_POINT_PASSES; pass += 1) {
-    const result = proposeSinglePass(working);
+    const result = proposeSinglePass(working, options);
     if (result.kind === "failed") return result;
     evaluatedLayouts += result.diagnostics.evaluatedLayouts;
     if (result.kind === "unchanged") {
       if (!changed) return result;
       const placements = currentPlacements(working);
-      const final = evaluateCompleteLayout(scene, placements);
+      const final = evaluateCompleteLayout(scene, placements, options);
       return {
         kind: "changed",
         placements,
@@ -1864,3 +2326,4 @@ export function proposeNaturalPlacement(scene: Scene): NaturalPlacementResult {
 
   return { kind: "failed", reason: "search-limit-exhausted" };
 }
+
