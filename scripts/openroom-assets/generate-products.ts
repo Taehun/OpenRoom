@@ -32,7 +32,7 @@ import {
   renderProductManifestModule,
   type CatalogProduct,
 } from "./product-jobs";
-import { modelFor, selectProvider } from "./providers";
+import { modelFor, selectProvider, type ImageReference } from "./providers";
 import { measureAnchor } from "./view-jobs";
 
 const MANIFEST_PATH = "src/features/photo/photo-products.generated.ts";
@@ -48,6 +48,8 @@ export interface DecodedImage {
 }
 
 export interface GenerateProductsDeps {
+  /** Reads a registered cutout for --angle-reference; defaults to node:fs. */
+  readFile?: (path: string) => Promise<Uint8Array>;
   argv: readonly string[];
   env: Readonly<Record<string, string | undefined>>;
   fetch: typeof globalThis.fetch;
@@ -203,14 +205,39 @@ export async function runGenerateProducts(
     );
   };
 
+  // An angle reference is a registered cutout sent as an image part so every
+  // generated product shares its camera pitch and three-quarter turn.
+  const readReference =
+    deps.readFile ??
+    (async (path: string): Promise<Uint8Array> => {
+      const { readFile } = await import("node:fs/promises");
+      return new Uint8Array(await readFile(path));
+    });
+  let angleReference: ImageReference | null = null;
+  if (options.angleReference !== null) {
+    const asset = PHOTO_ASSETS[options.angleReference];
+    if (!asset) {
+      log(`[products] unknown --angle-reference ${options.angleReference}`);
+      return { exitCode: 2 };
+    }
+    angleReference = {
+      bytes: await readReference(localPathOf(asset.src)),
+      mimeType: "image/webp",
+      filename: `${options.angleReference}.webp`,
+    };
+  }
+
   for (const job of jobs) {
     try {
       const generated = await provider.generate(
         {
-          prompt: buildProductPrompt(job),
+          prompt: buildProductPrompt(job, {
+            angleReference: angleReference !== null,
+          }),
           aspect: job.aspect,
           model,
           quality,
+          ...(angleReference ? { reference: angleReference } : {}),
         },
         {
           fetch: deps.fetch,

@@ -37,6 +37,11 @@ export interface ProductCliOptions {
   dryRun: boolean;
   force: boolean;
   products: string[];
+  /**
+   * A registered cutout whose camera angle every generated image must match;
+   * sent to the model as an image part next to the prompt.
+   */
+  angleReference: string | null;
 }
 
 const PRODUCTS_DIR = "/demo/photo/products";
@@ -85,6 +90,7 @@ export function parseProductArgs(argv: readonly string[]): ProductCliOptions {
   const options: ProductCliOptions = {
     dryRun: false,
     force: false,
+    angleReference: null,
     products: [],
   };
 
@@ -94,6 +100,15 @@ export function parseProductArgs(argv: readonly string[]): ProductCliOptions {
       case "--dry-run":
         options.dryRun = true;
         break;
+      case "--angle-reference": {
+        const value = argv[index + 1];
+        if (value === undefined || value.startsWith("--")) {
+          throw new Error("--angle-reference needs a registered asset id");
+        }
+        options.angleReference = value;
+        index += 1;
+        break;
+      }
       case "--force":
         options.force = true;
         break;
@@ -159,12 +174,23 @@ export function planProductJobs(
 /** Spec section 6, verbatim; the model never sees an id or a Scene enum. */
 export function buildProductPrompt(
   job: Pick<ProductJob, "title" | "description">,
+  options: { angleReference?: boolean } = {},
 ): string {
+  const angle = options.angleReference
+    ? [
+        "Match the camera angle of the attached reference image exactly: the",
+        "same camera height slightly above eye level looking gently down, and",
+        "the same three-quarter turn with the product's front toward the",
+        "viewer's right so its viewer-left end is visible. The reference is",
+        "only for the angle; do not copy its design, colour, or material.",
+      ]
+    : ["Three-quarter view turned to the viewer's right,"];
   return [
     `Product photography of ${job.title}: ${job.description}`,
-    "Three-quarter view turned to the viewer's right, the whole product",
-    "visible with a small margin, standing on an invisible floor, pure",
-    "white studio background, no props, no text, no shadow, no reflections.",
+    ...angle,
+    "the whole product visible with a small margin, standing on an invisible",
+    "floor, pure white studio background, no props, no text, no shadow, no",
+    "reflections.",
   ].join(" ");
 }
 

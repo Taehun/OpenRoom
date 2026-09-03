@@ -174,6 +174,7 @@ describe("product jobs", () => {
     expect(() => parseProductArgs(["--view", "side"])).toThrow(/unknown/i);
     expect(() => parseProductArgs(["--product"])).toThrow(/--product/);
     expect(parseProductArgs(["--dry-run", "--force"])).toEqual({
+      angleReference: null,
       dryRun: true,
       force: true,
       products: [],
@@ -815,5 +816,22 @@ describe("removeBackground with enclosed regions", () => {
     const size = 40;
     const out = removeBackground(frameWithHole(size, 4), size, size, { enclosed: true, enclosedMinimumPixels: 50 });
     expect(centre(size, out)).toBe(255);
+  });
+});
+
+describe("angle reference", () => {
+  it("parses --angle-reference and rejects a missing id", () => {
+    expect(parseProductArgs(["--angle-reference", "hinoki-low-sofa"]).angleReference).toBe("hinoki-low-sofa");
+    expect(parseProductArgs([]).angleReference).toBeNull();
+    expect(() => parseProductArgs(["--angle-reference"])).toThrow(/asset id/);
+  });
+
+  it("asks the model to match the reference angle only when a reference is attached", () => {
+    const job = { title: "Oak Drum Side Table", description: "A drum of oak." };
+    expect(buildProductPrompt(job)).toContain("turned to the viewer's right");
+    expect(buildProductPrompt(job)).not.toContain("reference image");
+    const withReference = buildProductPrompt(job, { angleReference: true });
+    expect(withReference).toContain("attached reference image");
+    expect(withReference).toContain("do not copy its design");
   });
 });
