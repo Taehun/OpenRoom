@@ -360,12 +360,14 @@ async function moveObject(
   tokens: SceneTokens,
   objectId: string,
   position: { x: number; z: number },
+  facing?: { x: number; z: number },
 ): Promise<SceneTokens> {
   const moved = await callTool(page, "move_object", {
     objectId,
     expectedRevision: tokens.revision,
     expectedStateVersion: tokens.stateVersion,
     position,
+    ...(facing ? { facing } : {}),
   });
   expect(moved.structuredContent.ok).toBe(true);
   expect(moved.structuredContent.sceneRevision).toBe(tokens.revision + 1);
@@ -763,19 +765,26 @@ test("grounds the redesigned room on the photo floor plane", async ({
   const lamp = stage.locator('[data-testid="photo-object-frame-lamp_01"]');
   // Selecting each object bumped the state version, so the tie moves need fresh tokens.
   let tokens = await currentTokens(page);
-  tokens = await moveObject(page, tokens, "chair_01", { x: -1.2, z: 0.4 });
+  // The tie moves sit 0.68 m either side of centre (1.2 m in the original 6 m room,
+  // scaled to the 3.4 m seed) and in front of the seed table, so every footprint stays
+  // inside the inset and the lamp never lands on the table; the chair is squared to the
+  // camera (facing +z) because the seed turns it 45 degrees.
+  const tieX = 0.68;
+  const tieZ = 0.85;
+  const squared = { x: 0, z: 1 };
+  tokens = await moveObject(page, tokens, "chair_01", { x: -tieX, z: tieZ }, squared);
   // Left of centre the chair turns inward the other way, so the unmirrored cutout wins.
   await expect(chair).toHaveAttribute("data-photo-mirrored", "false");
   await expect(chair).toHaveAttribute("data-photo-view", "front-quarter");
-  tokens = await moveObject(page, tokens, "lamp_01", { x: 1.2, z: 0.4 });
+  tokens = await moveObject(page, tokens, "lamp_01", { x: tieX, z: tieZ });
   const tiedChairPlacement = await visualPlacement(chair);
   expect((await visualPlacement(lamp)).top).toBe(tiedChairPlacement.top);
   const tiedChairLayer = await computedLayer(chair);
   const tiedLampLayer = await computedLayer(lamp);
   expect(tiedChairLayer).toBeLessThan(tiedLampLayer);
 
-  tokens = await moveObject(page, tokens, "chair_01", { x: 1.2, z: 0.4 });
-  await moveObject(page, tokens, "lamp_01", { x: -1.2, z: 0.4 });
+  tokens = await moveObject(page, tokens, "chair_01", { x: tieX, z: tieZ }, squared);
+  await moveObject(page, tokens, "lamp_01", { x: -tieX, z: tieZ });
   expect((await visualPlacement(lamp)).top).toBe(tiedChairPlacement.top);
   expect(await computedLayer(chair)).toBe(tiedChairLayer);
   expect(await computedLayer(lamp)).toBe(tiedLampLayer);

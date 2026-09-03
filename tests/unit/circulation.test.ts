@@ -33,7 +33,7 @@ describe("placement circulation", () => {
     const barrier: Footprint2D = {
       objectId: "barrier",
       center: { x: 0, z: 0 },
-      halfWidth: 2.9,
+      halfWidth: scene.room.width / 2 - 0.1,
       halfDepth: 0.45,
       rotationY: 0,
     };
@@ -44,7 +44,7 @@ describe("placement circulation", () => {
     const scene = createDemoScene();
     const blocker: Footprint2D = {
       objectId: "lamp_01",
-      center: { x: 0.2, z: 2 },
+      center: { x: 0.2, z: scene.room.depth / 2 - 0.35 },
       halfWidth: 0.29,
       halfDepth: 0.29,
       rotationY: 0,
@@ -59,7 +59,7 @@ describe("placement circulation", () => {
     const scene = createDemoScene();
     const clipper: Footprint2D = {
       objectId: "lamp_01",
-      center: { x: 1, z: 2 },
+      center: { x: 1, z: scene.room.depth / 2 - 0.35 },
       halfWidth: 0.29,
       halfDepth: 0.29,
       rotationY: 0,

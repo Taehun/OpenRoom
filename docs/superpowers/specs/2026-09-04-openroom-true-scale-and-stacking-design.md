@@ -21,7 +21,7 @@ the table's height, renders above it, and does not collide with it.
   (`move_object` semantics unchanged: a lamp moved onto a table is accepted and
   reported with its supporting object).
 - Projection stays pure and deterministic; the rug homography stays.
-- Room dimensions in the mock (6.0 × 4.8 m, height 2.5 m) and the catalog's
+- Room dimensions in the mock (3.4 × 2.72 m, height 2.5 m, calibrated from the before photo) and the catalog's
   `dimensionsCm` are real-world plausible and are not changed by this work
   unless a value is physically wrong (a reviewer lists any).
 

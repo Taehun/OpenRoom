@@ -67,8 +67,24 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
+/**
+ * The pinned pixels in this file were measured in the original 6 m demo room with the
+ * analysis-anchored seed (sofa on the left wall, table at the origin). The calibrated
+ * 3.4 m photo room has its own placement, so the pins render this fixture instead and
+ * the width-independent checks run on the real seed explicitly.
+ */
+const FIXTURE_ROOM_WIDTH_M = 6;
+
+function fixtureScene() {
+  return createDemoScene({ widthM: FIXTURE_ROOM_WIDTH_M });
+}
+
+function fixtureStore() {
+  return createSceneStore(fixtureScene());
+}
+
 function renderStage(
-  store = createSceneStore(),
+  store = fixtureStore(),
   stageRect: typeof STAGE_RECT = STAGE_RECT,
 ) {
   vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockReturnValue(
@@ -233,7 +249,7 @@ describe("RoomPhotoStage", () => {
   });
 
   test("keeps a failed projected rug labelled and selectable", () => {
-    const scene = createDemoScene();
+    const scene = fixtureScene();
     scene.selectedObjectId = null;
     const store = createSceneStore(scene);
     renderStage(store);
@@ -251,7 +267,7 @@ describe("RoomPhotoStage", () => {
   });
 
   test("uses the registered anchor layout for a zero-size stage rug", () => {
-    const scene = createDemoScene();
+    const scene = fixtureScene();
     scene.selectedObjectId = null;
     const store = createSceneStore(scene);
     renderStage(store, ZERO_STAGE_RECT);
@@ -270,7 +286,7 @@ describe("RoomPhotoStage", () => {
   });
 
   test("commits one move when an unlocked cutout drag ends", () => {
-    const store = createSceneStore();
+    const store = fixtureStore();
     const commit = vi.spyOn(store.getState(), "commitTransform");
     const originalTable = structuredClone(objectFromStore(store, "table_01"));
     const { stage } = renderStage(store);
@@ -310,7 +326,7 @@ describe("RoomPhotoStage", () => {
   });
 
   test("previews and commits canonical rug movement through its clipped hit target", () => {
-    const store = createSceneStore();
+    const store = fixtureStore();
     const commit = vi.spyOn(store.getState(), "commitTransform");
     const originalRug = structuredClone(objectFromStore(store, "rug_01"));
     renderStage(store);
@@ -357,7 +373,7 @@ describe("RoomPhotoStage", () => {
   });
 
   test("moves by the pointer delta without jumping the floor anchor", () => {
-    const store = createSceneStore();
+    const store = fixtureStore();
     const start = structuredClone(objectFromStore(store, "table_01"));
     renderStage(store);
     const table = screen.getByRole("button", { name: "Coffee table" });
@@ -384,7 +400,7 @@ describe("RoomPhotoStage", () => {
 
   test("applies the same scene delta from any point inside a cutout", () => {
     function movedPosition(startX: number, startY: number, pointerId: number) {
-      const store = createSceneStore();
+      const store = fixtureStore();
       const start = structuredClone(objectFromStore(store, "table_01"));
       const { unmount } = renderStage(store);
       const table = screen.getByRole("button", { name: "Coffee table" });
@@ -414,7 +430,7 @@ describe("RoomPhotoStage", () => {
   });
 
   test("keeps the first pointer as the sole gesture owner", () => {
-    const store = createSceneStore();
+    const store = fixtureStore();
     const commit = vi.spyOn(store.getState(), "commitTransform");
     const originalPosition = [...objectFromStore(store, "table_01").position];
     renderStage(store);
@@ -474,7 +490,7 @@ describe("RoomPhotoStage", () => {
   });
 
   test("discards a changed drag preview when the pointer is cancelled", () => {
-    const store = createSceneStore();
+    const store = fixtureStore();
     const commit = vi.spyOn(store.getState(), "commitTransform");
     const originalPosition = [...objectFromStore(store, "table_01").position];
     renderStage(store);
@@ -499,7 +515,7 @@ describe("RoomPhotoStage", () => {
   });
 
   test("selects a locked object without exposing a transform handle", () => {
-    const scene = createDemoScene();
+    const scene = fixtureScene();
     scene.selectedObjectId = null;
     const table = scene.objects.find(({ id }) => id === "table_01")!;
     table.locked = true;
@@ -520,7 +536,7 @@ describe("RoomPhotoStage", () => {
   });
 
   test("anchors a locked projected rug's badge to its floor quad", () => {
-    const scene = createDemoScene();
+    const scene = fixtureScene();
     scene.selectedObjectId = null;
     const rug = scene.objects.find(({ id }) => id === "rug_01")!;
     rug.locked = true;
@@ -556,7 +572,7 @@ describe("RoomPhotoStage", () => {
   });
 
   test("clears selection when the stage itself is clicked", () => {
-    const store = createSceneStore();
+    const store = fixtureStore();
     const { stage } = renderStage(store);
 
     fireEvent.click(stage);
@@ -568,7 +584,7 @@ describe("RoomPhotoStage", () => {
   });
 
   test("keeps an unknown photo asset as a labelled selectable fallback", async () => {
-    const scene = createDemoScene();
+    const scene = fixtureScene();
     scene.selectedObjectId = null;
     scene.objects.find(({ id }) => id === "table_01")!.assetId =
       "missing-table-cutout";
@@ -588,7 +604,7 @@ describe("RoomPhotoStage", () => {
   });
 
   test("keeps a failed registered photo asset selectable and resets failure for a new source", () => {
-    const firstScene = createDemoScene();
+    const firstScene = fixtureScene();
     firstScene.selectedObjectId = null;
     const firstStore = createSceneStore(firstScene);
     renderStage(firstStore);
@@ -661,7 +677,7 @@ describe("RoomPhotoStage", () => {
   });
 
   test("moves a focused object by one keyboard command with normal and Shift steps", () => {
-    const store = createSceneStore();
+    const store = fixtureStore();
     store.getState().setToolMode("move");
     const commit = vi.spyOn(store.getState(), "commitTransform");
     const initial = structuredClone(objectFromStore(store, "table_01"));
@@ -684,7 +700,7 @@ describe("RoomPhotoStage", () => {
   });
 
   test("rotates focused vertical objects and rugs by keyboard", () => {
-    const store = createSceneStore();
+    const store = fixtureStore();
     store.getState().setToolMode("rotate");
     const commit = vi.spyOn(store.getState(), "commitTransform");
     const initialRotation = objectFromStore(store, "table_01").rotation[1];
@@ -720,7 +736,7 @@ describe("RoomPhotoStage", () => {
   });
 
   test("previews and commits rug rotation from its aligned floor handle", () => {
-    const store = createSceneStore();
+    const store = fixtureStore();
     store.getState().selectObject("rug_01");
     store.getState().setToolMode("rotate");
     const commit = vi.spyOn(store.getState(), "commitTransform");
@@ -754,7 +770,7 @@ describe("RoomPhotoStage", () => {
   });
 
   test("selects a focused object with Enter or Space in any tool mode", () => {
-    const store = createSceneStore();
+    const store = fixtureStore();
     store.getState().selectObject(null);
     store.getState().setToolMode("rotate");
     renderStage(store);
@@ -769,7 +785,7 @@ describe("RoomPhotoStage", () => {
   });
 
   test("commits one rotation only when a rotation-handle gesture ends", () => {
-    const store = createSceneStore();
+    const store = fixtureStore();
     store.getState().setToolMode("rotate");
     const commit = vi.spyOn(store.getState(), "commitTransform");
     renderStage(store);
@@ -799,7 +815,7 @@ describe("RoomPhotoStage", () => {
   });
 
   test("adds rotation pointer-angle delta to the starting rotation", () => {
-    const scene = createDemoScene();
+    const scene = fixtureScene();
     scene.objects.find(({ id }) => id === "table_01")!.rotation[1] =
       Math.PI / 3;
     const store = createSceneStore(scene);
@@ -830,7 +846,7 @@ describe("RoomPhotoStage", () => {
   });
 
   test("uses the shortest signed rotation delta across the angle boundary", () => {
-    const store = createSceneStore();
+    const store = fixtureStore();
     store.getState().setToolMode("rotate");
     const { stage } = renderStage(store);
     const table = screen.getByRole("button", { name: "Coffee table" });
@@ -870,7 +886,7 @@ describe("RoomPhotoStage", () => {
   // resolves to the photographed cutout, so every piece of floor chrome has to
   // follow its native anchor 0.5007.
   test("anchors the object frame, floor marker, and rotation handle to the selected view", () => {
-    const store = createSceneStore();
+    const store = fixtureStore();
     store.getState().setToolMode("rotate");
     renderStage(store);
 
@@ -898,7 +914,7 @@ describe("RoomPhotoStage", () => {
   });
 
   // Spec §3: a cutout's width is its real width scaled by the calibrated floor width
-  // where it stands. The seed room is 6 m wide and the floor spans 0.72 of the stage
+  // where it stands. The fixture room is 6 m wide and the floor spans 0.72 of the stage
   // at mid depth, so the 2 m sofa covers 24% of the stage and the 0.8 m chair 9.6%.
   test("sizes every seed cutout from its real width at its own depth", () => {
     renderStage();
@@ -916,7 +932,7 @@ describe("RoomPhotoStage", () => {
   // its depth (0.72 / 6 m = 0.12 stage units per metre at mid depth), draws above the
   // object it stands on, and leaves its contact shadow on the floor.
   test("raises a stacked cutout above the floor and above its supporter", () => {
-    const scene = createDemoScene();
+    const scene = fixtureScene();
     const table = scene.objects.find(({ id }) => id === "table_01")!;
     const lamp = scene.objects.find(({ id }) => id === "lamp_01")!;
     lamp.position = [
@@ -985,7 +1001,7 @@ describe("RoomPhotoStage", () => {
   });
 
   test("marks a 90° keyboard rotation approximate when no side view exists", () => {
-    const store = createSceneStore();
+    const store = fixtureStore();
     store.getState().selectObject("sofa_01");
     store.getState().setToolMode("rotate");
     renderStage(store);

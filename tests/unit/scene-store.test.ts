@@ -144,12 +144,15 @@ describe("createSceneStore", () => {
       .getState()
       .scene.objects.find(({ id }) => id === "chair_01")!;
 
+    // A 45-degree chair reaches half its diagonal past its centre, so the target stays
+    // inside the 0.1 m inset at the seed room's depth and is committed verbatim.
+    const targetZ = 0.5;
     store.getState().setTransforming(true);
     const result = store
       .getState()
       .commitTransform(
         "chair_01",
-        [before.position[0] - 0.25, before.position[1], 0.75],
+        [before.position[0] - 0.25, before.position[1], targetZ],
         Math.PI / 4,
       );
 
@@ -160,7 +163,7 @@ describe("createSceneStore", () => {
     const chair = store
       .getState()
       .scene.objects.find(({ id }) => id === "chair_01")!;
-    expect(chair.position[2]).toBe(0.75);
+    expect(chair.position[2]).toBe(targetZ);
     expect(chair.rotation[1]).toBeCloseTo(Math.PI / 4);
   });
 
