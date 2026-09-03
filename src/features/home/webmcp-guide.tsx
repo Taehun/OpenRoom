@@ -205,9 +205,12 @@ export function WebMcpGuide({ onCheckAgain, status }: WebMcpGuideProps) {
             </button>
             <p className={styles.companionNote}>
               Using Claude Desktop or Claude Code?{" "}
-              <Link className={styles.inlineLink} href="/?view=dashboard">
+              {/* eslint-disable-next-line @next/next/no-html-link-for-pages --
+                  same-route query switch must reload: a soft navigation leaves
+                  this guide on screen without the Chromium Navigation API. */}
+              <a className={styles.inlineLink} href="/?view=dashboard">
                 Open the dashboard
-              </Link>{" "}
+              </a>{" "}
               and pair with the local companion.
             </p>
           </>

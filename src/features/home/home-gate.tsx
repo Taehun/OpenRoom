@@ -49,24 +49,12 @@ export function HomeGate() {
   const [view, setView] = useState<HomeView>(CHECKING);
 
   useEffect(() => {
-    const sync = () => {
-      setView({ status: readCompatibility(), ...readRequestedView() });
-    };
-
-    sync();
-
-    // `/?view=guide` and `/?view=dashboard` are the same route, so the App
-    // Router may keep this component mounted across the navigation. popstate
-    // covers back and forward; the Navigation API (Chromium, where WebMCP
-    // lives) covers the pushState the Guide and dashboard links perform.
-    const navigation = (window as Window & { navigation?: EventTarget })
-      .navigation;
-    window.addEventListener("popstate", sync);
-    navigation?.addEventListener("navigatesuccess", sync);
-    return () => {
-      window.removeEventListener("popstate", sync);
-      navigation?.removeEventListener("navigatesuccess", sync);
-    };
+    // Both view switches are plain anchors, so `/?view=guide` and
+    // `/?view=dashboard` load a new document and this mount reads the query
+    // once. A soft navigation would have needed a per-browser listener, and
+    // the Navigation API that carries `pushState` is Chromium-only.
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- one-shot read of browser-only state that cannot exist before hydration
+    setView({ status: readCompatibility(), ...readRequestedView() });
   }, []);
 
   const checkAgain = useCallback(() => {
