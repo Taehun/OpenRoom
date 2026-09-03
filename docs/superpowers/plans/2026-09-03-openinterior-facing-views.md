@@ -32,7 +32,7 @@
 **Files:**
 - Create: `src/features/photo/photo-facing.ts`
 - Create: `src/features/photo/photo-views.ts`
-- Create: `src/features/photo/photo-views.generated.json`
+- Create: `src/features/photo/photo-views.generated.ts`
 - Modify: `src/features/photo/photo-assets.ts` (keep `PHOTO_ASSETS`; export `PhotoAsset` unchanged)
 - Test: `tests/unit/photo-facing.test.ts`, `tests/unit/photo-views.test.ts`
 
@@ -186,7 +186,7 @@ import {
   buildRotationOptions, getPhotoAssetSet, rotationOptionsFor, selectPhotoView, viewFidelity,
   type PhotoAssetSet,
 } from "../../src/features/photo/photo-views";
-import manifest from "../../src/features/photo/photo-views.generated.json";
+import manifest from "../../src/features/photo/photo-views.generated.ts";
 import { createDemoScene } from "../../src/demo/demo-scene";
 
 const sofaSet = () => PHOTO_ASSET_SETS["hinoki-low-sofa"]!;
@@ -303,9 +303,9 @@ describe("viewFidelity and rotation options", () => {
 
 - [ ] **Step 6: Run to verify failure** — `pnpm vitest run tests/unit/photo-views.test.ts` — Expected: FAIL.
 
-- [ ] **Step 7: Implement `photo-views.generated.json` and `photo-views.ts`**
+- [ ] **Step 7: Implement `photo-views.generated.ts` and `photo-views.ts`**
 
-`photo-views.generated.json`: `{ "version": 1, "views": [] }`.
+`photo-views.generated.ts`: `{ "version": 1, "views": [] }`.
 
 Implementation notes for `photo-views.ts`:
 
@@ -315,7 +315,7 @@ import { DEMO_PRODUCTS } from "../demo/demo-data";
 import type { Scene, SceneObject, SceneObjectType } from "../scene/scene-schema";
 import { PHOTO_ASSETS, type NormalizedQuad, type PhotoAsset } from "./photo-assets";
 import { FRONT_VECTORS, PHOTO_VIEW_NAMES, angleBetweenDegrees, facingOf, type FacingVector, type PhotoViewName } from "./photo-facing";
-import manifest from "./photo-views.generated.json";
+import manifest from "./photo-views.generated.ts";
 
 export const PHOTO_VIEW_SYMMETRY = Object.freeze({ sofa: "none", chair: "none", coffee_table: "front-back", floor_lamp: "radial", plant: "radial", rug: "radial", unknown: "none" } as const satisfies Record<SceneObjectType, PhotoViewSymmetry>);
 const COVERAGE_DEGREES = 45;
@@ -350,7 +350,7 @@ Run: `pnpm vitest run tests/unit/photo-facing.test.ts tests/unit/photo-views.tes
 - [ ] **Step 9: Commit**
 
 ```bash
-git add src/features/photo/photo-facing.ts src/features/photo/photo-views.ts src/features/photo/photo-views.generated.json tests/unit/photo-facing.test.ts tests/unit/photo-views.test.ts
+git add src/features/photo/photo-facing.ts src/features/photo/photo-views.ts src/features/photo/photo-views.generated.ts tests/unit/photo-facing.test.ts tests/unit/photo-views.test.ts
 git commit -m "feat(photo): add facing vectors, view registry, selection, and rotation options"
 ```
 

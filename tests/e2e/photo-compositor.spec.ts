@@ -125,18 +125,36 @@ function selectedObjectId(result: BrowserToolResult) {
   return (result.structuredContent.data as { id: string }).id;
 }
 
+// The chosen view replaces the old CSS rotation: a cutout is never tilted, so the
+// truthful part of its presentation is which registered view is drawn and whether
+// it is mirrored. Both live on the frame, which is the element itself or its ancestor.
 async function visualPlacement(layer: Locator) {
   return layer.evaluate((element) => {
     const style = (element as HTMLElement).style;
+    const frame = (element as HTMLElement).closest<HTMLElement>(
+      '[data-testid^="photo-object-frame-"]',
+    );
     return {
       left: style.getPropertyValue("--photo-left"),
-      rotation: style.getPropertyValue("--photo-rotation"),
+      mirrored: frame?.getAttribute("data-photo-mirrored") ?? null,
       scale: style.getPropertyValue("--photo-scale"),
       top: style.getPropertyValue("--photo-top"),
+      view: frame?.getAttribute("data-photo-view") ?? null,
       width: style.getPropertyValue("--photo-width"),
       zIndex: style.zIndex,
     };
   });
+}
+
+/** Every rendered frame transform, so a stray CSS rotation cannot hide. */
+async function objectFrameTransforms(page: Page) {
+  return page.evaluate(() =>
+    [
+      ...document.querySelectorAll<HTMLElement>(
+        '[data-testid^="photo-object-frame-"]',
+      ),
+    ].map((frame) => frame.style.transform),
+  );
 }
 
 async function largestExposedHorizontalEdgeRatio(
@@ -811,6 +829,30 @@ test("arranges the room explicitly, settles, and restores it with one undo", asy
   expect(openingBlockingObjectIds(arrangedScene)).toEqual([]);
   expect(reachesOpening(arrangedScene)).toBe(true);
   expect(placementSignature(arrangedScene)).not.toEqual(savedPlacement);
+
+  // The solver turns the chair a quarter turn to flank the sofa's right end and face the
+  // table (spec 8.5). Only the photographed front-quarter pair is registered, whose
+  // native front is turned to the viewer's right, so a chair facing the other way is
+  // shown by that same cutout mirrored - never by a CSS rotation.
+  const arrangedChair = arrangedScene.objects.find(
+    (object) => object.id === "chair_01",
+  );
+  const arrangedSofa = arrangedScene.objects.find(
+    (object) => object.id === "sofa_01",
+  );
+  if (!arrangedChair || !arrangedSofa) {
+    throw new Error("Missing chair_01 or sofa_01 after arranging");
+  }
+  expect(arrangedChair.rotation[1]).toBeCloseTo(Math.PI / 4, 9);
+  expect(arrangedChair.position[0]).toBeGreaterThan(arrangedSofa.position[0] + 1.2);
+  const chairFrame = page.getByTestId("photo-object-frame-chair_01");
+  await expect(chairFrame).toHaveAttribute("data-photo-mirrored", "true");
+  await expect(chairFrame).toHaveAttribute("data-photo-view", "front-quarter");
+  const arrangedTransforms = await objectFrameTransforms(page);
+  expect(arrangedTransforms).toHaveLength(5);
+  for (const transform of arrangedTransforms) {
+    expect(transform).not.toContain("rotate(");
+  }
 
   await arrangeControl(page).click();
   await expect(placementStatus(page)).toHaveText(

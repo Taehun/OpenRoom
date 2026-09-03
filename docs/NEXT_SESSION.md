@@ -414,3 +414,47 @@ the relay down once on `SIGINT`, `SIGTERM`, or stdin close.
 - The pair code is single use, but exactly one is always live: the companion
   mints a replacement after five failed attempts and whenever a paired page
   disconnects or misses its heartbeat, so re-pairing never needs a restart.
+
+## Facing vectors and views (2026-09-04)
+
+Spec: `docs/superpowers/specs/2026-09-03-openinterior-facing-views-design.md`;
+plan: `docs/superpowers/plans/2026-09-03-openinterior-facing-views.md`.
+
+What changed:
+
+- Every cutout carries a stored front vector; every Scene object exposes a
+  derived `facing` (never stored; `rotation[1]` stays the source of truth).
+  `src/features/photo/photo-facing.ts`, `photo-views.ts`,
+  `photo-views.generated.ts` (manifest written by the pipeline).
+- The compositor renders the registered view nearest the object's facing,
+  mirroring the left/right twin, instead of tilting one picture with CSS
+  `rotate`. A facing more than 45° from any view is drawn with the nearest view
+  and disclosed as approximate (stage badge + inspector row).
+- `get_scene`, `get_selection`, and the committed Scenes returned by
+  `move_object`/`replace_object` carry `facing`; `move_object` accepts a
+  `facing { x, z }` vector (mutually exclusive with `rotationYDegrees`). Eval
+  `face-the-sofa` added.
+- The solver turns objects only toward directions a registered view can show
+  (`buildRotationOptions` → `PlacementOptions.rotationOptions`, validated again
+  by the command adapter), scores view fidelity and composition, flanks the
+  sofa with the chair, parks the lamp beside a sofa end and the plant in a back
+  corner. Profile version 2; p95 8.7 ms on a production build.
+- `pnpm assets:views` (`scripts/openinterior-assets/`) plans and performs
+  gpt-image-1 edits offline for the missing views (28 jobs for the demo
+  catalog), writes anchored WebPs beside the originals and rewrites the
+  manifest module. Key only in `.env.local`; never runs in CI; the app never
+  imports it. See `docs/asset-views.md`.
+
+Accepted staged composition (spec 8.5, pinned by unit tests): sofa (-1.3,
+-1.1) at -45°, table (-0.3, 0.1), rug (-0.3, 0.2) at -45°, chair (0.8, -1.0)
+at +45° (mirrored view), lamp (-2.6, 0.0), plant (-2.4, -1.7). A sofa square on
+the back wall is unreachable in the demo room because of the window clearance.
+
+Owner actions still open:
+
+- Put `OPENAI_API_KEY` in `.env.local` and run
+  `pnpm assets:views --product hinoki-low-sofa --view side` first; review the
+  image, then run the full `pnpm assets:views` (28 images). Commit the WebPs
+  and `photo-views.generated.ts`.
+- With generated views registered, the solver's option table widens to every
+  45° step automatically; no code change is needed.

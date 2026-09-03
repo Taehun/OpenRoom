@@ -2,7 +2,10 @@ import { describe, expect, test, vi } from "vitest";
 
 import { DEMO_PRODUCTS } from "../../src/features/demo/demo-data";
 import { proposeNaturalPlacement } from "../../src/features/placement/natural-placement";
-import type { NaturalPlacementResult } from "../../src/features/placement/placement-types";
+import type {
+  NaturalPlacementResult,
+  PlacementOptions,
+} from "../../src/features/placement/placement-types";
 import {
   createSceneStore,
   type SceneCommitEvent,
@@ -804,6 +807,77 @@ describe("createSceneStore", () => {
       expect(measure).toHaveBeenCalled();
     } finally {
       measure.mockRestore();
+    }
+  });
+
+  test("hands the solver and the adapter the rotation options it was built with", () => {
+    const scene = completedProductScene();
+    const chairOptions = [
+      { rotationY: 0, fidelity: 1 },
+      { rotationY: Math.PI / 4, fidelity: 0.95 },
+    ];
+    const seen: (PlacementOptions | undefined)[] = [];
+    const store = createSceneStore(scene, {
+      rotationOptions: () => ({ chair_01: chairOptions }),
+      proposePlacement: (proposed, options) => {
+        seen.push(options);
+        const result = proposeNaturalPlacement(proposed, options);
+        if (result.kind !== "changed") throw new Error("expected an arrangement");
+        return {
+          ...result,
+          placements: result.placements.map((placement) =>
+            placement.objectId === "chair_01"
+              ? { ...placement, rotationY: Math.PI / 4 }
+              : placement,
+          ),
+        };
+      },
+    });
+
+    // A turn the options allow is committed rather than rejected as invalid input.
+    expect(store.getState().arrangeNaturally()).toMatchObject({
+      ok: true,
+      changed: true,
+    });
+    expect(seen).toEqual([{ rotationOptions: { chair_01: chairOptions } }]);
+    expect(
+      store.getState().scene.objects.find(({ id }) => id === "chair_01")!.rotation[1],
+    ).toBe(Math.PI / 4);
+  });
+
+  test("rejects a turn the rotation options do not allow", () => {
+    const store = createSceneStore(completedProductScene(), {
+      proposePlacement: (scene) => {
+        const result = proposeNaturalPlacement(scene);
+        if (result.kind !== "changed") throw new Error("expected an arrangement");
+        return {
+          ...result,
+          placements: result.placements.map((placement) =>
+            placement.objectId === "chair_01"
+              ? { ...placement, rotationY: Math.PI / 4 }
+              : placement,
+          ),
+        };
+      },
+    });
+
+    expect(store.getState().arrangeNaturally()).toMatchObject({
+      ok: false,
+      changed: false,
+      reason: "invalid-input",
+    });
+  });
+
+  test("preserves every rotation for a store built without rotation options", () => {
+    const store = createSceneStore(completedProductScene());
+    const before = structuredClone(store.getState().scene);
+
+    expect(store.getState().arrangeNaturally()).toMatchObject({ ok: true });
+
+    for (const object of store.getState().scene.objects) {
+      const original = before.objects.find(({ id }) => id === object.id)!;
+      if (object.type === "rug") continue;
+      expect(object.rotation[1]).toBe(original.rotation[1]);
     }
   });
 

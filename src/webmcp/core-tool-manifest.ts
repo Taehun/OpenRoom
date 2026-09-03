@@ -32,13 +32,15 @@ function deepFreeze<T>(value: T): T {
 export const CORE_TOOL_MANIFEST = deepFreeze([
   {
     name: "get_scene",
-    description: "Return the current validated Scene.",
+    description:
+      "Return the current validated Scene; each object includes a derived unit facing vector {x, z} ({x:0,z:1} faces the camera side).",
     inputSchema: GET_SCENE_JSON_SCHEMA,
     annotations: { readOnlyHint: true, untrustedContentHint: true },
   },
   {
     name: "get_selection",
-    description: "Return the currently selected Scene object.",
+    description:
+      "Return the currently selected Scene object, including its derived unit facing vector {x, z} ({x:0,z:1} faces the camera side).",
     inputSchema: GET_SELECTION_JSON_SCHEMA,
     annotations: { readOnlyHint: true, untrustedContentHint: true },
   },
@@ -56,7 +58,8 @@ export const CORE_TOOL_MANIFEST = deepFreeze([
   },
   {
     name: "move_object",
-    description: "Move an explicit or selected Scene object.",
+    description:
+      "Move an explicit or selected Scene object; orient it with rotationYDegrees or a facing vector {x, z}.",
     inputSchema: MOVE_OBJECT_JSON_SCHEMA,
     annotations: { readOnlyHint: false, untrustedContentHint: true },
   },

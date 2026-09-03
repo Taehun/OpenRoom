@@ -6,9 +6,10 @@ import type {
 
 import styles from "../demo/demo-workspace.module.css";
 import type { SceneObject } from "../scene/scene-schema";
-import { getPhotoAsset } from "./photo-assets";
+import type { PhotoAsset } from "./photo-assets";
 import { PhotoAssetFallback, PhotoAssetImage } from "./photo-asset-image";
 import type { ProjectedPlacement } from "./photo-projection";
+import type { SelectedPhotoView } from "./photo-views";
 
 interface PhotoObjectLayerProps {
   label: string;
@@ -26,6 +27,8 @@ interface PhotoObjectLayerProps {
   placement: ProjectedPlacement;
   selected: boolean;
   showRotationHandle: boolean;
+  /** The registered view chosen for this object's facing, mirrored or not. */
+  view: SelectedPhotoView | null;
   visualWidth: number;
 }
 
@@ -45,22 +48,33 @@ export function PhotoObjectLayer({
   placement,
   selected,
   showRotationHandle,
+  view,
   visualWidth,
 }: PhotoObjectLayerProps) {
-  const asset = getPhotoAsset(object);
+  // The cutout is a photograph, never a tilted picture: the chosen view carries
+  // its own pixels and, when mirrored, its own anchor. Every piece of floor
+  // chrome below reads that same anchor so it cannot disagree with the pixels.
+  const asset: PhotoAsset | null = view
+    ? {
+        id: object.assetId ?? object.id,
+        src: view.view.src,
+        intrinsicWidth: view.view.intrinsicWidth,
+        intrinsicHeight: view.view.intrinsicHeight,
+        anchorX: view.anchorX,
+        anchorY: view.view.anchorY,
+      }
+    : null;
   const anchorX = asset?.anchorX ?? 0.5;
   const anchorY = asset?.anchorY ?? 1;
   const left = `${placement.left * 100}%`;
   const top = `${placement.top * 100}%`;
   const width = `${visualWidth}%`;
-  const rotation = `${(object.rotation[1] * 180) / Math.PI}deg`;
   const anchorXPercent = `${anchorX * 100}%`;
   const anchorYPercent = `${anchorY * 100}%`;
   const customStyle = {
     "--photo-left": left,
     "--photo-top": top,
     "--photo-width": width,
-    "--photo-rotation": rotation,
     "--photo-anchor-x": anchorXPercent,
     "--photo-anchor-y": anchorYPercent,
     "--photo-anchor-x-offset": `${anchorX * -100}%`,
@@ -71,7 +85,7 @@ export function PhotoObjectLayer({
     ...customStyle,
     left,
     top,
-    transform: `translate(${-anchorX * 100}%, ${-anchorY * 100}%) rotate(${rotation})`,
+    transform: `translate(${-anchorX * 100}%, ${-anchorY * 100}%)`,
     transformOrigin: `${anchorXPercent} ${anchorYPercent}`,
     width,
   } as CSSProperties;
@@ -94,15 +108,21 @@ export function PhotoObjectLayer({
   return (
     <div
       className={styles.photoObjectFrame}
+      data-photo-approximate={view ? String(!view.exact) : undefined}
+      data-photo-mirrored={view ? String(view.mirrored) : undefined}
+      data-photo-view={view?.view.view}
       data-testid={`photo-object-frame-${object.id}`}
       style={frameStyle}
     >
       <button
         aria-label={label}
         aria-pressed={selected}
-        className={
-          selected ? styles.photoObjectSelected : styles.photoObject
-        }
+        className={[
+          selected ? styles.photoObjectSelected : styles.photoObject,
+          view?.mirrored ? styles.photoMirrored : null,
+        ]
+          .filter(Boolean)
+          .join(" ")}
         data-object-id={object.id}
         disabled={false}
         onClick={onClick}
@@ -114,8 +134,15 @@ export function PhotoObjectLayer({
         style={objectStyle}
         type="button"
       >
-        {asset ? (
-          <PhotoAssetImage key={asset.src} asset={asset} label={label} />
+        {asset && view ? (
+          <PhotoAssetImage
+            approximate={!view.exact}
+            asset={asset}
+            key={asset.src}
+            label={label}
+            mirrored={view.mirrored}
+            view={view.view.view}
+          />
         ) : (
           <PhotoAssetFallback label={label} />
         )}
@@ -125,6 +152,15 @@ export function PhotoObjectLayer({
           </span>
         ) : null}
       </button>
+
+      {view && !view.exact ? (
+        <span
+          className={styles.photoApproximateBadge}
+          data-testid={`photo-approximate-${object.id}`}
+        >
+          Approximate view
+        </span>
+      ) : null}
 
       {selected ? (
         <span

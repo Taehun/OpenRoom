@@ -1,13 +1,18 @@
 import { describe, expect, test, vi } from "vitest";
 
 import { DEMO_PRODUCTS } from "../../src/features/demo/demo-data";
+import { facingOf, roundFacing } from "../../src/features/photo/photo-facing";
 import { createSceneStore } from "../../src/features/scene/scene-store";
 import type { SceneStore } from "../../src/features/scene/scene-store";
-import type { Scene } from "../../src/features/scene/scene-schema";
 import {
   createCoreTools,
   type ModelContextTool,
 } from "../../src/webmcp/tool-handlers";
+import {
+  ToolSceneObjectSchema,
+  ToolSceneSchema,
+  type ToolScene,
+} from "../../src/webmcp/tool-contracts";
 import type {
   CartApprovalDraft,
   CatalogProduct,
@@ -157,12 +162,24 @@ describe("WebMCP Core 6 handlers", () => {
       throw new Error("Expected the final replacement to succeed");
     }
     const data = finalResult.structuredContent.data as {
-      scene: Scene;
+      scene: ToolScene;
       message: string;
     };
     expect(finalResult.structuredContent.sceneRevision).toBe(7);
     expect(finalResult.structuredContent.stateVersion).toBe(7);
-    expect(data.scene).toEqual(store.getState().scene);
+    // The committed Scene comes back in the same shape a read does: stored
+    // fields untouched, plus the derived facing on every object.
+    expect(data.scene).toEqual({
+      ...store.getState().scene,
+      objects: store.getState().scene.objects.map((object) => ({
+        ...object,
+        facing: roundFacing(facingOf(object.rotation[1])),
+      })),
+    });
+    expect(ToolSceneSchema.safeParse(data.scene).success).toBe(true);
+    expect(
+      store.getState().scene.objects.some((object) => "facing" in object),
+    ).toBe(false);
     expect(data.scene.revision).toBe(7);
     expect(Object.keys(data).sort()).toEqual(["message", "scene"]);
     expect("placementOutcome" in data).toBe(false);
@@ -741,5 +758,142 @@ describe("execution options normalization", () => {
 
     expect(getScene).not.toHaveBeenCalled();
     expect(store.getState().scene.revision).toBe(1);
+  });
+});
+
+// Facing is derived, never stored: the Scene keeps `rotation[1]` as the only
+// orientation, and the tool surface translates it both ways for the model.
+describe("facing vectors", () => {
+  function issuePaths(result: Awaited<ReturnType<ModelContextTool["execute"]>>) {
+    if (result.structuredContent.ok) throw new Error("Expected an error result");
+    return (result.structuredContent.error.issues ?? []).map(({ path }) => path);
+  }
+
+  test("derives a unit facing for every get_scene object and for get_selection", async () => {
+    const store = createSceneStore();
+    const tools = createCoreTools(createContext(store).context);
+
+    const scene = await execute(tools, "get_scene", {});
+    expect(scene.structuredContent.ok).toBe(true);
+    if (!scene.structuredContent.ok) return;
+    const data = ToolSceneSchema.parse(scene.structuredContent.data);
+    expect(data.objects).not.toHaveLength(0);
+    for (const object of data.objects) {
+      expect(object.facing).toEqual(roundFacing(facingOf(object.rotation[1])));
+    }
+
+    const selection = await execute(tools, "get_selection", {});
+    expect(selection.structuredContent.ok).toBe(true);
+    if (!selection.structuredContent.ok) return;
+    expect(ToolSceneObjectSchema.parse(selection.structuredContent.data))
+      .toMatchObject({ id: "table_01", facing: { x: 0, z: 1 } });
+
+    // The stored Scene never gains the derived field.
+    expect(
+      store.getState().scene.objects.some((object) => "facing" in object),
+    ).toBe(false);
+  });
+
+  test("moves with a facing vector instead of rotationYDegrees", async () => {
+    const store = createSceneStore();
+    const { context } = createContext(store);
+    const tools = createCoreTools(context);
+
+    const result = await execute(tools, "move_object", {
+      objectId: "chair_01",
+      position: { x: 1, z: 0.5 },
+      facing: { x: -2, z: 0 },
+      expectedRevision: 1,
+      expectedStateVersion: 1,
+    });
+
+    expect(result.structuredContent.ok).toBe(true);
+    if (!result.structuredContent.ok) return;
+    // facing -x is +90° of stored yaw: rotationYOf({x:-1,z:0}) = atan2(1, 0).
+    expect(
+      store.getState().scene.objects.find(({ id }) => id === "chair_01")
+        ?.rotation[1],
+    ).toBeCloseTo(Math.PI / 2, 9);
+    // The Scene the move commits is returned in the same facing-carrying shape.
+    const moved = ToolSceneSchema.parse(
+      (result.structuredContent.data as { scene: unknown }).scene,
+    );
+    expect(moved.objects.find(({ id }) => id === "chair_01")?.facing).toEqual({
+      x: -1,
+      z: 0,
+    });
+    expect(
+      store.getState().scene.objects.some((object) => "facing" in object),
+    ).toBe(false);
+
+    const scene = await execute(tools, "get_scene", {});
+    if (!scene.structuredContent.ok) throw new Error("Expected a Scene");
+    expect(
+      ToolSceneSchema.parse(scene.structuredContent.data).objects.find(
+        ({ id }) => id === "chair_01",
+      )?.facing,
+    ).toEqual({ x: -1, z: 0 });
+  });
+
+  test("rejects a zero-length facing and facing combined with rotationYDegrees", async () => {
+    const store = createSceneStore();
+    const { context } = createContext(store);
+    const applyCommand = vi.spyOn(context, "applyCommand");
+    const tools = createCoreTools(context);
+
+    const zero = await execute(tools, "move_object", {
+      objectId: "chair_01",
+      position: { x: 1, z: 0.5 },
+      facing: { x: 0, z: 0 },
+      expectedRevision: 1,
+      expectedStateVersion: 1,
+    });
+    expect(errorCode(zero)).toBe("INVALID_INPUT");
+    expect(issuePaths(zero)).toContain("facing");
+
+    const both = await execute(tools, "move_object", {
+      objectId: "chair_01",
+      position: { x: 1, z: 0.5 },
+      facing: { x: 0, z: 1 },
+      rotationYDegrees: 10,
+      expectedRevision: 1,
+      expectedStateVersion: 1,
+    });
+    expect(errorCode(both)).toBe("INVALID_INPUT");
+    expect(issuePaths(both)).toContain("facing");
+
+    expect(applyCommand).not.toHaveBeenCalled();
+    expect(store.getState().scene.revision).toBe(1);
+    expect(store.getState().stateVersion).toBe(1);
+    expect(
+      store.getState().scene.objects.find(({ id }) => id === "chair_01")
+        ?.rotation[1],
+    ).toBe(0);
+  });
+
+  // A non-finite component is caught by the field contract before the refine
+  // runs, so the path is `facing.x` rather than `facing` — still an
+  // INVALID_INPUT rooted at facing, and still nothing mutates.
+  test("rejects a non-finite facing component before any command runs", async () => {
+    const store = createSceneStore();
+    const { context } = createContext(store);
+    const applyCommand = vi.spyOn(context, "applyCommand");
+
+    const result = await execute(createCoreTools(context), "move_object", {
+      objectId: "chair_01",
+      position: { x: 1, z: 0.5 },
+      facing: { x: Number.NaN, z: 1 },
+      expectedRevision: 1,
+      expectedStateVersion: 1,
+    });
+
+    expect(errorCode(result)).toBe("INVALID_INPUT");
+    expect(issuePaths(result).every((path) => path.startsWith("facing"))).toBe(
+      true,
+    );
+    expect(issuePaths(result)).toContain("facing.x");
+    expect(applyCommand).not.toHaveBeenCalled();
+    expect(store.getState().scene.revision).toBe(1);
+    expect(store.getState().stateVersion).toBe(1);
   });
 });

@@ -16,10 +16,15 @@ const CORE_TOOLS: ReadonlyArray<{
   name: CoreToolName;
   description: string;
 }> = [
-  { name: "get_scene", description: "Return the current validated Scene." },
+  {
+    name: "get_scene",
+    description:
+      "Return the current validated Scene; each object includes a derived unit facing vector {x, z} ({x:0,z:1} faces the camera side).",
+  },
   {
     name: "get_selection",
-    description: "Return the currently selected Scene object.",
+    description:
+      "Return the currently selected Scene object, including its derived unit facing vector {x, z} ({x:0,z:1} faces the camera side).",
   },
   {
     name: "search_products",
@@ -32,7 +37,8 @@ const CORE_TOOLS: ReadonlyArray<{
   },
   {
     name: "move_object",
-    description: "Move an explicit or selected Scene object.",
+    description:
+      "Move an explicit or selected Scene object; orient it with rotationYDegrees or a facing vector {x, z}.",
   },
   {
     name: "add_scene_to_cart",

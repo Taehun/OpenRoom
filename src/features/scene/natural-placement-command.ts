@@ -9,6 +9,7 @@ import { PLACEMENT_LIMITS } from "../placement/placement-profile";
 import type {
   NaturalPlacementResult,
   PlacementFailureReason,
+  RotationOption,
 } from "../placement/placement-types";
 import { SceneSchema, type Scene, type SceneObject } from "./scene-schema";
 
@@ -25,6 +26,29 @@ function blocksOpening(scene: Scene, object: SceneObject) {
   const footprint = objectFootprint(object);
   return openingClearanceZones(scene).some((zone) =>
     footprintsOverlap(footprint, zone),
+  );
+}
+
+/** Spec 8.4: two option rotations closer than this stand for the same orientation. */
+const ROTATION_OPTION_EPSILON = 1e-9;
+
+/**
+ * Spec 8.4: the solver's candidate generators guarantee it, and this re-checks it. A
+ * non-rug placement may only carry a rotation the object's own options list, and an
+ * object the table says nothing about may not be turned at all.
+ */
+function rotationIsAllowed(
+  current: SceneObject,
+  rotationY: number,
+  rotationOptions: Readonly<Record<string, readonly RotationOption[]>> | undefined,
+) {
+  if (current.type === "rug") return true;
+  const choices = rotationOptions?.[current.id];
+  if (choices === undefined || choices.length === 0) {
+    return rotationY === current.rotation[1];
+  }
+  return choices.some(
+    (option) => Math.abs(option.rotationY - rotationY) <= ROTATION_OPTION_EPSILON,
   );
 }
 
@@ -48,6 +72,7 @@ function hasNonRugCollision(objects: readonly SceneObject[]) {
 export function validateAndApplyPlacement(
   scene: Scene,
   proposal: NaturalPlacementResult,
+  rotationOptions?: Readonly<Record<string, readonly RotationOption[]>>,
 ): PlacementApplication {
   if (proposal.kind === "failed") {
     return { ok: false, scene, reason: proposal.reason };
@@ -93,7 +118,7 @@ export function validateAndApplyPlacement(
         !placement.position.every(Number.isFinite) ||
         !Number.isFinite(placement.rotationY) ||
         placement.position[1] !== current.position[1] ||
-        (current.type !== "rug" && placement.rotationY !== current.rotation[1])
+        !rotationIsAllowed(current, placement.rotationY, rotationOptions)
       ) {
         return invalid(scene);
       }

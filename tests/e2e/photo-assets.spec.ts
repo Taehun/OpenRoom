@@ -4,15 +4,25 @@ import {
   PHOTO_ASSETS,
   ROOM_PHOTO_ASSETS,
 } from "../../src/features/photo/photo-assets";
+import { GENERATED_VIEW_MANIFEST } from "../../src/features/photo/photo-views.generated";
 
 test("audits every registered room and cutout image in the browser", async ({
   page,
 }) => {
   const rooms = Object.values(ROOM_PHOTO_ASSETS);
   const cutouts = Object.values(PHOTO_ASSETS);
+  // Generated views are ordinary committed cutouts: audit each one the manifest
+  // registers, so a wrong dimension or a flattened alpha channel fails here.
+  const generated = GENERATED_VIEW_MANIFEST.views.map((view) => ({
+    id: `${view.assetId}--${view.view}`,
+    src: view.src,
+    intrinsicWidth: view.intrinsicWidth,
+    intrinsicHeight: view.intrinsicHeight,
+  }));
   const assets = [
     ...rooms.map(({ id, src }) => ({ id, src })),
     ...cutouts.map(({ id, src, floorQuad }) => ({ id, src, floorQuad })),
+    ...generated.map(({ id, src }) => ({ id, src })),
   ];
 
   await page.goto("/demo");
@@ -62,7 +72,9 @@ test("audits every registered room and cutout image in the browser", async ({
 
     return Promise.all(registeredAssets.map(inspect));
   }, assets);
-  expect(audits, "Expected every registered asset to load").toHaveLength(26);
+  expect(audits, "Expected every registered asset to load").toHaveLength(
+    26 + generated.length,
+  );
 
   const auditById = new Map(audits.map((audit) => [audit.id, audit]));
   for (const room of rooms) {
@@ -74,7 +86,7 @@ test("audits every registered room and cutout image in the browser", async ({
     expect(audit!.maximumAlpha, `${room.id} maximum alpha`).toBe(255);
   }
 
-  for (const cutout of cutouts) {
+  for (const cutout of [...cutouts, ...generated]) {
     const audit = auditById.get(cutout.id);
     expect(audit, `Missing audit for ${cutout.id}`).toBeDefined();
     expect(audit!.naturalWidth, `${cutout.id} width`).toBe(

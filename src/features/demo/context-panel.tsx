@@ -1,4 +1,6 @@
 import type { Dispatch } from "react";
+import { facingOf, roundFacing } from "../photo/photo-facing";
+import { getPhotoAssetSet, selectPhotoView } from "../photo/photo-views";
 import type { Scene, SceneObject } from "../scene/scene-schema";
 import { DEMO_PRODUCTS } from "./demo-data";
 import type { DemoAction, DemoState } from "./demo-types";
@@ -43,6 +45,26 @@ function formatRotation(object: SceneObject) {
   return object.rotation
     .map((radians) => `${Math.round((radians * 180) / Math.PI)}°`)
     .join(" · ");
+}
+
+/**
+ * The derived facing plus the registered view the compositor actually drew, so
+ * a mirrored twin or an only-approximate view is disclosed rather than hidden.
+ */
+function formatFacing(object: SceneObject) {
+  const facing = roundFacing(facingOf(object.rotation[1]));
+  const parts = [
+    `x ${formatCoordinate(facing.x)}`,
+    `z ${formatCoordinate(facing.z)}`,
+  ];
+  const set = getPhotoAssetSet(object);
+  if (set && object.type !== "rug") {
+    const view = selectPhotoView(object, set);
+    parts.push(view.view.view);
+    if (view.mirrored) parts.push("mirrored");
+    if (!view.exact) parts.push("approximate");
+  }
+  return parts.join(" · ");
 }
 
 function InspectorPanel({
@@ -95,6 +117,10 @@ function InspectorPanel({
         <div>
           <dt>Rotation</dt>
           <dd>{formatRotation(selectedObject)}</dd>
+        </div>
+        <div>
+          <dt>Facing</dt>
+          <dd>{formatFacing(selectedObject)}</dd>
         </div>
         <div>
           <dt>Style</dt>

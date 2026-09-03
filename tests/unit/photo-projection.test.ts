@@ -101,7 +101,8 @@ describe("photo projection", () => {
 
     const shadow = projectContactShadow(sofa, scene.room);
 
-    expect(shadow.left).toBeCloseTo(0.5052083333333334, 12);
+    // Centred on the projected footprint centre, exactly where the cutout is anchored.
+    expect(shadow.left).toBeCloseTo(0.5, 12);
     expect(shadow.top).toBeCloseTo(0.74, 12);
     expect(shadow.width).toBeCloseTo(13.117943817534822, 12);
     expect(shadow.height).toBeCloseTo(5.668247328564432, 12);

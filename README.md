@@ -118,6 +118,46 @@ The photo inventory is 26 WebPs total: two room images, six seed cutouts, and
 eighteen catalog cutouts. `app/icon.svg` supplies the local application icon so
 browser QA has no missing-resource console error.
 
+## Facing and views
+
+Every cutout records the direction its front points in the photo
+(`frontVector`), and every Scene object derives the direction its front points
+in the room (`facing`) from `rotation[1]`, which stays the only stored
+orientation. The compositor picks the registered view whose front vector best
+matches the object's facing and mirrors left/right twins for free; it never
+tilts a cutout with a CSS rotation. The placement solver only turns an object
+toward a direction some registered view can show truthfully, and the stage
+marks a rendered view as approximate when the nearest one is more than 45° off.
+
+| Piece | Where |
+| --- | --- |
+| Facing math | `src/features/photo/photo-facing.ts` |
+| View registry and selection | `src/features/photo/photo-views.ts` (`PHOTO_ASSET_SETS`) |
+| Generated view manifest | `src/features/photo/photo-views.generated.ts` |
+| Offline pipeline | `scripts/openinterior-assets/` (`pnpm assets:views`) |
+
+The photographed 3/4 cutout plus its mirror already covers every facing within
+80° of the camera, so the demo works with an empty manifest. The missing views
+(`side`, `back-quarter`, `back` for seating; `side` for coffee tables, which are
+front/back symmetric; none for lamps, plants, or rugs, which are radial) are
+produced once, offline, by a developer-run script:
+
+```bash
+pnpm assets:views --dry-run   # prints the 28 planned jobs, makes no request
+pnpm assets:views             # needs OPENAI_API_KEY in .env.local
+```
+
+The script reads the photographed WebP, asks OpenAI `gpt-image-1` for the
+missing view on a transparent background, measures the floor anchor from the
+alpha channel, writes the WebP beside the original in `public/demo/photo/`, and
+rewrites `photo-views.generated.ts`. It is the only place in the project that
+calls an image model: the app has no inference route, no key, and no runtime
+generation, and CI never runs the pipeline. A full run of the demo catalog is 28
+images, an order of magnitude of a few US dollars at `quality=high`; check
+current image pricing before running it over a real catalog. Generated views are
+reviewed and committed like any other asset. See
+[docs/asset-views.md](docs/asset-views.md).
+
 ## Prerequisites
 
 - Node.js 24.13.1 (recorded in `package.json` and `.node-version`)
@@ -154,6 +194,7 @@ local environment file; never commit them.
 | `pnpm test:e2e` | Run the Playwright demo-mode end-to-end tests (port 3000). |
 | `pnpm test:e2e:commerce` | Run the Playwright Shopify-mode journeys (port 3001). |
 | `pnpm mcp:openinterior` | Start the localhost MCP companion for Claude Desktop, Claude Code, or Codex CLI. |
+| `pnpm assets:views` | Generate the missing cutout views offline (developer-run; needs `OPENAI_API_KEY`). Add `--dry-run` to only print the plan. |
 | `pnpm cf-typegen` | Generate Cloudflare Worker types. |
 | `pnpm dev:vinext` | Start vinext locally on port 3001. |
 | `pnpm build:vinext` | Build the vinext Cloudflare Workers target. |
@@ -208,9 +249,13 @@ bundle. OpenInterior never needs a Shopify access token.
 | `NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN` | empty | Bare store host such as `your-store.myshopify.com`. Required in `shopify` mode; a missing or invalid value falls back to demo mode, recorded in `CommerceConfig` as `not-configured` or `invalid-domain`, and the approval sheet shows that reason. |
 | `NEXT_PUBLIC_SHOPIFY_VARIANTS` | empty | Optional comma-separated `productId=gid://shopify/ProductVariant/<id>` pairs that override `src/features/commerce/shopify-variants.ts`. |
 | `ASSET_PROVIDER` | `cached` | Assets are cached; no live generation exists. |
+| `OPENAI_API_KEY` | empty | Script-only. Read from `.env.local` by `pnpm assets:views`; never bundled, never logged, never used by the app. |
+| `OPENINTERIOR_IMAGE_MODEL` | `gpt-image-1` | Script-only. The image model the view pipeline calls. |
+| `OPENINTERIOR_IMAGE_QUALITY` | `high` | Script-only. `low`, `medium`, or `high` for the view pipeline. |
 
-The remaining values in `.env.example` are reserved placeholders for future
-integrations and are unused by any code today.
+The three `OPENAI_*`/`OPENINTERIOR_IMAGE_*` values are read only by
+`scripts/openinterior-assets/generate-views.ts` when you run `pnpm assets:views`
+by hand. No runtime code path, build step, or CI job reads them.
 
 ## Commerce integration
 

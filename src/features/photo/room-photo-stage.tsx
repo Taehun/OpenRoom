@@ -27,6 +27,11 @@ import {
   stableLayerOrder,
   unprojectStagePoint,
 } from "./photo-projection";
+import {
+  getPhotoAssetSet,
+  selectPhotoView,
+  type SelectedPhotoView,
+} from "./photo-views";
 import type { NormalizedPoint } from "./photo-calibration";
 
 interface TransformPreview {
@@ -375,6 +380,7 @@ export function RoomPhotoStage() {
     >();
     const rugObjects: SceneObject[] = [];
     const verticalObjects: SceneObject[] = [];
+    const views = new Map<string, SelectedPhotoView | null>();
 
     for (const object of visualObjects) {
       const projectedPlacement = projectRoomPoint(
@@ -402,6 +408,10 @@ export function RoomPhotoStage() {
         );
       } else {
         verticalObjects.push(object);
+        // Rugs keep their floor homography and their own rotation; only the
+        // vertical cutouts are chosen by front vector.
+        const set = getPhotoAssetSet(object);
+        views.set(object.id, set ? selectPhotoView(object, set) : null);
       }
     }
 
@@ -411,6 +421,7 @@ export function RoomPhotoStage() {
       rugProjections,
       placements,
       verticalObjects,
+      views,
     };
   }, [scene, stageSize, transformPreview]);
 
@@ -500,6 +511,7 @@ export function RoomPhotoStage() {
             showRotationHandle={
               selected && toolMode === "rotate" && !object.locked
             }
+            view={renderModel.views.get(object.id) ?? null}
             visualWidth={objectVisualWidth(
               object.dimensionsM.width,
               placement.scale,

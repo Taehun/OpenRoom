@@ -129,6 +129,15 @@ test("completes WebMCP Core 6 against the shared demo Scene", async ({
     sceneRevision: 1,
     stateVersion: 1,
   });
+  // Facing is derived from `rotation[1]` on the way out: the seed room is
+  // unrotated, so every object faces the camera side.
+  const seedScene = sceneWithoutOptions?.structuredContent.data as
+    | { objects: Array<{ id: string; facing: { x: number; z: number } }> }
+    | undefined;
+  expect(seedScene?.objects[0]).toMatchObject({
+    id: "sofa_01",
+    facing: { x: 0, z: 1 },
+  });
 
   const selection = await page.evaluate(() =>
     window.__webMcpTools.get_selection?.execute(
@@ -273,6 +282,56 @@ test("completes WebMCP Core 6 against the shared demo Scene", async ({
   expect(externalRequestsDuringCart).toEqual([]);
 
   await page.keyboard.press("Escape");
+
+  // Orientation can arrive as a facing vector instead of degrees: facing -x is
+  // +90° of stored yaw, and the Scene reports the same direction back.
+  const beforeFacingMove = await page.evaluate(() =>
+    window.__webMcpTools.get_scene?.execute(
+      {},
+      { signal: new AbortController().signal },
+    ),
+  );
+  const facingMove = await page.evaluate(
+    (state) =>
+      window.__webMcpTools.move_object?.execute(
+        {
+          objectId: "chair_01",
+          position: { x: 1, z: 0.5 },
+          facing: { x: -2, z: 0 },
+          expectedRevision: state.sceneRevision,
+          expectedStateVersion: state.stateVersion,
+        },
+        { signal: new AbortController().signal },
+      ),
+    {
+      sceneRevision: beforeFacingMove?.structuredContent.sceneRevision ?? 0,
+      stateVersion: beforeFacingMove?.structuredContent.stateVersion ?? 0,
+    },
+  );
+  expect(facingMove?.structuredContent).toMatchObject({
+    ok: true,
+    sceneRevision: (beforeFacingMove?.structuredContent.sceneRevision ?? 0) + 1,
+  });
+  const facedScene = await page.evaluate(() =>
+    window.__webMcpTools.get_scene?.execute(
+      {},
+      { signal: new AbortController().signal },
+    ),
+  );
+  const chair = (
+    facedScene?.structuredContent.data as
+      | {
+          objects: Array<{
+            id: string;
+            rotation: [number, number, number];
+            facing: { x: number; z: number };
+          }>;
+        }
+      | undefined
+  )?.objects.find((object) => object.id === "chair_01");
+  expect(chair?.rotation[1]).toBeCloseTo(Math.PI / 2, 9);
+  expect(chair?.facing).toEqual({ x: -1, z: 0 });
+
   await page.getByRole("link", { name: "OpenInterior home" }).click();
   await expect(page).toHaveURL("/");
   // `/` is the dashboard whenever WebMCP is present, so it remounts the

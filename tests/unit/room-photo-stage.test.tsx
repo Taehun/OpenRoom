@@ -866,19 +866,21 @@ describe("RoomPhotoStage", () => {
     expect(stage).toContainElement(table);
   });
 
-  test("anchors the object frame, floor marker, and rotation handle to the asset", () => {
+  // The seed table sits at x = 0, where the tie between the front-quarter pair
+  // resolves to the photographed cutout, so every piece of floor chrome has to
+  // follow its native anchor 0.5007.
+  test("anchors the object frame, floor marker, and rotation handle to the selected view", () => {
     const store = createSceneStore();
     store.getState().setToolMode("rotate");
     renderStage(store);
 
     const frame = screen.getByTestId("photo-object-frame-table_01");
+    expect(frame.dataset.photoMirrored).toBe("false");
     expect(frame.style.getPropertyValue("--photo-anchor-x")).toBe("50.07%");
     expect(frame.style.getPropertyValue("--photo-anchor-y")).toBe("86.13%");
     expect(frame.style.left).toBe("50%");
     expect(frame.style.top).toBe("74%");
-    expect(frame.style.transform).toBe(
-      "translate(-50.07%, -86.13%) rotate(0deg)",
-    );
+    expect(frame.style.transform).toBe("translate(-50.07%, -86.13%)");
     expect(frame.style.transformOrigin).toBe("50.07% 86.13%");
     const floorAnchor = screen.getByTestId("photo-floor-anchor-table_01");
     const object = screen.getByRole("button", { name: "Coffee table" });
@@ -893,5 +895,65 @@ describe("RoomPhotoStage", () => {
     expect(handle.style.left).toBe("50.07%");
     expect(handle.style.top).toBe("0px");
     expect(handle.style.transform).toBe("translate(-50%, -100%)");
+  });
+
+  test("renders the chair on the right with the mirrored front-quarter view and no CSS rotation", () => {
+    const { stage } = renderStage();
+
+    const frame = screen.getByTestId("photo-object-frame-chair_01");
+    expect(frame.dataset.photoView).toBe("front-quarter");
+    expect(frame.dataset.photoMirrored).toBe("true");
+    expect(frame.dataset.photoApproximate).toBe("false");
+    expect(frame.style.transform).not.toContain("rotate(");
+    const image = within(frame).getByRole("button").querySelector("img");
+    if (!image) throw new Error("Missing chair cutout image");
+    expect(getComputedStyle(image).transform || image.style.transform).toContain(
+      "scaleX(-1)",
+    );
+    expect(image.dataset.photoView).toBe("front-quarter");
+    expect(image.dataset.photoMirrored).toBe("true");
+
+    for (const objectFrame of within(stage).getAllByTestId(
+      /^photo-object-frame-/,
+    )) {
+      expect((objectFrame as HTMLElement).style.transform).not.toContain(
+        "rotate(",
+      );
+    }
+  });
+
+  test("keeps the sofa on the left un-mirrored", () => {
+    renderStage();
+
+    const frame = screen.getByTestId("photo-object-frame-sofa_01");
+    expect(frame.dataset.photoView).toBe("front-quarter");
+    expect(frame.dataset.photoMirrored).toBe("false");
+    expect(frame.dataset.photoApproximate).toBe("false");
+    const image = within(frame).getByRole("button").querySelector("img");
+    if (!image) throw new Error("Missing sofa cutout image");
+    expect(
+      getComputedStyle(image).transform || image.style.transform,
+    ).not.toContain("scaleX(-1)");
+  });
+
+  test("marks a 90° keyboard rotation approximate when no side view exists", () => {
+    const store = createSceneStore();
+    store.getState().selectObject("sofa_01");
+    store.getState().setToolMode("rotate");
+    renderStage(store);
+    const sofa = screen.getByRole("button", { name: "Sofa" });
+
+    for (let step = 0; step < 6; step += 1) {
+      fireEvent.keyDown(sofa, { key: "ArrowRight", shiftKey: true });
+    }
+
+    expect(objectFromStore(store, "sofa_01").rotation[1]).toBeCloseTo(
+      Math.PI / 2,
+    );
+    const frame = screen.getByTestId("photo-object-frame-sofa_01");
+    expect(frame.dataset.photoApproximate).toBe("true");
+    expect(frame.dataset.photoMirrored).toBe("true");
+    expect(frame.style.transform).not.toContain("rotate(");
+    expect(screen.getByText(/approximate/i)).toBeInTheDocument();
   });
 });

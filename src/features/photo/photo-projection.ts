@@ -230,13 +230,6 @@ export function projectContactShadow(
   const projectedCorners = footprintCorners(objectFootprint(object)).map(
     ({ x, z }) => projectRoomPoint({ x, z }, room),
   );
-  const center = projectedCorners.reduce(
-    (current, corner) => ({
-      x: current.x + corner.x / projectedCorners.length,
-      y: current.y + corner.y / projectedCorners.length,
-    }),
-    { x: 0, y: 0 },
-  );
   const midpoint = (
     first: ProjectedPlacement,
     second: ProjectedPlacement,
@@ -271,8 +264,13 @@ export function projectContactShadow(
         );
 
   return {
-    left: center.x,
-    top: center.y,
+    // The cutout is a billboard anchored at the projected footprint centre, so the
+    // shadow is centred there too. The mean of the projected corners is not that point:
+    // the floor projection is bilinear, and its cross term pulls the mean sideways for
+    // any rotation that is not a multiple of a quarter turn, sliding the shadow out from
+    // under the object it grounds.
+    left: placement.left,
+    top: placement.top,
     width:
       (Math.hypot(widthAxis.x, widthAxis.y) / PHOTO_STAGE_WIDTH_UNITS) *
       100 *

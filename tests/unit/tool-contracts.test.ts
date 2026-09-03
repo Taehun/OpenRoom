@@ -16,6 +16,8 @@ import {
   moveObjectInputSchema,
   replaceObjectInputSchema,
   searchProductsInputSchema,
+  ToolSceneObjectSchema,
+  ToolSceneSchema,
   type CoreToolName,
 } from "../../src/webmcp/tool-contracts";
 import {
@@ -194,6 +196,54 @@ const CONTRACT_PARITY_CASES: readonly ContractParityCase[] = [
     false,
   ),
   agree("move_object", { expectedRevision: 1, expectedStateVersion: 1 }, false),
+  agree(
+    "move_object",
+    {
+      position: { x: 0, z: 0 },
+      facing: { x: -2, z: 0 },
+      expectedRevision: 1,
+      expectedStateVersion: 1,
+    },
+    true,
+  ),
+  agree(
+    "move_object",
+    {
+      position: { x: 0, z: 0 },
+      facing: { x: 0, z: 1, y: 0 },
+      expectedRevision: 1,
+      expectedStateVersion: 1,
+    },
+    false,
+  ),
+  {
+    // JSON Schema cannot express "exactly one of these two", so the transport
+    // gate admits both orientation inputs and the Zod refine is what answers
+    // INVALID_INPUT with the `facing` issue path.
+    tool: "move_object",
+    input: {
+      position: { x: 0, z: 0 },
+      rotationYDegrees: 10,
+      facing: { x: 0, z: 1 },
+      expectedRevision: 1,
+      expectedStateVersion: 1,
+    },
+    zod: false,
+    jsonSchema: true,
+  },
+  {
+    // Same asymmetry for a zero-length vector: it is a well-formed pair of
+    // numbers, and only Zod knows it names no direction.
+    tool: "move_object",
+    input: {
+      position: { x: 0, z: 0 },
+      facing: { x: 0, z: 0 },
+      expectedRevision: 1,
+      expectedStateVersion: 1,
+    },
+    zod: false,
+    jsonSchema: true,
+  },
   agree("add_scene_to_cart", { expectedRevision: 1, expectedStateVersion: 1 }, true),
   agree(
     "add_scene_to_cart",
@@ -464,9 +514,10 @@ describe("WebMCP Core 6 contracts", () => {
         "stale-move-conflict",
         "cart-approval-only",
         "cart-approval-shopify-lines",
+        "face-the-sofa",
       ]),
     );
-    expect(journeys).toHaveLength(4);
+    expect(journeys).toHaveLength(5);
     expect(journeys.every((journey) =>
       typeof journey.prompt === "string" &&
       Array.isArray(journey.expectedTools) &&
@@ -478,6 +529,76 @@ describe("WebMCP Core 6 contracts", () => {
     expect(getSceneInputSchema.parse({})).toEqual({});
     expect(getSceneInputSchema.safeParse({ unexpected: 1 }).success).toBe(false);
     expect(z.object({}).strict().safeParse({ unexpected: 1 }).success).toBe(false);
+  });
+
+  test("publishes facing on both contract layers and on the tool Scene shape", () => {
+    expect(MOVE_OBJECT_JSON_SCHEMA.properties.facing).toMatchObject({
+      type: "object",
+      properties: { x: { type: "number" }, z: { type: "number" } },
+      required: ["x", "z"],
+      additionalProperties: false,
+    });
+    expect(MOVE_OBJECT_JSON_SCHEMA.properties.facing.description).toContain(
+      "rotationYDegrees",
+    );
+    expect(MOVE_OBJECT_JSON_SCHEMA.required).not.toContain("facing");
+
+    const object = {
+      id: "chair_01",
+      type: "chair",
+      source: "placeholder",
+      position: [0, 0, 0],
+      rotation: [0, 0, 0],
+      scale: [1, 1, 1],
+      dimensionsM: { width: 1, height: 1, depth: 1 },
+      locked: false,
+      styleTags: [],
+      addedBy: "seed",
+    };
+    // The stored Scene shape never carries facing; the tool shape always does.
+    expect(ToolSceneObjectSchema.safeParse(object).success).toBe(false);
+    expect(
+      ToolSceneObjectSchema.safeParse({ ...object, facing: { x: 0, z: 1 } })
+        .success,
+    ).toBe(true);
+    expect(
+      ToolSceneObjectSchema.safeParse({
+        ...object,
+        facing: { x: 0, z: 1, y: 0 },
+      }).success,
+    ).toBe(false);
+    const scene = {
+      id: "demo",
+      version: 1,
+      revision: 1,
+      source: "demo",
+      styleIntent: null,
+      room: { width: 4, height: 2.6, depth: 5 },
+      openings: [],
+      objects: [object],
+      selectedObjectId: null,
+    };
+    expect(ToolSceneSchema.safeParse(scene).success).toBe(false);
+    const facingScene = {
+      ...scene,
+      objects: [{ ...object, facing: { x: 0, z: 1 } }],
+    };
+    expect(ToolSceneSchema.safeParse(facingScene).success).toBe(true);
+    // Overwriting `objects` needs Zod 4's `safeExtend`; these two guard that
+    // the Scene contract it carries over stays exactly as strict as before.
+    expect(
+      ToolSceneSchema.safeParse({ ...facingScene, unexpected: 1 }).success,
+    ).toBe(false);
+    expect(
+      ToolSceneSchema.safeParse({
+        ...facingScene,
+        selectedObjectId: "not_an_object",
+      }).success,
+    ).toBe(false);
+    expect(
+      ToolSceneSchema.safeParse({ ...facingScene, selectedObjectId: "chair_01" })
+        .success,
+    ).toBe(true);
   });
 
   test("reuses the published JSON Schemas in the shared manifest", () => {

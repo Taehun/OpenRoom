@@ -141,19 +141,22 @@ export interface PhotoAssetSet {
 `PHOTO_ASSETS` (24 photographed base assets, the existing `PhotoAsset` shape)
 stays as is so the asset inventory tests keep their meaning. A new
 `PHOTO_ASSET_SETS: Record<string, PhotoAssetSet>` is built from `PHOTO_ASSETS`
-plus `src/features/photo/photo-views.generated.json`, the manifest the pipeline
+plus `src/features/photo/photo-views.generated.ts`, the manifest the pipeline
 writes. `getPhotoAssetSet(object)` replaces `getPhotoAsset` in the compositor;
 `getPhotoAsset` remains for existing callers and returns the front-quarter view.
 
 ### 5.2 Generated manifest
 
-`src/features/photo/photo-views.generated.json` is checked in and has this
-shape (empty array until the pipeline runs):
+`src/features/photo/photo-views.generated.ts` is checked in and exports one
+constant, `GENERATED_VIEW_MANIFEST: GeneratedViewManifest`, as a plain object
+literal with this shape (empty array until the pipeline runs). It is a TypeScript
+module rather than JSON so every loader in the project (Next, Vitest, Playwright's
+ESM runner, `tsx`) imports it without import attributes:
 
-```json
-{
-  "version": 1,
-  "views": [
+```ts
+export const GENERATED_VIEW_MANIFEST: GeneratedViewManifest = {
+  version: 1,
+  views: [
     {
       "assetId": "hinoki-low-sofa",
       "view": "side",
@@ -166,7 +169,7 @@ shape (empty array until the pipeline runs):
       "generatedAt": "2026-09-03T13:00:00.000Z"
     }
   ]
-}
+};
 ```
 
 Loading validates the manifest with Zod (`strict`), rejects a view whose
@@ -199,11 +202,12 @@ Rules, in order:
    whichever gives the smaller angle.
 3. Score each candidate by the angle between `facingOf(rotation[1])` and the
    candidate front vector. Pick the smallest angle.
-4. Ties within `1e-9` radians (a `yaw = 0` object against the front-quarter pair
-   is the common case) resolve toward the room centre: when `position[0] < 0`
-   prefer the candidate whose `frontVector.x > 0`, otherwise prefer
-   `frontVector.x <= 0`. Remaining ties prefer `photographed` over `generated`,
-   then not-mirrored, then source order.
+4. Ties within `1e-7` degrees (a `yaw = 0` object against the front-quarter pair
+   is the common case) resolve toward the room centre: when `position[0] <= 0`
+   prefer the candidate whose `frontVector.x > 0` (the photographed
+   orientation, so an object on the centre line keeps its native cutout),
+   otherwise prefer `frontVector.x <= 0`. Remaining ties prefer `photographed`
+   over `generated`, then not-mirrored, then source order.
 5. `exact` is `angleDegrees <= 45`.
 
 The seed sofa (`x = -1.7`, `yaw = 0`) therefore keeps today's un-mirrored
@@ -353,7 +357,8 @@ entry), times 1000, rounded.
   `room.depth / 2 - 1.0`, falling linearly to 0 at `room.depth / 2 - 0.1`;
 - lamp adjacency (floor lamps only, replaces the foreground term for them at
   weight 1:1): proximity of the lateral edge gap to a sofa end to 0.15m over
-  0.5m, 0 when there is no sofa or the lamp is not within the sofa's depth band;
+  0.5m, 0 when the lamp is not within the sofa's depth band; when the scene has
+  no sofa the lamp falls back to the foreground term like any other object;
 - plant corner term (plants only, 1:1 with the foreground term): 1 when both
   the `x` and `z` wall gaps are at most 0.3m, 0.5 when one is, else 0.
 
@@ -368,12 +373,42 @@ against `rotationOptionsFor` and rejects the whole proposal as
 
 ### 8.5 Expected demo outcome
 
-For the seed scene with photographed views only, the arranged layout has the
-sofa on the back wall facing the camera, table and rug in front, the chair
-flanking the sofa's right end turned 45° toward the table (mirrored
-front-quarter view), the lamp beside the sofa's left end, and the plant in the
-back-right corner clear of the window clearance. Exact coordinates are pinned
-by the unit tests once the implementation lands; the plan records them.
+The demo room's back window (offset 0.62) casts an opening clearance zone of
+x ∈ [-0.18, 1.62], z ∈ [-2.4, -1.65]. A sofa square on the back wall must
+therefore sit at x ≤ -1.2, which leaves no valid position for a chair flanking
+either sofa end (verified by exhaustive enumeration over the flank family), and
+the weight table itself prefers the corner composition below (9431 vs 9212 with
+the sofa pinned to rotation 0). The accepted staged composition is:
+
+- sofa quarter-turned into the back-left corner, facing the room centre
+  (the native front-quarter cutout is 10° from a -45° facing, so the picture
+  matches the geometry);
+- table and rug in front of the sofa along its forward axis;
+- chair flanking the sofa's right end, turned 45° toward the table (mirrored
+  front-quarter view);
+- lamp beside the sofa's left end; plant in the back-left corner behind the
+  sofa; nothing colliding, the window clearance and the circulation path free.
+
+Pinned coordinates (room metres, Y rotation in degrees) for the poor-journey
+scene the browser journey drives, with photographed views only:
+
+| object   | x    | z    | rotation |
+|----------|------|------|----------|
+| sofa_01  | -1.3 | -1.1 | -45      |
+| table_01 | -0.3 |  0.1 | 0        |
+| rug_01   | -0.3 |  0.2 | -45      |
+| chair_01 |  0.8 | -1.0 | +45      |
+| lamp_01  | -2.6 |  0.0 | 0        |
+| plant_01 | -2.4 | -1.7 | 0        |
+
+The seed demo scene arranges to the same composition — sofa (-1.3, -1.2) at
+-45°, table and rug (-0.2, -0.1), lamp (-2.7, -0.5), chair (0.7, -1.0) at +45°,
+plant (-2.625, -2.025); both tables are pinned by the unit tests. "Sofa at the
+back" is asserted on the centre (z ≤ -0.9) and the footprint's minimum z
+(< -2.2, flush on the wall): a quarter-turned sofa's front corner swings
+forward to about z = 0.
+The flank family therefore offers forward offsets {0.2, 0.5, 0.8} m: the first
+two land inside the 0.75 m opening clearance on the sofa's own wall.
 
 ## 9. Generation Pipeline
 
@@ -402,7 +437,9 @@ runs `scripts/openinterior-assets/generate-views.ts` with `tsx`.
   `anchorX = (left + right + 1) / 2 / width`, `anchorY = (bottom + 1) / height`,
   rounded to 4 decimals; an image with no such pixel fails the job.
 - Manifest entries are merged by `(assetId, view)`, sorted by `assetId` then
-  view order, and written pretty-printed.
+  view order, and written as the TypeScript module described in section 5.2
+  (a header comment naming the generator, then the exported constant,
+  pretty-printed with two-space indentation).
 
 ### 9.2 Prompt
 
