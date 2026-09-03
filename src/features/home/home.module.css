@@ -190,8 +190,20 @@
   border-color: var(--terracotta);
 }
 
+.companionNote {
+  margin: 14px 0 0;
+  color: var(--muted-text);
+  font-size: 0.78rem;
+}
+
+.inlineLink {
+  color: var(--moss);
+  font-weight: 700;
+}
+
 .copyButton:focus-visible,
 .checkButton:focus-visible,
+.inlineLink:focus-visible,
 .demoLink:focus-visible {
   outline: 3px solid var(--moss);
   outline-offset: 3px;

@@ -137,3 +137,40 @@ test("keeps the guide reachable at ?view=guide while WebMCP is present", async (
     "/demo",
   );
 });
+
+test("opens the dashboard for a Claude-only browser at ?view=dashboard", async () => {
+  stubBrowser({ secureContext: true, userAgent: FIREFOX_UA });
+  window.history.replaceState({}, "", "/?view=dashboard");
+
+  render(<HomeGate />);
+
+  expect(
+    await screen.findByRole("main", { name: "Room canvas" }),
+  ).toBeVisible();
+  expect(
+    screen.getByRole("status", { name: "Claude connection status" })
+      .textContent,
+  ).toBe("Claude: Not connected");
+  expect(screen.getByLabelText("Pairing code")).toBeVisible();
+  expect(screen.getByRole("link", { name: "Guide" })).toHaveAttribute(
+    "href",
+    "/?view=guide",
+  );
+});
+
+test("points a browser without WebMCP at the local companion dashboard", async () => {
+  stubBrowser({ secureContext: true, userAgent: FIREFOX_UA });
+  window.history.replaceState({}, "", "/?view=guide");
+
+  render(<HomeGate />);
+
+  const dashboard = await screen.findByRole("link", {
+    name: "Open the dashboard",
+  });
+  expect(dashboard).toHaveAttribute("href", "/?view=dashboard");
+  expect(dashboard).toBeVisible();
+  expect(dashboard.closest("p")?.textContent).toBe(
+    "Using Claude Desktop or Claude Code? Open the dashboard and pair with the local companion.",
+  );
+  expect(screen.queryByRole("main", { name: "Room canvas" })).toBeNull();
+});

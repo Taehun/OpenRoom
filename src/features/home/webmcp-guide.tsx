@@ -203,6 +203,13 @@ export function WebMcpGuide({ onCheckAgain, status }: WebMcpGuideProps) {
             >
               Check again
             </button>
+            <p className={styles.companionNote}>
+              Using Claude Desktop or Claude Code?{" "}
+              <Link className={styles.inlineLink} href="/?view=dashboard">
+                Open the dashboard
+              </Link>{" "}
+              and pair with the local companion.
+            </p>
           </>
         )}
       </section>
