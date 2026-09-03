@@ -400,8 +400,12 @@ scene the browser journey drives, with photographed views only:
 | lamp_01  | -2.6 |  0.0 | 0        |
 | plant_01 | -2.4 | -1.7 | 0        |
 
-The seed demo scene arranges to the same composition (table and rug at
-(-0.2, 0.0), plant at (-2.4, -1.8)); both tables are pinned by the unit tests.
+The seed demo scene arranges to the same composition — sofa (-1.3, -1.2) at
+-45°, table and rug (-0.2, -0.1), lamp (-2.7, -0.5), chair (0.7, -1.0) at +45°,
+plant (-2.625, -2.025); both tables are pinned by the unit tests. "Sofa at the
+back" is asserted on the centre (z ≤ -0.9) and the footprint's minimum z
+(< -2.2, flush on the wall): a quarter-turned sofa's front corner swings
+forward to about z = 0.
 The flank family therefore offers forward offsets {0.2, 0.5, 0.8} m: the first
 two land inside the 0.75 m opening clearance on the sofa's own wall.
 
