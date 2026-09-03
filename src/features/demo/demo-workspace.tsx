@@ -24,16 +24,26 @@ import { WorkspaceHeader } from "./workspace-header";
 import styles from "./demo-workspace.module.css";
 import type { ToolContext } from "../../webmcp/tool-context";
 import { useWebMcpTools } from "../../webmcp/use-webmcp-tools";
+import { ACTIVE_COMMERCE } from "../commerce/commerce-runtime";
+import type { CommerceContext } from "../commerce/commerce-types";
 
-export function DemoWorkspace({ store }: { store?: SceneStore } = {}) {
+interface DemoWorkspaceProps {
+  store?: SceneStore;
+  commerce?: CommerceContext;
+}
+
+export function DemoWorkspace({
+  store,
+  commerce = ACTIVE_COMMERCE,
+}: DemoWorkspaceProps = {}) {
   return (
     <SceneStoreProvider store={store}>
-      <DemoWorkspaceContent />
+      <DemoWorkspaceContent commerce={commerce} />
     </SceneStoreProvider>
   );
 }
 
-function DemoWorkspaceContent() {
+function DemoWorkspaceContent({ commerce }: { commerce: CommerceContext }) {
   const [state, dispatch] = useReducer(
     demoReducer,
     undefined,
@@ -91,8 +101,9 @@ function DemoWorkspaceContent() {
         sceneStore.getState().applyCommand(request),
       openCartApproval: (draft) =>
         dispatch({ type: "open-cart", draft }),
+      commerce,
     }),
-    [sceneStore],
+    [sceneStore, commerce],
   );
 
   useWebMcpTools(toolContext);

@@ -1,5 +1,6 @@
 import type { ZodIssue } from "zod";
 
+import { enrichCartDraft } from "../features/commerce/shopify-cart";
 import {
   SceneObjectSchema,
   SceneSchema,
@@ -473,8 +474,8 @@ export function createCoreTools(context: ToolContext): readonly ModelContextTool
             (object): object is SceneObject => object !== undefined,
           );
         }
-        const draft = draftFor(snapshot.scene, objects);
-        if (draft.items.length === 0) {
+        const baseDraft = draftFor(snapshot.scene, objects);
+        if (baseDraft.items.length === 0) {
           return toolError(
             "add_scene_to_cart",
             snapshot.scene.revision,
@@ -484,6 +485,7 @@ export function createCoreTools(context: ToolContext): readonly ModelContextTool
             false,
           );
         }
+        const draft = enrichCartDraft(context.commerce, baseDraft);
         signal.throwIfAborted();
         context.openCartApproval(draft);
         return toolSuccess(

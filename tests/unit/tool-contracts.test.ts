@@ -245,9 +245,10 @@ describe("WebMCP Core 6 contracts", () => {
         "replace-second-result",
         "stale-move-conflict",
         "cart-approval-only",
+        "cart-approval-shopify-lines",
       ]),
     );
-    expect(journeys).toHaveLength(3);
+    expect(journeys).toHaveLength(4);
     expect(journeys.every((journey) =>
       typeof journey.prompt === "string" &&
       Array.isArray(journey.expectedTools) &&

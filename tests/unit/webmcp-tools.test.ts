@@ -13,10 +13,13 @@ import type {
   CatalogProduct,
   ToolContext,
 } from "../../src/webmcp/tool-context";
+import type { CommerceContext } from "../../src/features/commerce/commerce-types";
+import { DEMO_COMMERCE, SHOPIFY_COMMERCE } from "../helpers/commerce-fixtures";
 
 function createContext(
   store: SceneStore,
   catalog: readonly CatalogProduct[] = DEMO_PRODUCTS,
+  commerce: CommerceContext = DEMO_COMMERCE,
 ) {
   const drafts: CartApprovalDraft[] = [];
   const context: ToolContext = {
@@ -49,6 +52,7 @@ function createContext(
     openCartApproval: (draft) => {
       drafts.push(draft);
     },
+    commerce,
   };
 
   return { context, drafts };
@@ -572,5 +576,67 @@ describe("WebMCP Core 6 handlers", () => {
       { readOnlyHint: false, untrustedContentHint: true },
       { readOnlyHint: false, untrustedContentHint: true },
     ]);
+  });
+});
+
+describe("add_scene_to_cart commerce block", () => {
+  test("omits commerce in demo mode", async () => {
+    const store = createSceneStore();
+    const { context, drafts } = createContext(store, DEMO_PRODUCTS, DEMO_COMMERCE);
+    const tools = createCoreTools(context);
+
+    await execute(tools, "replace_object", {
+      productId: "oak-frame-table",
+      expectedRevision: store.getState().scene.revision,
+      expectedStateVersion: store.getState().stateVersion,
+    });
+    const result = await execute(tools, "add_scene_to_cart", {
+      expectedRevision: store.getState().scene.revision,
+      expectedStateVersion: store.getState().stateVersion,
+    });
+
+    expect(result.structuredContent.ok).toBe(true);
+    if (!result.structuredContent.ok) return;
+    const { draft } = result.structuredContent.data as { draft: CartApprovalDraft };
+    expect("commerce" in draft).toBe(false);
+    expect(drafts).toHaveLength(1);
+    expect("commerce" in drafts[0]!).toBe(false);
+  });
+
+  test("returns public Shopify lines, skipped products, and the MCP endpoint in shopify mode", async () => {
+    const store = createSceneStore();
+    const { context, drafts } = createContext(store, DEMO_PRODUCTS, SHOPIFY_COMMERCE);
+    const tools = createCoreTools(context);
+
+    await execute(tools, "replace_object", {
+      productId: "oak-frame-table",
+      expectedRevision: store.getState().scene.revision,
+      expectedStateVersion: store.getState().stateVersion,
+    });
+    const result = await execute(tools, "add_scene_to_cart", {
+      expectedRevision: store.getState().scene.revision,
+      expectedStateVersion: store.getState().stateVersion,
+    });
+
+    expect(result.structuredContent.ok).toBe(true);
+    if (!result.structuredContent.ok) return;
+    const { draft } = result.structuredContent.data as { draft: CartApprovalDraft };
+    expect(draft.commerce).toEqual({
+      provider: "shopify",
+      storeDomain: "nook-placeholder.myshopify.com",
+      mcpEndpoint: "https://nook-placeholder.myshopify.com/api/mcp",
+      lines: [
+        {
+          productId: "oak-frame-table",
+          merchandiseId: "gid://shopify/ProductVariant/1003",
+          quantity: 1,
+        },
+      ],
+      skipped: [],
+      checkoutPermalink: "https://nook-placeholder.myshopify.com/cart/1003:1",
+    });
+    expect(drafts).toHaveLength(1);
+    expect(drafts[0]!.commerce).toEqual(draft.commerce);
+    expect(JSON.stringify(result)).not.toMatch(/token/i);
   });
 });
