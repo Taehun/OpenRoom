@@ -305,6 +305,14 @@
   line-height: var(--md-sys-typescale-body-medium-line-height);
 }
 
+@media (max-width: 899px) {
+  /* Stacked under the copy, the photo spans the column instead of stopping at
+     the two-column height cap. */
+  .heroRoom {
+    max-height: none;
+  }
+}
+
 @media (min-width: 900px) {
   .hero {
     gap: 40px;

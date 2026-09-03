@@ -12,7 +12,9 @@
   position: relative;
   z-index: 20;
   display: grid;
-  grid-template-columns: minmax(300px, 1fr) auto minmax(420px, 1fr);
+  /* The actions column is sized by its content so no label or badge is ever
+     squeezed; the identity column absorbs whatever width is left. */
+  grid-template-columns: minmax(300px, 1fr) auto max-content;
   align-items: center;
   height: 64px;
   border-bottom: 1px solid var(--warm-divider);
@@ -104,6 +106,11 @@
   gap: 4px;
   height: 100%;
   padding-right: 12px;
+}
+
+.headerActions > *,
+.cartCount {
+  flex: none;
 }
 
 /*
@@ -651,9 +658,17 @@
  */
 .promptGuidance {
   display: grid;
+  /* One track that can never grow past the column, so the prompt wraps inside
+     it instead of running under the button. */
+  grid-template-columns: minmax(0, 1fr);
   align-content: center;
   gap: 6px;
   min-width: 0;
+}
+
+.composerChips {
+  display: grid;
+  gap: 6px;
 }
 
 /* Body-small is the floor for readable UI text; nothing in the composer may
@@ -1373,7 +1388,36 @@
   }
 
   .header {
-    grid-template-columns: minmax(270px, 1fr) auto minmax(390px, 1fr);
+    grid-template-columns: minmax(270px, 1fr) auto max-content;
+  }
+
+  /* A narrower inspector hands the composer the width its chips need. */
+  .workspaceBody {
+    grid-template-columns: minmax(0, 1fr) 320px;
+  }
+
+  /* Under 1280px the style chips and the status chips share one wrapping
+     row, so the composer stays two rows tall instead of four. */
+  .composerChips {
+    display: flex;
+    flex-wrap: wrap;
+  }
+
+  .promptSuggestions,
+  .agentStatusRow {
+    display: contents;
+  }
+
+  /* The prompt takes the full width and the button drops under the chips. */
+  .composer {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .composer .agentButton {
+    grid-column: 2;
+    grid-row: 2;
+    justify-self: end;
+    margin-top: 0;
   }
 }
 
