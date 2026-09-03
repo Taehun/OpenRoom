@@ -15,7 +15,7 @@ import {
 import styles from "../demo/demo-workspace.module.css";
 import { useSceneStore, useSceneStoreApi } from "../scene/scene-context";
 import type { SceneObject, Vec3 } from "../scene/scene-schema";
-import { getPhotoAsset, OPENINTERIOR_ROOM_BACKGROUND } from "./photo-assets";
+import { getPhotoAsset, OPENROOM_ROOM_BACKGROUND } from "./photo-assets";
 import { PhotoContactShadow } from "./photo-contact-shadow";
 import { PhotoObjectLayer } from "./photo-object-layer";
 import { PhotoRugLayer } from "./photo-rug-layer";
@@ -432,7 +432,7 @@ export function RoomPhotoStage() {
       onClick={clearSelection}
       ref={stageRef}
       role="region"
-      style={{ backgroundImage: `url(${OPENINTERIOR_ROOM_BACKGROUND})` }}
+      style={{ backgroundImage: `url(${OPENROOM_ROOM_BACKGROUND})` }}
     >
       {renderModel.rugObjects.map((object) => {
         const placement = renderModel.placements.get(object.id)!;

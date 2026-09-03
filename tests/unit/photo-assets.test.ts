@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createDemoScene } from "../../src/demo/demo-scene";
 import { DEMO_PRODUCTS } from "../../src/features/demo/demo-data";
 import {
-  OPENINTERIOR_ROOM_BACKGROUND,
+  OPENROOM_ROOM_BACKGROUND,
   PHOTO_ASSETS,
   ROOM_PHOTO_ASSETS,
   getPhotoAsset,
@@ -123,7 +123,7 @@ describe("photo assets", () => {
   let fixtureDirectory: string;
 
   beforeEach(() => {
-    fixtureDirectory = mkdtempSync(join(tmpdir(), "openinterior-webp-metadata-"));
+    fixtureDirectory = mkdtempSync(join(tmpdir(), "openroom-webp-metadata-"));
   });
 
   afterEach(() => {
@@ -205,7 +205,7 @@ describe("photo assets", () => {
       expect(asset).toBeDefined();
       expect(existsSync(join(process.cwd(), "public", asset.src))).toBe(true);
     }
-    expect(existsSync(join(process.cwd(), "public", OPENINTERIOR_ROOM_BACKGROUND)))
+    expect(existsSync(join(process.cwd(), "public", OPENROOM_ROOM_BACKGROUND)))
       .toBe(true);
   });
 

@@ -1,12 +1,14 @@
-# OpenInterior
+# OpenRoom
 
-[![CI](https://github.com/Taehun/OpenInterior/actions/workflows/ci.yml/badge.svg)](https://github.com/Taehun/OpenInterior/actions/workflows/ci.yml)
+AI Room Planner & Furniture Shopping
 
-OpenInterior is a browser-based photo compositor for exploring and furnishing
+[![CI](https://github.com/Taehun/OpenRoom/actions/workflows/ci.yml/badge.svg)](https://github.com/Taehun/OpenRoom/actions/workflows/ci.yml)
+
+OpenRoom is a browser-based photo compositor for exploring and furnishing
 a room with deterministic catalog products.
 
-Repository: <https://github.com/Taehun/OpenInterior> (MIT, contributions
-welcome). Live demo: <https://openinterior.taehun.workers.dev> (deployed from
+Repository: <https://github.com/Taehun/OpenRoom> (MIT, contributions
+welcome). Live demo: <https://openroom.taehun.workers.dev> (deployed from
 `main` by CI).
 
 ## Status
@@ -53,8 +55,8 @@ mode the original human four-item `$626 USD` fixture and product-backed WebMCP
 Scene drafts both emit no external cart write or network request. Shopify
 checkout is available through cart permalinks and the store's Storefront MCP
 endpoint, with no server route, no access token, and no request made by
-OpenInterior itself; see [Commerce integration](#commerce-integration). A
-localhost MCP companion (`pnpm mcp:openinterior`) serves the same Core 6 over
+OpenRoom itself; see [Commerce integration](#commerce-integration). A
+localhost MCP companion (`pnpm mcp:openroom`) serves the same Core 6 over
 stdio to Claude Desktop, Claude Code, and Codex CLI by relaying each call to one
 explicitly paired browser page; see
 [Agent surface compatibility](#agent-surface-compatibility) and
@@ -71,13 +73,19 @@ reached. `tests/e2e/webmcp-core.spec.ts` asserts that parity.
 
 | Agent surface | How it reaches Core 6 | Setup |
 | --- | --- | --- |
-| ChatGPT Work and Codex in the ChatGPT desktop app's browser | Native WebMCP through `document.modelContext` | Open OpenInterior. Nothing else. |
-| Any other Chromium browser exposing `document.modelContext` | Native WebMCP | Open OpenInterior. Nothing else. |
-| Claude Desktop | Local MCP companion over stdio | `pnpm mcp:openinterior`, then pair the page. See [docs/local-mcp.md](docs/local-mcp.md). |
+| ChatGPT Work and Codex in the ChatGPT desktop app's browser | Native WebMCP through `document.modelContext` | Open OpenRoom. Nothing else. |
+| Any other Chromium browser exposing `document.modelContext` | Native WebMCP | Open OpenRoom. Nothing else. |
+| Claude Desktop | Local MCP companion over stdio | `pnpm mcp:openroom`, then pair the page. See [docs/local-mcp.md](docs/local-mcp.md). |
 | Claude Code | Local MCP companion over stdio | Same. |
 | Codex CLI | Local MCP companion over stdio | Same. |
 | Claude for Chrome | Not supported as a WebMCP site-tool surface | Anthropic documents it as browser automation, not WebMCP site-tool discovery. Use the companion. |
 | Browsers with no `document.modelContext` | No agent path | The complete human editor still works. |
+
+Chromium exposes `document.modelContext` from version 146, but until Chrome 149
+it sits behind `chrome://flags/#enable-webmcp-testing`, which needs a browser
+relaunch to take effect; from Chrome 149 an origin trial removes that flag
+requirement. WebMCP has only been verified on Google Chrome, so other Chromium
+browsers may differ. The guide at `/` detects all of this and says what to do.
 
 Cart semantics do not change with the surface. `add_scene_to_cart` always opens
 the local approval sheet in the page, and in the default `demo` mode it makes no
@@ -87,7 +95,7 @@ Start and verify:
 
 ```bash
 pnpm dev                                                       # serve the app on :3000
-pnpm mcp:openinterior                                          # start the companion on 127.0.0.1:43110
+pnpm mcp:openroom                                              # start the companion on 127.0.0.1:43110
 pnpm exec vitest run tests/integration/local-mcp-companion.test.ts   # real client, real process
 pnpm test                                                      # unit suite plus that integration test
 ```
@@ -105,8 +113,8 @@ discovery
 
 | Layer | Source | Invariant |
 | --- | --- | --- |
-| Room | `public/demo/photo/openinterior-room-empty.webp` | Fixed 16:9 background for editing. |
-| Reference | `public/demo/photo/openinterior-room-before.webp` | Original mismatched room reference. |
+| Room | `public/demo/photo/openroom-room-empty.webp` | Fixed 16:9 background for editing. |
+| Reference | `public/demo/photo/openroom-room-before.webp` | Original mismatched room reference. |
 | Seed cutouts | `public/demo/photo/seed/` | Six transparent WebPs, one for each canonical object. |
 | Catalog cutouts | `public/demo/photo/products/` | Eighteen transparent WebPs, three per category. |
 | Calibration | `src/features/photo/photo-calibration.ts` | Maps room `x/z` to stable stage coordinates. |
@@ -166,7 +174,7 @@ reviewed and committed like any other asset. See
   without `document.modelContext` retain the complete human demo.
 - No WebMCP-capable browser is needed for the local MCP companion path: Claude
   Desktop, Claude Code, and Codex CLI reach the same six tools through
-  `pnpm mcp:openinterior`. See [docs/local-mcp.md](docs/local-mcp.md).
+  `pnpm mcp:openroom`. See [docs/local-mcp.md](docs/local-mcp.md).
 
 ## Setup
 
@@ -193,6 +201,7 @@ local environment file; never commit them.
 | `pnpm test:watch` | Run Vitest in watch mode. |
 | `pnpm test:e2e` | Run the Playwright demo-mode end-to-end tests (port 3000). |
 | `pnpm test:e2e:commerce` | Run the Playwright Shopify-mode journeys (port 3001). |
+| `pnpm mcp:openroom` | Start the localhost MCP companion for Claude Desktop, Claude Code, or Codex CLI. |
 | `pnpm mcp:openinterior` | Start the localhost MCP companion for Claude Desktop, Claude Code, or Codex CLI. |
 | `pnpm assets:views` | Generate the missing cutout views offline (developer-run; needs `OPENAI_API_KEY`). Add `--dry-run` to only print the plan. |
 | `pnpm cf-typegen` | Generate Cloudflare Worker types. |
@@ -241,7 +250,7 @@ time: both `next build` (`pnpm build:next`) and `vinext build` (`pnpm build`)
 read them from the environment that runs the build, so set them there and
 rebuild to change them. `ASSET_PROVIDER` is a reserved value that nothing reads
 today. Cloudflare Worker `vars` are runtime-only and never reach the client
-bundle. OpenInterior never needs a Shopify access token.
+bundle. OpenRoom never needs a Shopify access token.
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
@@ -259,7 +268,7 @@ by hand. No runtime code path, build step, or CI job reads them.
 
 ## Commerce integration
 
-OpenInterior has no backend and stores no credentials. Two paths use one
+OpenRoom has no backend and stores no credentials. Two paths use one
 static mapping from demo product ids to Shopify variant GIDs:
 
 1. **Human checkout.** In `shopify` mode, `Continue to Shopify` in the approval
@@ -272,7 +281,7 @@ static mapping from demo product ids to Shopify variant GIDs:
    `checkoutPermalink`, and `mcpEndpoint` (`https://<store>/api/mcp`). Connect
    Claude, ChatGPT, or any MCP client to that endpoint (Shopify's Storefront MCP
    needs no authentication), let it call `update_cart` with the returned
-   `merchandise_id` lines, then `get_cart` for the checkout URL. OpenInterior
+   `merchandise_id` lines, then `get_cart` for the checkout URL. OpenRoom
    itself makes no request.
 
 Setup:
@@ -296,9 +305,9 @@ typecheck, lint, unit and integration tests, the Playwright smoke suites
 `vinext build`). Playwright traces are uploaded when a smoke test fails.
 
 On a push to `main` that passes CI, the `deploy` job builds with vinext and
-deploys the Worker `openinterior` (static assets included) to Cloudflare with
+deploys the Worker `openroom` (static assets included) to Cloudflare with
 `pnpm run deploy:vinext`, using the existing `wrangler.jsonc`. The live URL is
-<https://openinterior.taehun.workers.dev>.
+<https://openroom.taehun.workers.dev>.
 
 Deployment needs two repository secrets; the job is skipped with a notice until
 both exist:
@@ -308,7 +317,7 @@ both exist:
 | `CLOUDFLARE_ACCOUNT_ID` | The Cloudflare account id (`pnpm exec wrangler whoami`). |
 | `CLOUDFLARE_API_TOKEN` | An API token created from the **Edit Cloudflare Workers** template in the Cloudflare dashboard. |
 
-Set them with `gh secret set CLOUDFLARE_API_TOKEN -R Taehun/OpenInterior` (paste
+Set them with `gh secret set CLOUDFLARE_API_TOKEN -R Taehun/OpenRoom` (paste
 the token when prompted). A first deploy can also be run locally with
 `pnpm run build && pnpm run deploy:vinext` after `pnpm exec wrangler login`.
 
@@ -320,4 +329,4 @@ applicable and must keep secrets and room photos out of git.
 ## License
 
 MIT. See [LICENSE](LICENSE). Source and issues live at
-<https://github.com/Taehun/OpenInterior>.
+<https://github.com/Taehun/OpenRoom>.

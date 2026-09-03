@@ -282,6 +282,7 @@ test("completes WebMCP Core 6 against the shared demo Scene", async ({
   expect(externalRequestsDuringCart).toEqual([]);
 
   await page.keyboard.press("Escape");
+  await page.getByRole("link", { name: "OpenRoom home" }).click();
 
   // Orientation can arrive as a facing vector instead of degrees: facing -x is
   // +90° of stored yaw, and the Scene reports the same direction back.

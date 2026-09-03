@@ -577,43 +577,96 @@ test("Reset Demo restores the canonical inspector state", async () => {
   ).not.toBeInTheDocument();
 });
 
-test("offers accessible manual pairing controls beside the native WebMCP status", () => {
+/**
+ * Pairing is the same deliberate human act it always was — the operator copies
+ * the code the companion prints and types it in — but the composer now shows
+ * only a status chip and one button, and the fields live in a modal dialog.
+ */
+function openPairingDialog() {
+  return screen.getByRole("button", { name: "Connect an AI app" });
+}
+
+test("shows the local agent status as a chip beside the native WebMCP status", () => {
   render(<DemoWorkspace />);
 
   expect(
     screen.getByRole("status", { name: "Native WebMCP status" }),
   ).toHaveTextContent("Native WebMCP: Unavailable");
-  expect(
-    screen.getByRole("status", { name: "Claude connection status" })
-      .textContent,
-  ).toBe("Claude: Not connected");
+  const chip = screen.getByRole("status", {
+    name: "Local agent connection status",
+  });
+  expect(chip.textContent).toBe("Local agent: Not connected");
 
-  const code = screen.getByLabelText("Pairing code");
+  // The composer row itself carries no fields any more.
+  expect(openPairingDialog()).toBeVisible();
+  expect(
+    screen.queryByRole("dialog", { name: "Connect an AI app" }),
+  ).not.toBeInTheDocument();
+  expect(
+    screen.queryByRole("button", { name: "Disconnect" }),
+  ).not.toBeInTheDocument();
+});
+
+test("opens a pairing dialog with the accessible code and port fields", async () => {
+  const user = userEvent.setup();
+  render(<DemoWorkspace />);
+
+  await user.click(openPairingDialog());
+
+  const dialog = screen.getByRole("dialog", { name: "Connect an AI app" });
+  expect(dialog).toBeVisible();
+  expect(
+    within(dialog).getByText(
+      "Run pnpm mcp:openroom in the repository and type the six-digit code it prints.",
+    ),
+  ).toBeVisible();
+
+  const code = within(dialog).getByRole("textbox", { name: "Pairing code" });
   expect(code).toHaveAttribute("inputMode", "numeric");
   expect(code).toHaveAttribute("pattern", "[0-9]{6}");
   expect(code).toHaveAttribute("maxLength", "6");
   expect(code).toHaveAttribute("autoComplete", "off");
-
-  expect(screen.getByRole("button", { name: "Connect Claude" })).toBeDisabled();
-  expect(
-    screen.queryByRole("button", { name: "Disconnect Claude" }),
-  ).not.toBeInTheDocument();
-  expect(screen.getByLabelText("Relay port")).toHaveValue(43_110);
-  // The hint is visually hidden and reaches the operator only through
-  // `aria-describedby`, so assert the wiring rather than its visibility: jsdom
-  // applies no CSS module rules, which would make `toBeVisible` pass even with
-  // the description detached.
   expect(code).toHaveAccessibleDescription(
-    "Start pnpm mcp:openinterior, then enter the code printed in that terminal.",
+    "Run pnpm mcp:openroom in the repository and type the six-digit code it prints.",
   );
+
+  // The relay port is an expert setting, folded behind a closed disclosure.
+  const advanced = within(dialog).getByText("Advanced").closest("details");
+  expect(advanced).not.toBeNull();
+  expect(advanced).not.toHaveAttribute("open");
+  expect(within(dialog).getByLabelText("Relay port")).toHaveValue(43_110);
+
+  expect(within(dialog).getByRole("button", { name: "Connect" })).toBeDisabled();
+  expect(within(dialog).getByRole("button", { name: "Cancel" })).toBeVisible();
 });
 
-test("enables Connect Claude only for exactly six digits", async () => {
+test("Cancel closes the pairing dialog without touching the relay", async () => {
+  const server = new FakeRelayServer();
+  vi.spyOn(globalThis, "fetch").mockImplementation(server.fetch);
   const user = userEvent.setup();
   render(<DemoWorkspace />);
 
-  const connect = screen.getByRole("button", { name: "Connect Claude" });
-  const code = screen.getByLabelText("Pairing code");
+  await user.click(openPairingDialog());
+  await user.click(
+    within(
+      screen.getByRole("dialog", { name: "Connect an AI app" }),
+    ).getByRole("button", { name: "Cancel" }),
+  );
+
+  expect(
+    screen.queryByRole("dialog", { name: "Connect an AI app" }),
+  ).not.toBeInTheDocument();
+  expect(server.requests).toHaveLength(0);
+});
+
+test("enables Connect only for exactly six digits", async () => {
+  const user = userEvent.setup();
+  render(<DemoWorkspace />);
+  await user.click(openPairingDialog());
+
+  const dialog = screen.getByRole("dialog", { name: "Connect an AI app" });
+  const connect = within(dialog).getByRole("button", { name: "Connect" });
+  const code = within(dialog).getByRole("textbox", { name: "Pairing code" });
 
   await user.type(code, "12345");
   expect(connect).toBeDisabled();
@@ -627,36 +680,109 @@ test("enables Connect Claude only for exactly six digits", async () => {
   expect(connect).toBeDisabled();
 });
 
-test("pairs with the local relay without exposing the session token", async () => {
+test("pairs with the local relay from the dialog without exposing the session token", async () => {
   const server = new FakeRelayServer();
   vi.spyOn(globalThis, "fetch").mockImplementation(server.fetch);
   const user = userEvent.setup();
   render(<DemoWorkspace />);
 
-  await user.type(screen.getByLabelText("Pairing code"), "123456");
-  await user.click(screen.getByRole("button", { name: "Connect Claude" }));
+  await user.click(openPairingDialog());
+  const dialog = screen.getByRole("dialog", { name: "Connect an AI app" });
+  await user.type(
+    within(dialog).getByRole("textbox", { name: "Pairing code" }),
+    "123456",
+  );
+  await user.click(within(dialog).getByRole("button", { name: "Connect" }));
 
   await waitFor(() =>
     expect(
-      screen.getByRole("status", { name: "Claude connection status" })
+      screen.getByRole("status", { name: "Local agent connection status" })
         .textContent,
-    ).toBe("Claude: Connected"),
+    ).toBe("Local agent: Connected"),
   );
+  // A successful pair closes the dialog and hands the composer back.
   expect(
-    screen.getByRole("button", { name: "Disconnect Claude" }),
-  ).toBeVisible();
+    screen.queryByRole("dialog", { name: "Connect an AI app" }),
+  ).not.toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Disconnect" })).toBeVisible();
   expect(document.body.innerHTML).not.toContain(RELAY_SESSION_TOKEN);
   expect(window.location.href).not.toContain(RELAY_SESSION_TOKEN);
   expect(localStorage.length).toBe(0);
   expect(sessionStorage.length).toBe(0);
   expect(screen.getByLabelText("Pairing code")).toHaveValue("");
 
-  await user.click(screen.getByRole("button", { name: "Disconnect Claude" }));
+  await user.click(screen.getByRole("button", { name: "Disconnect" }));
   expect(
-    screen.getByRole("status", { name: "Claude connection status" })
+    screen.getByRole("status", { name: "Local agent connection status" })
       .textContent,
-  ).toBe("Claude: Not connected");
+  ).toBe("Local agent: Not connected");
   expect(server.deletes).toHaveLength(1);
+});
+
+test("keeps a rejected pairing inside the dialog", async () => {
+  const server = new FakeRelayServer();
+  server.pairStatus = 403;
+  vi.spyOn(globalThis, "fetch").mockImplementation(server.fetch);
+  const user = userEvent.setup();
+  render(<DemoWorkspace />);
+
+  await user.click(openPairingDialog());
+  const dialog = screen.getByRole("dialog", { name: "Connect an AI app" });
+  await user.type(
+    within(dialog).getByRole("textbox", { name: "Pairing code" }),
+    "123456",
+  );
+  await user.click(within(dialog).getByRole("button", { name: "Connect" }));
+
+  await waitFor(() =>
+    expect(
+      within(dialog).getByText(
+        "Pairing was rejected. Check the code and try again.",
+      ),
+    ).toBeVisible(),
+  );
+  expect(dialog).toBeVisible();
+  expect(
+    screen.getByRole("status", { name: "Local agent connection status" })
+      .textContent,
+  ).toBe("Local agent: Not connected");
+});
+
+test("clears a stale failure and the code when the dialog is reopened", async () => {
+  const server = new FakeRelayServer();
+  server.pairStatus = 403;
+  vi.spyOn(globalThis, "fetch").mockImplementation(server.fetch);
+  const user = userEvent.setup();
+  render(<DemoWorkspace />);
+
+  await user.click(openPairingDialog());
+  const dialog = screen.getByRole("dialog", { name: "Connect an AI app" });
+  await user.type(
+    within(dialog).getByRole("textbox", { name: "Pairing code" }),
+    "123456",
+  );
+  await user.click(within(dialog).getByRole("button", { name: "Connect" }));
+  await waitFor(() =>
+    expect(
+      within(dialog).getByText(
+        "Pairing was rejected. Check the code and try again.",
+      ),
+    ).toBeVisible(),
+  );
+
+  await user.click(within(dialog).getByRole("button", { name: "Cancel" }));
+  await user.click(openPairingDialog());
+
+  const reopened = screen.getByRole("dialog", { name: "Connect an AI app" });
+  expect(
+    within(reopened).queryByText(
+      "Pairing was rejected. Check the code and try again.",
+    ),
+  ).not.toBeInTheDocument();
+  expect(
+    within(reopened).getByRole("textbox", { name: "Pairing code" }),
+  ).toHaveValue("");
+  expect(within(reopened).getByRole("button", { name: "Connect" })).toBeDisabled();
 });
 
 test("explains an insecure context instead of pairing", async () => {
@@ -664,18 +790,23 @@ test("explains an insecure context instead of pairing", async () => {
   vi.spyOn(globalThis, "fetch").mockImplementation(server.fetch);
   const user = userEvent.setup();
   render(<DemoWorkspace />);
-  await user.type(screen.getByLabelText("Pairing code"), "123456");
+  await user.click(openPairingDialog());
+  const dialog = screen.getByRole("dialog", { name: "Connect an AI app" });
+  await user.type(
+    within(dialog).getByRole("textbox", { name: "Pairing code" }),
+    "123456",
+  );
   vi.stubGlobal("crypto", {});
 
-  await user.click(screen.getByRole("button", { name: "Connect Claude" }));
+  await user.click(within(dialog).getByRole("button", { name: "Connect" }));
 
   expect(
-    screen.getByText("Pairing needs HTTPS or localhost."),
+    within(dialog).getByText("Pairing needs HTTPS or localhost."),
   ).toBeVisible();
   expect(
-    screen.getByRole("status", { name: "Claude connection status" })
+    screen.getByRole("status", { name: "Local agent connection status" })
       .textContent,
-  ).toBe("Claude: Not connected");
+  ).toBe("Local agent: Not connected");
   expect(server.requests).toHaveLength(0);
 });
 

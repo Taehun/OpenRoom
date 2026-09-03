@@ -8,11 +8,11 @@ import {
   createPairCodeAnnouncer,
   lockoutReissueDelayMs,
   type PairCodeAnnouncer,
-} from "../../scripts/openinterior-mcp/pair-code-announcer";
+} from "../../scripts/openroom-mcp/pair-code-announcer";
 import {
   SESSION_CLOSED_BY_PAGE,
   SESSION_CLOSED_HEARTBEAT_EXPIRED,
-} from "../../scripts/openinterior-mcp/session-registry";
+} from "../../scripts/openroom-mcp/session-registry";
 
 /**
  * The announcer is the whole reissue policy: it decides when a fresh pair code

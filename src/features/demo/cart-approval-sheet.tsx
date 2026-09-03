@@ -8,7 +8,7 @@ import {
 } from "react";
 import { CART_ITEMS } from "./demo-data";
 import type { DemoAction } from "./demo-types";
-import { OpenInteriorIcon } from "./open-interior-icon";
+import { OpenRoomIcon } from "./open-room-icon";
 import styles from "./demo-workspace.module.css";
 import type { CartApprovalDraft } from "../../webmcp/tool-context";
 import type { CommerceContext, CommerceDraft } from "../commerce/commerce-types";
@@ -190,16 +190,16 @@ export function CartApprovalSheet({
             title="Close cart review (Escape)"
             type="button"
           >
-            <OpenInteriorIcon name="close" />
+            <OpenRoomIcon name="close" />
           </button>
         </header>
 
         <p className={styles.sheetIntro}>
           {isShopify
-            ? "Approving opens Shopify checkout in a new tab. OpenInterior sends nothing itself."
+            ? "Approving opens Shopify checkout in a new tab. OpenRoom sends nothing itself."
             : draft
-              ? `OpenInterior has prepared ${draft.items.length} Scene item${draft.items.length === 1 ? "" : "s"} from Scene revision ${draft.sceneRevision} for your approval. Nothing has been sent to Shopify.`
-              : "OpenInterior has prepared these four fixtures for your approval. Nothing has been sent to Shopify."}
+              ? `OpenRoom has prepared ${draft.items.length} Scene item${draft.items.length === 1 ? "" : "s"} from Scene revision ${draft.sceneRevision} for your approval. Nothing has been sent to Shopify.`
+              : "OpenRoom has prepared these four fixtures for your approval. Nothing has been sent to Shopify."}
         </p>
 
         <ul className={styles.cartItems}>
@@ -238,7 +238,7 @@ export function CartApprovalSheet({
           <span aria-hidden="true">i</span>
           <p>
             {isShopify && storeDomain
-              ? `Checkout opens on ${storeDomain} in a new tab. OpenInterior stores no Shopify credentials and makes no request of its own.`
+              ? `Checkout opens on ${storeDomain} in a new tab. OpenRoom stores no Shopify credentials and makes no request of its own.`
               : "UI-only approval. Continuing closes this sheet and creates no external cart or network request."}
           </p>
         </div>

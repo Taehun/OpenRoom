@@ -4,7 +4,7 @@ import { getPhotoAssetSet, selectPhotoView } from "../photo/photo-views";
 import type { Scene, SceneObject } from "../scene/scene-schema";
 import { DEMO_PRODUCTS } from "./demo-data";
 import type { DemoAction, DemoState } from "./demo-types";
-import { OpenInteriorIcon } from "./open-interior-icon";
+import { OpenRoomIcon } from "./open-room-icon";
 import styles from "./demo-workspace.module.css";
 
 interface ContextPanelProps {
@@ -128,7 +128,7 @@ function InspectorPanel({
         </div>
       </dl>
 
-      <div className={styles.lockRow}>
+      <div className={`md-card md-card--outlined ${styles.lockRow}`}>
         <span className={styles.lockMark} aria-hidden="true">
           〼
         </span>
@@ -139,7 +139,7 @@ function InspectorPanel({
       </div>
 
       <button
-        className={styles.primaryPanelButton}
+        className={`md-button md-button--filled ${styles.primaryPanelButton}`}
         onClick={() => dispatch({ type: "show-products" })}
         type="button"
       >
@@ -268,13 +268,13 @@ function ActivityPanel({
         </button>
       </div>
 
-      <p className={styles.agentPrompt}>
+      <p className={`md-card md-card--outlined ${styles.agentPrompt}`}>
         Real agent actions appear through the active agent surface.
       </p>
 
-      <div className={styles.revisionCard}>
+      <div className={`md-card md-card--outlined ${styles.revisionCard}`}>
         <span className={styles.revisionSpark} aria-hidden="true">
-          <OpenInteriorIcon name="sparkles" size={17} />
+          <OpenRoomIcon name="sparkles" size={17} />
         </span>
         <span>
           <small>Scene diagnostics</small>

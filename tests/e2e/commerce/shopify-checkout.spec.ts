@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 
-const STORE = "openinterior-placeholder.myshopify.com";
+const STORE = "openroom-placeholder.myshopify.com";
 const APP_ORIGIN = "http://127.0.0.1:3001";
 const FIXTURE_PERMALINK = `https://${STORE}/cart/1001:1,1002:1`;
 // app/globals.css:10 — --terracotta: #c8784e
@@ -94,7 +94,7 @@ async function callTool(
   );
 }
 
-test("opens a Shopify cart permalink in a new tab without any request from OpenInterior", async ({
+test("opens a Shopify cart permalink in a new tab without any request from OpenRoom", async ({
   context,
   page,
 }) => {
@@ -109,7 +109,7 @@ test("opens a Shopify cart permalink in a new tab without any request from OpenI
   await expect(dialog.getByText(STORE, { exact: false })).toHaveCount(1);
   await expect(
     dialog.getByText(
-      `Checkout opens on ${STORE} in a new tab. OpenInterior stores no Shopify credentials and makes no request of its own.`,
+      `Checkout opens on ${STORE} in a new tab. OpenRoom stores no Shopify credentials and makes no request of its own.`,
     ),
   ).toBeVisible();
 
@@ -150,7 +150,7 @@ test("opens a Shopify cart permalink in a new tab without any request from OpenI
   await expect(page.getByRole("dialog")).toHaveCount(0);
 
   // The permalink is the only thing that ever touched the store domain, and it
-  // came from the popup Chromium opened — OpenInterior itself issued no request.
+  // came from the popup Chromium opened — OpenRoom itself issued no request.
   expect(storeRequests).toEqual([FIXTURE_PERMALINK]);
   expect(foreign).toEqual([]);
   expect(consoleErrors).toEqual([]);

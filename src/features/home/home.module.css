@@ -1,58 +1,108 @@
+/*
+ * Guide layout only. Every colour, type step, and radius is a Material token
+ * from `app/material-tokens.css`; the buttons, cards, banner, code spans, and
+ * top app bar are the global `.md-*` classes. What lives here is placement:
+ * the 1040px column, the two-column hero, the three-up connect row, and the
+ * spacing that keeps everything above the disclosures inside one 1440×900
+ * viewport.
+ */
+
+.page {
+  --guide-column: 1040px;
+  --guide-gutter: clamp(20px, 4vw, 32px);
+
+  display: flex;
+  flex-direction: column;
+  min-height: 100svh;
+  background: var(--md-sys-color-surface);
+  color: var(--md-sys-color-on-surface);
+}
+
+/*
+ * The bar spans the viewport so nothing shows beside it while the page
+ * scrolls; its content aligns with the guide column instead. The doubled class
+ * outranks `.md-top-app-bar`'s own inline padding whatever the sheet order is.
+ */
+.appBar.appBar {
+  padding-inline: 0;
+}
+
+.appBarInner {
+  display: flex;
+  width: 100%;
+  max-width: var(--guide-column);
+  align-items: center;
+  justify-content: space-between;
+  margin-inline: auto;
+  /* The text button carries 16px of its own padding on the right. */
+  padding-inline: var(--guide-gutter) calc(var(--guide-gutter) - 16px);
+}
+
 .guide {
   display: grid;
-  gap: 28px;
-  min-height: 100svh;
-  padding: clamp(28px, 5vw, 72px) clamp(20px, 6vw, 96px)
-    clamp(48px, 8vw, 104px);
-  background: var(--limestone);
-  color: var(--ink);
-  font-size: 0.92rem;
-  line-height: 1.6;
+  width: 100%;
+  max-width: var(--guide-column);
+  align-content: start;
+  gap: 20px;
+  margin-inline: auto;
+  padding: 16px var(--guide-gutter) 72px;
 }
+
+/* ------------------------------------------------------------------- hero */
 
 .hero {
   display: grid;
   align-items: center;
-  gap: clamp(24px, 4vw, 56px);
+  gap: 24px;
   grid-template-columns: minmax(0, 1fr);
 }
 
-.heroCopy p {
+.heroCopy {
+  display: grid;
+  justify-items: start;
+  gap: 6px;
+}
+
+.heroTitle {
   margin: 0;
+  font-size: var(--md-sys-typescale-headline-large-size);
+  font-weight: var(--md-sys-typescale-headline-large-weight);
+  letter-spacing: var(--md-sys-typescale-headline-large-tracking);
+  line-height: var(--md-sys-typescale-headline-large-line-height);
 }
 
-.eyebrow {
-  color: var(--moss);
-  font-size: 0.67rem;
-  font-weight: 750;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
+.heroTagline {
+  margin: 0;
+  color: var(--md-sys-color-on-surface-variant);
+  font-size: var(--md-sys-typescale-title-large-size);
+  font-weight: var(--md-sys-typescale-title-large-weight);
+  letter-spacing: var(--md-sys-typescale-title-large-tracking);
+  line-height: var(--md-sys-typescale-title-large-line-height);
 }
 
-.heroCopy h1 {
-  max-width: 12ch;
-  margin: 18px 0 0;
-  font-family: var(--font-editorial), Georgia, serif;
-  font-size: clamp(2.6rem, 5.4vw, 4.6rem);
-  font-weight: 450;
-  letter-spacing: -0.05em;
-  line-height: 0.95;
+.heroLede {
+  max-width: 44ch;
+  margin: 6px 0 0;
+  color: var(--md-sys-color-on-surface-variant);
+  font-size: var(--md-sys-typescale-body-large-size);
+  font-weight: var(--md-sys-typescale-body-large-weight);
+  letter-spacing: var(--md-sys-typescale-body-large-tracking);
+  line-height: var(--md-sys-typescale-body-large-line-height);
 }
 
-.intro {
-  max-width: 34rem;
-  margin-top: 22px;
-  color: var(--muted-text);
-  font-size: clamp(0.98rem, 1.2vw, 1.1rem);
+.heroAction {
+  margin-top: 14px;
 }
 
 .heroRoom {
   position: relative;
   aspect-ratio: 16 / 10;
+  /* Caps the tallest row so the connect cards close above the 900px fold. */
+  max-height: 248px;
   margin: 0;
   overflow: hidden;
-  border-radius: 10px;
-  background: #d5d0c6;
+  border-radius: var(--md-sys-shape-corner-large);
+  background: var(--md-sys-color-surface-dim);
 }
 
 .heroRoom img {
@@ -60,159 +110,170 @@
   object-position: center;
 }
 
-.card,
-.panel {
-  padding: clamp(20px, 2.4vw, 30px);
-  border: 1px solid var(--warm-divider);
-  border-radius: 10px;
-  background: var(--paper);
+/* ----------------------------------------------------------------- banner */
+
+/*
+ * Both extra rows sit in the banner's second column. The facts line comes
+ * last, quiet and after the instruction, so the browser is never named on two
+ * adjacent lines.
+ */
+.bannerFacts {
+  grid-column: 2;
+  margin: 4px 0 0;
+  color: var(--md-sys-color-on-surface-variant);
+  font-size: var(--md-sys-typescale-body-small-size);
+  font-weight: var(--md-sys-typescale-body-small-weight);
+  letter-spacing: var(--md-sys-typescale-body-small-tracking);
+  line-height: var(--md-sys-typescale-body-small-line-height);
 }
 
-.card h2,
-.panel h2 {
+.bannerCode {
+  grid-column: 2;
+  margin: 6px 0 0;
+}
+
+/* ---------------------------------------------------------------- connect */
+
+.sectionTitle {
   margin: 0 0 12px;
-  font-family: var(--font-editorial), Georgia, serif;
-  font-size: 1.32rem;
-  font-weight: 500;
-  letter-spacing: -0.02em;
+  font-size: var(--md-sys-typescale-title-large-size);
+  font-weight: var(--md-sys-typescale-title-large-weight);
+  letter-spacing: var(--md-sys-typescale-title-large-tracking);
+  line-height: var(--md-sys-typescale-title-large-line-height);
 }
 
-.card p,
-.panel p {
-  margin: 0 0 12px;
-  max-width: 62ch;
+/* The anchored jump target must clear the sticky bar. */
+.connect {
+  scroll-margin-top: 80px;
 }
 
-.status {
-  font-size: 1.02rem;
-  font-weight: 650;
+.connectGrid {
+  display: grid;
+  align-items: stretch;
+  gap: 16px;
+  grid-template-columns: minmax(0, 1fr);
 }
 
-.facts {
+.connectCard {
   display: flex;
-  flex-wrap: wrap;
-  gap: 10px 28px;
-  margin: 0 0 18px;
-  padding: 14px 0 0;
-  border-top: 1px solid var(--warm-divider);
+  flex-direction: column;
+  align-items: flex-start;
+  min-width: 0;
 }
 
-.facts div {
-  display: flex;
-  gap: 8px;
-}
-
-.facts dt {
-  color: var(--muted-text);
-  font-size: 0.78rem;
-  font-weight: 650;
-}
-
-.facts dt::after {
-  content: ":";
-}
-
-.facts dd {
+.connectTitle {
   margin: 0;
-  font-size: 0.78rem;
+  font-size: var(--md-sys-typescale-title-medium-size);
+  font-weight: var(--md-sys-typescale-title-medium-weight);
+  letter-spacing: var(--md-sys-typescale-title-medium-tracking);
+  line-height: var(--md-sys-typescale-title-medium-line-height);
+}
+
+.connectBody,
+.steps {
+  color: var(--md-sys-color-on-surface-variant);
+  font-size: var(--md-sys-typescale-body-medium-size);
+  font-weight: var(--md-sys-typescale-body-medium-weight);
+  letter-spacing: var(--md-sys-typescale-body-medium-tracking);
+  line-height: var(--md-sys-typescale-body-medium-line-height);
+}
+
+.connectBody {
+  margin: 8px 0 12px;
 }
 
 .steps {
   /* Tailwind preflight clears list markers; the steps are ordered on purpose. */
-  margin: 0 0 14px;
-  padding-left: 22px;
+  margin: 10px 0 12px;
+  padding-left: 18px;
   list-style: decimal;
+  /* `align-items: flex-start` would otherwise size the list to its widest
+     command, and a `pre` command is wider than the card. */
+  width: 100%;
+  min-width: 0;
 }
 
-.steps li {
-  margin-bottom: 10px;
+.steps li + li {
+  margin-top: 6px;
 }
 
-.flagRow {
+/*
+ * The command keeps the row's first line and wraps inside it, so `Copy` stays
+ * beside the ordinal instead of dropping to a line of its own; the code box
+ * shrinks but never grows, which keeps a short command hugging its text.
+ */
+.commandRow {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
-  margin-top: 8px;
+  align-items: flex-start;
+  gap: 6px;
 }
 
-.code {
-  padding: 3px 7px;
-  border: 1px solid var(--warm-divider);
-  border-radius: 5px;
-  background: var(--limestone);
-  font-size: 0.8rem;
-  word-break: break-all;
+/*
+ * A command wraps only at its spaces: every token (`--dir`, `<repo>`,
+ * `mcp:openroom`) stays whole, and nothing scrolls or clips. `.md-code` keeps
+ * its default wrapping for the inline spans elsewhere in the guide.
+ */
+.commandRow code {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 100%;
+  white-space: pre-wrap;
+  overflow-wrap: normal;
+  word-break: normal;
+  line-height: 1.5;
 }
 
-.instruction {
-  margin-bottom: 14px;
+.stepCopy {
+  flex: none;
 }
 
-.note {
-  color: var(--muted-text);
-  font-size: 0.78rem;
+/* Pulls the text button's 16px of padding back so its label aligns with the
+   card's text edge. */
+.connectLink {
+  margin-top: auto;
+  margin-left: -16px;
 }
 
-.copyButton,
-.checkButton,
-.demoLink {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 38px;
-  padding: 0 14px;
-  border: 1px solid var(--warm-divider);
-  border-radius: 7px;
-  background: var(--paper);
-  color: var(--ink);
+/* -------------------------------------------------------------- disclosures */
+
+.moreInfo {
+  display: grid;
+  margin-top: 4px;
+  border-top: 1px solid var(--md-sys-color-outline-variant);
+}
+
+.disclosure {
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--md-sys-color-outline-variant);
+}
+
+.summary {
+  padding: 12px 0;
   cursor: pointer;
-  font: inherit;
-  font-size: 0.78rem;
-  font-weight: 650;
-  text-decoration: none;
+  font-size: var(--md-sys-typescale-title-small-size);
+  font-weight: var(--md-sys-typescale-title-small-weight);
+  letter-spacing: var(--md-sys-typescale-title-small-tracking);
+  line-height: var(--md-sys-typescale-title-small-line-height);
 }
 
-.copyButton:hover,
-.checkButton:hover,
-.demoLink:hover {
-  background: var(--limestone);
+.disclosureBody,
+.toolList {
+  max-width: 78ch;
+  color: var(--md-sys-color-on-surface-variant);
+  font-size: var(--md-sys-typescale-body-medium-size);
+  font-weight: var(--md-sys-typescale-body-medium-weight);
+  letter-spacing: var(--md-sys-typescale-body-medium-tracking);
+  line-height: var(--md-sys-typescale-body-medium-line-height);
 }
 
-.demoLink {
-  border-color: var(--ink);
-  background: var(--ink);
-  color: var(--paper);
-}
-
-.demoLink:hover {
-  background: var(--terracotta);
-  border-color: var(--terracotta);
-}
-
-.companionNote {
-  margin: 14px 0 0;
-  color: var(--muted-text);
-  font-size: 0.78rem;
-}
-
-.inlineLink {
-  color: var(--moss);
-  font-weight: 700;
-}
-
-.copyButton:focus-visible,
-.checkButton:focus-visible,
-.inlineLink:focus-visible,
-.demoLink:focus-visible {
-  outline: 3px solid var(--moss);
-  outline-offset: 3px;
+.disclosureBody {
+  margin: 0 0 8px;
 }
 
 .toolList {
   display: grid;
-  gap: 10px;
-  margin: 0;
+  gap: 6px;
+  margin: 0 0 10px;
   padding: 0;
   list-style: none;
 }
@@ -221,20 +282,24 @@
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;
-  gap: 10px;
+  gap: 8px;
 }
 
-.toolList span {
-  color: var(--muted-text);
-  font-size: 0.85rem;
+.textLink {
+  color: var(--md-sys-color-primary);
+  font-size: var(--md-sys-typescale-body-medium-size);
+  font-weight: var(--md-sys-typescale-label-large-weight);
+  letter-spacing: var(--md-sys-typescale-body-medium-tracking);
+  line-height: var(--md-sys-typescale-body-medium-line-height);
 }
 
 @media (min-width: 900px) {
   .hero {
-    grid-template-columns: minmax(0, 1fr) minmax(0, 0.9fr);
+    gap: 40px;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 0.82fr);
   }
 
-  .heroCopy h1 {
-    max-width: 10ch;
+  .connectGrid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }

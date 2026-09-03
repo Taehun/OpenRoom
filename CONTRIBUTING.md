@@ -1,4 +1,4 @@
-# Contributing to OpenInterior
+# Contributing to OpenRoom
 
 Keep changes focused and update documentation when behavior or setup changes.
 

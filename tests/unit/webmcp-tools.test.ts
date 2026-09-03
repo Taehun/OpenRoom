@@ -640,8 +640,8 @@ describe("add_scene_to_cart commerce block", () => {
     const { draft } = result.structuredContent.data as { draft: CartApprovalDraft };
     expect(draft.commerce).toEqual({
       provider: "shopify",
-      storeDomain: "openinterior-placeholder.myshopify.com",
-      mcpEndpoint: "https://openinterior-placeholder.myshopify.com/api/mcp",
+      storeDomain: "openroom-placeholder.myshopify.com",
+      mcpEndpoint: "https://openroom-placeholder.myshopify.com/api/mcp",
       lines: [
         {
           productId: "oak-frame-table",
@@ -650,7 +650,7 @@ describe("add_scene_to_cart commerce block", () => {
         },
       ],
       skipped: [],
-      checkoutPermalink: "https://openinterior-placeholder.myshopify.com/cart/1003:1",
+      checkoutPermalink: "https://openroom-placeholder.myshopify.com/cart/1003:1",
     });
     expect(drafts).toHaveLength(1);
     expect(drafts[0]!.commerce).toEqual(draft.commerce);

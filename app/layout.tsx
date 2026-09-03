@@ -1,28 +1,30 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
-import { DM_Sans, Newsreader } from "next/font/google";
+import { Roboto, Roboto_Mono } from "next/font/google";
 import "./globals.css";
 
-const editorial = Newsreader({
+const ui = Roboto({
   subsets: ["latin"],
-  display: "swap",
-  variable: "--font-editorial",
-});
-
-const ui = DM_Sans({
-  subsets: ["latin"],
+  weight: ["400", "500", "700"],
   display: "swap",
   variable: "--font-ui",
 });
 
+const mono = Roboto_Mono({
+  subsets: ["latin"],
+  weight: ["400", "500"],
+  display: "swap",
+  variable: "--font-mono",
+});
+
 export const metadata: Metadata = {
-  title: "OpenInterior",
-  description: "The room becomes the storefront.",
+  title: "OpenRoom",
+  description: "AI Room Planner & Furniture Shopping",
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="en" className={`${editorial.variable} ${ui.variable}`}>
+    <html lang="en" className={`${ui.variable} ${mono.variable}`}>
       <body>{children}</body>
     </html>
   );

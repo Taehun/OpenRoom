@@ -12,14 +12,14 @@ import {
   RelayErrorSchema,
   RelayToolCallSchema,
 } from "../../src/local-mcp/relay-protocol";
-import { SessionRegistry } from "../../scripts/openinterior-mcp/session-registry";
+import { SessionRegistry } from "../../scripts/openroom-mcp/session-registry";
 import {
   LONG_POLL_TIMEOUT_MS,
   MAX_PAIR_ATTEMPTS,
   allowedOriginsFromEnv,
   startRelayHttpServer,
   type RelayHttpServer,
-} from "../../scripts/openinterior-mcp/relay-http";
+} from "../../scripts/openroom-mcp/relay-http";
 import type { ToolResult } from "../../src/webmcp/tool-result";
 
 const MANIFEST_HASH = "0123456789abcdef".repeat(4);
@@ -920,7 +920,7 @@ describe("allowedOriginsFromEnv", () => {
     ["file:///tmp", "non-http scheme"],
     ["https://a.example,", "empty trailing entry"],
   ])("rejects %s (%s)", (value) => {
-    expect(() => allowedOriginsFromEnv(value)).toThrow(/Invalid OPENINTERIOR_ALLOWED_ORIGINS entry/);
+    expect(() => allowedOriginsFromEnv(value)).toThrow(/Invalid OPENROOM_ALLOWED_ORIGINS entry/);
   });
 
   it("never mentions nook in the error message", () => {
@@ -930,7 +930,7 @@ describe("allowedOriginsFromEnv", () => {
     } catch (error) {
       message = (error as Error).message;
     }
-    expect(message).toContain("OPENINTERIOR_ALLOWED_ORIGINS");
+    expect(message).toContain("OPENROOM_ALLOWED_ORIGINS");
     expect(message.toLowerCase()).not.toContain("nook");
   });
 });

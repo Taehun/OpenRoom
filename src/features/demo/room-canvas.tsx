@@ -6,7 +6,7 @@ import { useSceneStore } from "../scene/scene-context";
 import type { Scene } from "../scene/scene-schema";
 import type { DemoAction, DemoState } from "./demo-types";
 import { LocalAgentStatus } from "./local-agent-status";
-import { OpenInteriorIcon } from "./open-interior-icon";
+import { OpenRoomIcon } from "./open-room-icon";
 import styles from "./demo-workspace.module.css";
 
 const ROOM_OBJECTS = [
@@ -116,7 +116,7 @@ export function RoomCanvas({
             title="Select"
             type="button"
           >
-            <OpenInteriorIcon name="select" />
+            <OpenRoomIcon name="select" />
             <span>Select</span>
           </button>
           <button
@@ -129,7 +129,7 @@ export function RoomCanvas({
             title="Move selected object"
             type="button"
           >
-            <OpenInteriorIcon name="move" />
+            <OpenRoomIcon name="move" />
             <span>Move</span>
           </button>
           <button
@@ -144,7 +144,7 @@ export function RoomCanvas({
             title="Rotate selected object"
             type="button"
           >
-            <OpenInteriorIcon name="rotate" />
+            <OpenRoomIcon name="rotate" />
             <span>Rotate</span>
           </button>
         </div>
@@ -195,10 +195,22 @@ export function RoomCanvas({
           </figcaption>
 
           <div className={styles.canvasTopbar}>
-            <span className={styles.demoBadge}>Photo placement</span>
-            <span>Live Scene transforms</span>
+            {/* Captions for the mode, not controls: the figcaption above already
+                names what the stage does, so they stay out of the a11y tree. */}
+            <span
+              aria-hidden="true"
+              className="md-chip md-chip--dense md-chip--selected"
+            >
+              Photo placement
+            </span>
+            <span
+              aria-hidden="true"
+              className={`md-chip md-chip--dense ${styles.canvasTopbarGround}`}
+            >
+              Live Scene transforms
+            </span>
             <button
-              className={styles.arrangeButton}
+              className={`md-button md-button--outlined md-button--dense ${styles.canvasTopbarGround}`}
               disabled={
                 isTransforming || scene.objects.every(({ locked }) => locked)
               }
@@ -243,7 +255,7 @@ export function RoomCanvas({
           {state.toast ? (
             <div className={styles.undoToast} role="status">
               <span className={styles.toastCheck} aria-hidden="true">
-                <OpenInteriorIcon name="check" size={16} />
+                <OpenRoomIcon name="check" size={16} />
               </span>
               <span>{state.toast.message}</span>
               <button
@@ -261,29 +273,32 @@ export function RoomCanvas({
           className={styles.composer}
         >
           <span className={styles.composerIcon} aria-hidden="true">
-            <OpenInteriorIcon name="sparkles" />
+            <OpenRoomIcon name="sparkles" />
           </span>
           <div className={styles.promptGuidance}>
             <p>{PRIMARY_PROMPT}</p>
             <div className={styles.promptSuggestions}>
-              <span>Modern organic, soft neutral textures</span>
-              <span>Mid-century, warm walnut and brass</span>
+              <span className="md-chip md-chip--dense">
+                Modern organic, soft neutral textures
+              </span>
+              <span className="md-chip md-chip--dense">
+                Mid-century, warm walnut and brass
+              </span>
             </div>
-            <div
-              aria-label="Native WebMCP status"
-              className={styles.webMcpStatus}
-              role="status"
-            >
-              Native WebMCP: {nativeWebMcpAvailable ? "Available" : "Unavailable"}
+            <div className={styles.agentStatusRow}>
+              <div
+                aria-label="Native WebMCP status"
+                className="md-chip md-chip--dense"
+                role="status"
+              >
+                Native WebMCP:{" "}
+                {nativeWebMcpAvailable ? "Available" : "Unavailable"}
+              </div>
+              <LocalAgentStatus relay={localMcp} />
             </div>
-            <LocalAgentStatus relay={localMcp} />
-            <small>
-              Copy this guidance into an active agent surface; this workspace
-              does not simulate agent actions.
-            </small>
           </div>
           <button
-            className={styles.agentButton}
+            className={`md-button md-button--filled ${styles.agentButton}`}
             onClick={copyPrompt}
             type="button"
           >

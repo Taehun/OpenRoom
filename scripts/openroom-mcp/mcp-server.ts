@@ -18,7 +18,7 @@ import type { SessionRegistry } from "./session-registry";
  * reach here is something the page would have executed anyway.
  */
 
-export const MCP_SERVER_NAME = "openinterior";
+export const MCP_SERVER_NAME = "openroom";
 export const MCP_SERVER_VERSION = "0.1.0";
 
 /**
@@ -37,7 +37,7 @@ function wireAnnotations(entry: (typeof CORE_TOOL_MANIFEST)[number]) {
 function relayFailureText(error: RelayError): string {
   switch (error.code) {
     case "PAGE_UNAVAILABLE":
-      return "PAGE_UNAVAILABLE: no OpenInterior page is paired with this companion. Open the app, type the pairing code printed on the companion's stderr into the Pairing code field, press Connect Claude, then retry.";
+      return "PAGE_UNAVAILABLE: no OpenRoom page is paired with this companion. Open the app, press Connect an AI app, type the pairing code printed on the companion's stderr into the Pairing code field, press Connect, then retry.";
     case "SESSION_DISCONNECTED":
       return "SESSION_DISCONNECTED: the paired page went away mid-call. The companion prints a fresh pairing code on stderr when that happens; enter it in the page and retry.";
     case "TOO_MANY_PENDING_CALLS":
@@ -45,9 +45,9 @@ function relayFailureText(error: RelayError): string {
     case "CALL_TIMEOUT":
       return "CALL_TIMEOUT: the paired page did not answer in time. The call was abandoned and was not retried.";
     case "UNKNOWN_TOOL":
-      return "UNKNOWN_TOOL: that name is not one of the six OpenInterior tools.";
+      return "UNKNOWN_TOOL: that name is not one of the six OpenRoom tools.";
     default:
-      return `${error.code}: the OpenInterior relay refused the call.`;
+      return `${error.code}: the OpenRoom relay refused the call.`;
   }
 }
 
@@ -78,7 +78,7 @@ function isPageToolResult(value: unknown): value is CallToolResult {
   return candidate.isError === undefined || candidate.isError === true;
 }
 
-export function createOpenInteriorMcpServer(registry: SessionRegistry): McpServer {
+export function createOpenRoomMcpServer(registry: SessionRegistry): McpServer {
   // One validator instance compiles each manifest schema once, at registration.
   const validator = new AjvJsonSchemaValidator();
   const server = new McpServer(
@@ -101,7 +101,7 @@ export function createOpenInteriorMcpServer(registry: SessionRegistry): McpServe
           // relay's thirty second call timeout.
           const result = await registry.forwardToolCall(entry.name, input, ctx.mcpReq.signal);
           if (!isPageToolResult(result)) {
-            return toolFailure("The paired OpenInterior page returned a malformed tool result.");
+            return toolFailure("The paired OpenRoom page returned a malformed tool result.");
           }
           return result;
         } catch (error) {
@@ -109,7 +109,7 @@ export function createOpenInteriorMcpServer(registry: SessionRegistry): McpServe
           // this adapter to re-send: one MCP call is at most one page
           // execution, so a refusal is reported once and the call is dropped.
           if (isRelayError(error)) return toolFailure(relayFailureText(error));
-          return toolFailure("The OpenInterior companion could not complete the call.");
+          return toolFailure("The OpenRoom companion could not complete the call.");
         }
       },
     );

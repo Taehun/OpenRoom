@@ -34,7 +34,7 @@
     "assertions": [
       "In shopify mode the draft carries commerce.lines with merchandiseId and quantity plus commerce.mcpEndpoint",
       "Unmapped products appear in commerce.skipped and are not sent anywhere",
-      "OpenInterior makes no external request; the agent calls update_cart and get_cart on the store MCP itself"
+      "OpenRoom makes no external request; the agent calls update_cart and get_cart on the store MCP itself"
     ]
   },
   {
