@@ -1330,7 +1330,7 @@
   line-height: 1.4;
 }
 
-.cartSkipped {
+.cartItemCopy small.cartSkipped {
   color: var(--terracotta);
 }
 
