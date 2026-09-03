@@ -1,9 +1,11 @@
 import { type Dispatch, useRef, useState, useSyncExternalStore } from "react";
+import type { LocalMcpRelay } from "../../local-mcp/use-local-mcp-relay";
 import { getDocumentModelContext } from "../../webmcp/register-tools";
 import { RoomPhotoStage } from "../photo/room-photo-stage";
 import { useSceneStore } from "../scene/scene-context";
 import type { Scene } from "../scene/scene-schema";
 import type { DemoAction, DemoState } from "./demo-types";
+import { LocalAgentStatus } from "./local-agent-status";
 import { OpenInteriorIcon } from "./open-interior-icon";
 import styles from "./demo-workspace.module.css";
 
@@ -51,11 +53,18 @@ function getServerNativeWebMcpSnapshot() {
 
 interface RoomCanvasProps {
   dispatch: Dispatch<DemoAction>;
+  /** Pairing state for the localhost MCP companion. */
+  localMcp: LocalMcpRelay;
   scene: Scene;
   state: DemoState;
 }
 
-export function RoomCanvas({ dispatch, scene, state }: RoomCanvasProps) {
+export function RoomCanvas({
+  dispatch,
+  localMcp,
+  scene,
+  state,
+}: RoomCanvasProps) {
   const toolMode = useSceneStore((store) => store.toolMode);
   const setToolMode = useSceneStore((store) => store.setToolMode);
   const arrangeNaturally = useSceneStore((store) => store.arrangeNaturally);
@@ -267,6 +276,7 @@ export function RoomCanvas({ dispatch, scene, state }: RoomCanvasProps) {
             >
               Native WebMCP: {nativeWebMcpAvailable ? "Available" : "Unavailable"}
             </div>
+            <LocalAgentStatus relay={localMcp} />
             <small>
               Copy this guidance into an active agent surface; this workspace
               does not simulate agent actions.

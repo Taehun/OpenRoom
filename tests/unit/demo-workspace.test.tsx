@@ -14,6 +14,10 @@ import { DemoWorkspace } from "../../src/features/demo/demo-workspace";
 import { createSceneStore } from "../../src/features/scene/scene-store";
 import type { ModelContextTool } from "../../src/webmcp/tool-handlers";
 import { completedProductScene } from "../helpers/natural-placement-fixtures";
+import {
+  FakeRelayServer,
+  RELAY_SESSION_TOKEN,
+} from "../helpers/relay-server";
 
 interface CapturedRegistration {
   signal: AbortSignal;
@@ -31,7 +35,10 @@ const CORE_6 = [
 
 afterEach(() => {
   cleanup();
+  vi.unstubAllGlobals();
   vi.restoreAllMocks();
+  localStorage.clear();
+  sessionStorage.clear();
   Reflect.deleteProperty(document, "modelContext");
 });
 
@@ -568,4 +575,104 @@ test("Reset Demo restores the canonical inspector state", async () => {
   expect(
     screen.queryByText("Previewing Oak Frame Table"),
   ).not.toBeInTheDocument();
+});
+
+test("offers accessible manual pairing controls beside the native WebMCP status", () => {
+  render(<DemoWorkspace />);
+
+  expect(
+    screen.getByRole("status", { name: "Native WebMCP status" }),
+  ).toHaveTextContent("Native WebMCP: Unavailable");
+  expect(
+    screen.getByRole("status", { name: "Claude connection status" })
+      .textContent,
+  ).toBe("Claude: Not connected");
+
+  const code = screen.getByLabelText("Pairing code");
+  expect(code).toHaveAttribute("inputMode", "numeric");
+  expect(code).toHaveAttribute("pattern", "[0-9]{6}");
+  expect(code).toHaveAttribute("maxLength", "6");
+  expect(code).toHaveAttribute("autoComplete", "off");
+
+  expect(screen.getByRole("button", { name: "Connect Claude" })).toBeDisabled();
+  expect(
+    screen.queryByRole("button", { name: "Disconnect Claude" }),
+  ).not.toBeInTheDocument();
+  expect(screen.getByLabelText("Relay port")).toHaveValue(43_110);
+  expect(
+    screen.getByText(
+      "Start pnpm mcp:openinterior, then enter the code printed in that terminal.",
+    ),
+  ).toBeVisible();
+});
+
+test("enables Connect Claude only for exactly six digits", async () => {
+  const user = userEvent.setup();
+  render(<DemoWorkspace />);
+
+  const connect = screen.getByRole("button", { name: "Connect Claude" });
+  const code = screen.getByLabelText("Pairing code");
+
+  await user.type(code, "12345");
+  expect(connect).toBeDisabled();
+
+  await user.type(code, "6");
+  expect(connect).toBeEnabled();
+
+  await user.clear(code);
+  await user.type(code, "abcdef");
+  expect(code).toHaveValue("");
+  expect(connect).toBeDisabled();
+});
+
+test("pairs with the local relay without exposing the session token", async () => {
+  const server = new FakeRelayServer();
+  vi.spyOn(globalThis, "fetch").mockImplementation(server.fetch);
+  const user = userEvent.setup();
+  render(<DemoWorkspace />);
+
+  await user.type(screen.getByLabelText("Pairing code"), "123456");
+  await user.click(screen.getByRole("button", { name: "Connect Claude" }));
+
+  await waitFor(() =>
+    expect(
+      screen.getByRole("status", { name: "Claude connection status" })
+        .textContent,
+    ).toBe("Claude: Connected"),
+  );
+  expect(
+    screen.getByRole("button", { name: "Disconnect Claude" }),
+  ).toBeVisible();
+  expect(document.body.innerHTML).not.toContain(RELAY_SESSION_TOKEN);
+  expect(window.location.href).not.toContain(RELAY_SESSION_TOKEN);
+  expect(localStorage.length).toBe(0);
+  expect(sessionStorage.length).toBe(0);
+  expect(screen.getByLabelText("Pairing code")).toHaveValue("");
+
+  await user.click(screen.getByRole("button", { name: "Disconnect Claude" }));
+  expect(
+    screen.getByRole("status", { name: "Claude connection status" })
+      .textContent,
+  ).toBe("Claude: Not connected");
+  expect(server.deletes).toHaveLength(1);
+});
+
+test("explains an insecure context instead of pairing", async () => {
+  const server = new FakeRelayServer();
+  vi.spyOn(globalThis, "fetch").mockImplementation(server.fetch);
+  const user = userEvent.setup();
+  render(<DemoWorkspace />);
+  await user.type(screen.getByLabelText("Pairing code"), "123456");
+  vi.stubGlobal("crypto", {});
+
+  await user.click(screen.getByRole("button", { name: "Connect Claude" }));
+
+  expect(
+    screen.getByText("Pairing needs HTTPS or localhost."),
+  ).toBeVisible();
+  expect(
+    screen.getByRole("status", { name: "Claude connection status" })
+      .textContent,
+  ).toBe("Claude: Not connected");
+  expect(server.requests).toHaveLength(0);
 });
