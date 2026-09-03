@@ -1314,8 +1314,19 @@ describe("rotation options", () => {
     const { sofa_01: sofa, chair_01: chair, table_01: table } = layout;
     const { rug_01: rug, lamp_01: lamp, plant_01: plant } = layout;
 
-    // The sofa backs onto the back wall and the table and rug sit on its forward axis.
+    // Spec 8.5 as amended: the sofa backs onto the back wall or a back corner, and the
+    // only turns it may take are the ones a registered view can show it in. Its centre is
+    // measured rather than its footprint's far edge - a sofa quarter-turned into the
+    // corner reaches z ~ 0 with its front corner while its back is flush on the wall.
+    expect(sofa!.position[2]).toBeLessThanOrEqual(-0.9);
     expect(footprintExtent(objectFootprint(sofa!)).minimumZ).toBeLessThan(-2.2);
+    expect(
+      [0, Math.PI / 4].some(
+        (turn) => Math.abs(Math.abs(sofa!.rotation[1]) - turn) < 1e-9,
+      ),
+    ).toBe(true);
+
+    // The table and the rug sit on the sofa's forward axis.
     expect(forwardProjection(sofa!, table!)).toBeGreaterThan(0);
     expect(forwardProjection(sofa!, rug!)).toBeGreaterThan(0);
 
