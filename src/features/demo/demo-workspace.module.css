@@ -566,36 +566,10 @@
   }
 }
 
-/*
- * Two `.md-*` mode captions; what lives here is where the bar sits and how wide
- * it may run before the inspector's photo panel starts.
- */
-.canvasTopbar {
-  position: absolute;
-  z-index: 2;
-  top: 16px;
-  right: 18px;
-  left: 18px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-height: 44px;
-  padding-right: 340px;
-  box-sizing: border-box;
-}
-
-/*
- * The bar floats over the room photo, so the transparent-by-default caption
- * carries an opaque surface behind it; the selected chip already has one.
- */
-.canvasTopbarGround {
-  background: var(--paper);
-}
-
 .sceneSelectionLabel {
   position: absolute;
   z-index: 3;
-  top: 88px;
+  top: 16px;
   left: 18px;
   padding: 7px 10px;
   border-radius: var(--md-sys-shape-corner-extra-small);
@@ -605,21 +579,6 @@
   font-weight: 700;
   box-shadow: 0 0 0 1px color-mix(in srgb, var(--md-sys-color-surface-container-lowest) 76%, transparent);
   pointer-events: none;
-}
-
-.selectionHint {
-  position: absolute;
-  z-index: 2;
-  top: 50%;
-  left: 50%;
-  margin: 0;
-  padding: 8px 12px;
-  border: 1px solid color-mix(in srgb, var(--md-sys-color-on-surface) 18%, transparent);
-  border-radius: var(--md-sys-shape-corner-full);
-  background: color-mix(in srgb, var(--md-sys-color-surface-container-lowest) 92%, transparent);
-  color: var(--muted-text);
-  font-size: 0.72rem;
-  transform: translate(-50%, -50%);
 }
 
 .undoToast {

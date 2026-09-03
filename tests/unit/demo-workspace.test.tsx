@@ -63,8 +63,8 @@ test("connects the Core 6 journey to the shared Scene and approval UI", async ()
     ...CORE_6,
   ]);
   expect(
-    screen.getByRole("status", { name: "Native WebMCP status" }),
-  ).toHaveTextContent("Available");
+    screen.getByRole("status", { name: "In-browser AI status" }),
+  ).toHaveTextContent("Ready");
   const tool = (name: ModelContextTool["name"]) => {
     const descriptor = registrations.find(
       (registration) => registration.tool.name === name,
@@ -122,7 +122,7 @@ test("moves from object inspection to product preview", async () => {
   render(<DemoWorkspace />);
 
   expect(
-    screen.getByRole("heading", { name: "Object inspector" }),
+    screen.getByRole("heading", { name: "Coffee table" }),
   ).toBeVisible();
   await user.click(screen.getByRole("button", { name: "Find alternatives" }));
 
@@ -132,9 +132,13 @@ test("moves from object inspection to product preview", async () => {
   expect(within(products).getAllByRole("article")).toHaveLength(5);
 
   await user.click(
-    screen.getByRole("button", { name: "Preview Oak Frame Table" }),
+    screen.getByRole("button", { name: "Place Oak Frame Table in room" }),
   );
-  expect(screen.getByText("Previewing Oak Frame Table")).toBeVisible();
+  expect(
+    within(screen.getByRole("main", { name: "Room canvas" })).getByText(
+      "Oak Frame Table",
+    ),
+  ).toBeVisible();
   expect(screen.getByText("Revision 2")).toBeVisible();
   expect(screen.getAllByText("$169")).not.toHaveLength(0);
   expect(
@@ -171,8 +175,8 @@ test("exposes six photo controls and six object-rail controls", () => {
     screen.getByRole("button", { name: "Copy redesign prompt" }),
   ).toBeVisible();
   expect(
-    screen.getByRole("status", { name: "Native WebMCP status" }),
-  ).toHaveTextContent("Unavailable");
+    screen.getByRole("status", { name: "In-browser AI status" }),
+  ).toHaveTextContent("Not available");
   expect(screen.queryByRole("link", { name: "Guide" })).toBeNull();
 });
 
@@ -212,7 +216,7 @@ test("uses Scene selection without incrementing revision", async () => {
   const objectRail = screen.getByRole("region", { name: "Objects in room" });
   await user.click(within(objectRail).getByRole("button", { name: "Chair" }));
 
-  expect(screen.getByText("Lounge chair")).toBeVisible();
+  expect(screen.getByRole("heading", { name: "Chair" })).toBeVisible();
   expect(screen.getByText("Revision 1")).toBeVisible();
   expect(
     screen.getByRole("status", { name: "Scene diagnostics" }),
@@ -464,12 +468,12 @@ test("Reset Demo restores the canonical inspector state", async () => {
 
   await user.click(screen.getByRole("button", { name: "Find alternatives" }));
   await user.click(
-    screen.getByRole("button", { name: "Preview Oak Frame Table" }),
+    screen.getByRole("button", { name: "Place Oak Frame Table in room" }),
   );
   await user.click(screen.getByRole("button", { name: "Reset Demo" }));
 
   expect(
-    screen.getByRole("heading", { name: "Object inspector" }),
+    screen.getByRole("heading", { name: "Coffee table" }),
   ).toBeVisible();
   expect(screen.getByText("Revision 1")).toBeVisible();
   expect(screen.getByText("$0")).toBeVisible();
@@ -477,7 +481,9 @@ test("Reset Demo restores the canonical inspector state", async () => {
     screen.getByRole("status", { name: "Scene diagnostics" }),
   ).toHaveTextContent("Revision 1 · table_01 · placeholder");
   expect(
-    screen.queryByText("Previewing Oak Frame Table"),
+    within(screen.getByRole("main", { name: "Room canvas" })).queryByText(
+      "Oak Frame Table",
+    ),
   ).not.toBeInTheDocument();
 });
 
@@ -494,8 +500,8 @@ test("shows the local agent status as a chip beside the native WebMCP status", (
   render(<DemoWorkspace />);
 
   expect(
-    screen.getByRole("status", { name: "Native WebMCP status" }),
-  ).toHaveTextContent("Native WebMCP: Unavailable");
+    screen.getByRole("status", { name: "In-browser AI status" }),
+  ).toHaveTextContent("In-browser AI: Not available");
   const chip = screen.getByRole("status", {
     name: "Local agent connection status",
   });
@@ -714,38 +720,33 @@ test("explains an insecure context instead of pairing", async () => {
   expect(server.requests).toHaveLength(0);
 });
 
-// The seed table sits at x = 0, so the front-quarter tie resolves to the
-// photographed cutout and the inspector has to name that view.
-test("discloses the selected object's facing and chosen view", async () => {
+// The inspector says where a piece faces in words, never as a vector.
+test("describes the selected object's facing in plain words", async () => {
   const user = userEvent.setup();
   render(<DemoWorkspace />);
 
   const inspector = screen
-    .getByRole("heading", { name: "Object inspector" })
+    .getByRole("heading", { name: "Coffee table" })
     .closest("section");
   if (!inspector) throw new Error("Missing inspector section");
-  const facing = within(inspector).getByText("Facing").nextElementSibling;
-  expect(facing).toHaveTextContent("x 0.00 · z 1.00 · front-quarter");
-  expect(facing?.textContent).not.toContain("mirrored");
-  expect(within(inspector).getByText("Rotation")).toBeVisible();
+  expect(within(inspector).getByText("Faces").nextElementSibling)
+    .toHaveTextContent("Toward the camera");
+  expect(within(inspector).queryByText("Rotation")).toBeNull();
+  expect(within(inspector).queryByText("Position")).toBeNull();
 
   const stage = screen.getByRole("region", { name: "Editable room photo" });
   const sofa = within(stage).getByRole("button", { name: "Sofa" });
   await user.click(sofa);
-  const sofaFacing = within(inspector).getByText("Facing").nextElementSibling;
-  expect(sofaFacing).toHaveTextContent("x 0.00 · z 1.00 · front-quarter");
-  expect(sofaFacing?.textContent).not.toContain("mirrored");
+  expect(within(inspector).getByText("Faces").nextElementSibling)
+    .toHaveTextContent("Toward the camera");
 
-  // Six Shift steps turn the sofa 90°, further than the front-quarter pair can
-  // show truthfully, so the inspector has to say the view is approximate.
+  // Six Shift steps turn the sofa 90° toward the viewer's left.
   await user.click(screen.getByRole("button", { name: "Rotate tool" }));
   for (let step = 0; step < 6; step += 1) {
     fireEvent.keyDown(sofa, { key: "ArrowRight", shiftKey: true });
   }
-  expect(within(inspector).getByText("Facing").nextElementSibling)
-    .toHaveTextContent(
-      "x −1.00 · z 0.00 · front-quarter · mirrored · approximate",
-    );
+  expect(within(inspector).getByText("Faces").nextElementSibling)
+    .toHaveTextContent("Turned 90° to the left");
 });
 
 // Spec §5: the inspector names the object a lamp stands on, and says nothing at all

@@ -107,10 +107,10 @@ test("completes the deterministic spatial commerce UI journey", async ({
     }),
   ).toHaveCount(6);
   await expect(
-    page.getByRole("heading", { name: "Object inspector" }),
+    page.getByRole("heading", { name: "Coffee table" }),
   ).toBeVisible();
   await objectRail.getByRole("button", { name: "Chair" }).click();
-  await expect(page.getByText("Lounge chair")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Chair" })).toBeVisible();
   await page.getByRole("button", { name: "Move tool" }).click();
   await expect(page.getByRole("button", { name: "Move tool" })).toHaveAttribute(
     "aria-pressed",
@@ -118,8 +118,10 @@ test("completes the deterministic spatial commerce UI journey", async ({
   );
   await stage.getByRole("button", { name: "Coffee table" }).click();
   await page.getByRole("button", { name: "Find alternatives" }).click();
-  await page.getByRole("button", { name: "Preview Oak Frame Table" }).click();
-  await expect(page.getByText("Previewing Oak Frame Table")).toBeVisible();
+  await page.getByRole("button", { name: "Place Oak Frame Table in room" }).click();
+  await expect(
+    page.getByRole("main", { name: "Room canvas" }).getByText("Oak Frame Table"),
+  ).toBeVisible();
   await expect(
     page.getByRole("button", { name: "Run Agent move" }),
   ).toHaveCount(0);

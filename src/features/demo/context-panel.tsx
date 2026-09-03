@@ -1,11 +1,11 @@
 import type { Dispatch } from "react";
 import { PHOTO_ASSETS } from "../photo/photo-assets";
-import { facingOf, roundFacing } from "../photo/photo-facing";
-import { getPhotoAssetSet, selectPhotoView } from "../photo/photo-views";
+import { facingOf, rotationYOf } from "../photo/photo-facing";
 import type { Scene, SceneObject } from "../scene/scene-schema";
 import { supportOf } from "../scene/support";
 import { DEMO_PRODUCTS } from "./demo-data";
 import type { DemoAction, DemoState } from "./demo-types";
+import { humanizeSlug, objectDisplayName } from "./object-labels";
 import { OpenRoomIcon } from "./open-room-icon";
 import styles from "./demo-workspace.module.css";
 
@@ -15,66 +15,54 @@ interface ContextPanelProps {
   state: DemoState;
 }
 
-const OBJECT_NAMES: Record<string, string> = {
-  sofa_01: "Linen sofa",
-  table_01: "Coffee table",
-  rug_01: "Woven rug",
-  lamp_01: "Floor lamp",
-  chair_01: "Lounge chair",
-  plant_01: "Fiddle-leaf fig",
-};
-
 function formatPrice(priceMinor: number) {
   return `$${Math.round(priceMinor / 100).toLocaleString("en-US")}`;
 }
 
-function formatCoordinate(value: number) {
-  const magnitude = Math.abs(value).toFixed(2);
-  return value < 0 ? `−${magnitude}` : magnitude;
-}
-
 function formatDimensions(object: SceneObject) {
   const { width, height, depth } = object.dimensionsM;
-  return `${Math.round(width * 100)} × ${Math.round(depth * 100)} × ${Math.round(height * 100)} cm`;
-}
-
-function formatPosition(object: SceneObject) {
-  const [x, y, z] = object.position;
-  return `X ${formatCoordinate(x)} · Y ${formatCoordinate(y)} · Z ${formatCoordinate(z)}`;
-}
-
-function formatRotation(object: SceneObject) {
-  return object.rotation
-    .map((radians) => `${Math.round((radians * 180) / Math.PI)}°`)
-    .join(" · ");
+  const cm = (metres: number) => Math.round(metres * 100);
+  return `W ${cm(width)} · D ${cm(depth)} · H ${cm(height)} cm`;
 }
 
 /**
- * The derived facing plus the registered view the compositor actually drew, so
- * a mirrored twin or an only-approximate view is disclosed rather than hidden.
+ * Where the piece faces, in words. Yaw 0 faces the camera; a positive yaw
+ * turns the front toward the viewer's left (`forward = {-sin, cos}`).
  */
-function formatFacing(object: SceneObject) {
-  const facing = roundFacing(facingOf(object.rotation[1]));
-  const parts = [
-    `x ${formatCoordinate(facing.x)}`,
-    `z ${formatCoordinate(facing.z)}`,
-  ];
-  const set = getPhotoAssetSet(object);
-  if (set && object.type !== "rug") {
-    const view = selectPhotoView(object, set);
-    parts.push(view.view.view);
-    if (view.mirrored) parts.push("mirrored");
-    if (!view.exact) parts.push("approximate");
-  }
-  return parts.join(" · ");
+export function describeFacing(rotationY: number): string {
+  const yaw = rotationYOf(facingOf(rotationY));
+  const degrees = Math.round((yaw * 180) / Math.PI);
+  const magnitude = Math.abs(degrees);
+  if (magnitude <= 5) return "Toward the camera";
+  if (magnitude >= 175) return "Away from the camera";
+  return `Turned ${magnitude}° to the ${degrees > 0 ? "left" : "right"}`;
 }
 
-/** The supporter's product title if it has one, else its seed name, else its type. */
-function supporterName(supporter: SceneObject) {
-  return (
-    supporter.product?.title ?? OBJECT_NAMES[supporter.id] ?? supporter.type
-  );
+/** What people read in the Style row: humanised catalog data or the seed tags. */
+function describeStyle(object: SceneObject): string {
+  if (object.product) {
+    return [object.product.material, object.product.color]
+      .filter((value): value is string => Boolean(value))
+      .map(humanizeSlug)
+      .join(" · ");
+  }
+  if (object.styleTags.length > 0) {
+    return object.styleTags.map(humanizeSlug).join(" · ");
+  }
+  return "Original piece";
 }
+
+const CATEGORY_HEADINGS: Readonly<Record<SceneObject["type"], string>> = {
+  sofa: "Sofas for your room",
+  coffee_table: "Coffee tables for your room",
+  rug: "Rugs for your room",
+  floor_lamp: "Lamps for your room",
+  chair: "Chairs for your room",
+  plant: "Plants for your room",
+  side_table: "Side tables for your room",
+  bookshelf: "Bookshelves and storage for your room",
+  unknown: "Products for your room",
+};
 
 function InspectorPanel({
   dispatch,
@@ -91,58 +79,44 @@ function InspectorPanel({
     return (
       <div className={styles.emptyInspector}>
         <span className={styles.panelEyebrow}>Selection</span>
-        <h2>No object selected</h2>
-        <p>Choose an object from the rail to inspect it in the room.</p>
+        <h2>Nothing selected</h2>
+        <p>Click any piece in the photo, or pick one from the list on the left.</p>
       </div>
     );
   }
 
-  const selectedName = OBJECT_NAMES[selectedObject.id] ?? "Room object";
   // Spec §5: a lamp standing on a table reads as such rather than as a lamp with a
   // surprising Y; unsupported objects keep the panel exactly as it was.
   const supporter = supportOf(scene, selectedObject);
-  const style = selectedObject.product
-    ? [selectedObject.product.material, selectedObject.product.color]
-        .filter(Boolean)
-        .join(" · ")
-    : selectedObject.styleTags.length > 0
-      ? selectedObject.styleTags.join(" · ")
-      : "Seed fixture";
 
   return (
     <section className={styles.inspectorPanel} aria-labelledby="inspector-title">
       <div className={styles.panelHeading}>
-        <span className={styles.panelEyebrow}>Selected object</span>
-        <h2 id="inspector-title">Object inspector</h2>
-        <p>{selectedName}</p>
+        <span className={styles.panelEyebrow}>Selected</span>
+        <h2 id="inspector-title">{objectDisplayName(selectedObject)}</h2>
+        {selectedObject.product ? (
+          <p>{formatPrice(selectedObject.product.price.amountMinor)}</p>
+        ) : null}
       </div>
 
       <dl className={styles.objectSummary}>
         <div>
-          <dt>Dimensions</dt>
+          <dt>Size</dt>
           <dd>{formatDimensions(selectedObject)}</dd>
         </div>
         <div>
-          <dt>Position</dt>
-          <dd>{formatPosition(selectedObject)}</dd>
-        </div>
-        <div>
-          <dt>Rotation</dt>
-          <dd>{formatRotation(selectedObject)}</dd>
-        </div>
-        <div>
-          <dt>Facing</dt>
-          <dd>{formatFacing(selectedObject)}</dd>
+          <dt>Faces</dt>
+          <dd>{describeFacing(selectedObject.rotation[1])}</dd>
         </div>
         {supporter ? (
           <div>
             <dt>On</dt>
-            <dd>{supporterName(supporter)}</dd>
+            <dd>{objectDisplayName(supporter)}</dd>
           </div>
         ) : null}
         <div>
           <dt>Style</dt>
-          <dd>{style}</dd>
+          <dd>{describeStyle(selectedObject)}</dd>
         </div>
       </dl>
 
@@ -151,8 +125,8 @@ function InspectorPanel({
           〼
         </span>
         <span>
-          <strong>{selectedObject.locked ? "Position locked" : "Position kept"}</strong>
-          <small>Previewing an alternative keeps this position and rotation.</small>
+          <strong>{selectedObject.locked ? "Position locked" : "Stays in place"}</strong>
+          <small>Swapping keeps this spot and angle.</small>
         </span>
       </div>
 
@@ -181,17 +155,7 @@ function ProductsPanel({
     ? DEMO_PRODUCTS.filter(({ category }) => category === selectedObject.type)
     : [];
   const categoryHeading = selectedObject
-    ? {
-        sofa: "Sofas for your room",
-        coffee_table: "Coffee tables for your room",
-        rug: "Rugs for your room",
-        floor_lamp: "Floor lamps for your room",
-        chair: "Chairs for your room",
-        plant: "Plants for your room",
-        side_table: "Side tables for your room",
-        bookshelf: "Bookshelves and storage for your room",
-        unknown: "Products for your room",
-      }[selectedObject.type]
+    ? CATEGORY_HEADINGS[selectedObject.type]
     : "Products for your room";
 
   return (
@@ -202,7 +166,7 @@ function ProductsPanel({
     >
       <div className={styles.panelHeadingWithAction}>
         <div>
-          <span className={styles.panelEyebrow}>Product alternatives</span>
+          <span className={styles.panelEyebrow}>Alternatives</span>
           <h2 id="products-title">{categoryHeading}</h2>
         </div>
         <button
@@ -210,20 +174,20 @@ function ProductsPanel({
           onClick={() => dispatch({ type: "show-inspector" })}
           type="button"
         >
-          Inspector
+          Back
         </button>
       </div>
       <p className={styles.panelIntro}>
-        Locally cached fixtures, fitted to the selected footprint.
+        Every option is sized to fit the selected piece&apos;s spot.
       </p>
 
       <div className={styles.productList}>
         {alternatives.map((product, index) => {
-          const isPreviewing = product.id === selectedObject?.product?.id;
+          const isPlaced = product.id === selectedObject?.product?.id;
 
           return (
             <article
-              className={isPreviewing ? styles.productActive : styles.product}
+              className={isPlaced ? styles.productActive : styles.product}
               key={product.id}
             >
               {PHOTO_ASSETS[product.id] ? (
@@ -254,13 +218,13 @@ function ProductsPanel({
                 <p>{product.description}</p>
                 <button
                   aria-label={
-                    isPreviewing ? "Active preview" : `Preview ${product.title}`
+                    isPlaced
+                      ? `${product.title} is in your room`
+                      : `Place ${product.title} in room`
                   }
-                  aria-pressed={isPreviewing}
+                  aria-pressed={isPlaced}
                   className={
-                    isPreviewing
-                      ? styles.previewButtonActive
-                      : styles.previewButton
+                    isPlaced ? styles.previewButtonActive : styles.previewButton
                   }
                   onClick={() =>
                     dispatch({
@@ -270,7 +234,7 @@ function ProductsPanel({
                   }
                   type="button"
                 >
-                  {isPreviewing ? "Active preview" : "Preview"}
+                  {isPlaced ? "In your room" : "Place in room"}
                 </button>
               </div>
             </article>
@@ -292,20 +256,20 @@ function ActivityPanel({
     <section className={styles.activityPanel} aria-labelledby="activity-title">
       <div className={styles.panelHeadingWithAction}>
         <div>
-          <span className={styles.panelEyebrow}>Human + Agent co-edit</span>
-          <h2 id="activity-title">Agent activity</h2>
+          <span className={styles.panelEyebrow}>Human + AI app co-edit</span>
+          <h2 id="activity-title">AI app activity</h2>
         </div>
         <button
           className={styles.textButton}
           onClick={() => dispatch({ type: "show-inspector" })}
           type="button"
         >
-          Inspector
+          Back
         </button>
       </div>
 
       <p className={`md-card md-card--outlined ${styles.agentPrompt}`}>
-        Real agent actions appear through the active agent surface.
+        Changes made by your AI app appear here as they happen.
       </p>
 
       <div className={`md-card md-card--outlined ${styles.revisionCard}`}>
@@ -313,13 +277,13 @@ function ActivityPanel({
           <OpenRoomIcon name="sparkles" size={17} />
         </span>
         <span>
-          <small>Scene diagnostics</small>
-          <strong>Current Scene · rev {scene.revision}</strong>
+          <small>Room version</small>
+          <strong>Revision {scene.revision}</strong>
         </span>
       </div>
       <p className={styles.activityDisclosure}>
-        Ask the agent to read the latest Scene after each change, then use the
-        revision above to confirm that the workspace received it.
+        Ask your AI app to read the room again after each change, then use the
+        revision above to confirm it saw the latest one.
       </p>
     </section>
   );

@@ -7,6 +7,7 @@ import type { Scene, SceneObjectType } from "../scene/scene-schema";
 import type { DemoAction, DemoState } from "./demo-types";
 import { LocalAgentStatus } from "./local-agent-status";
 import { OpenRoomIcon } from "./open-room-icon";
+import { OBJECT_ABBREVIATIONS, OBJECT_LABELS, objectDisplayName } from "./object-labels";
 import styles from "./demo-workspace.module.css";
 
 const ROOM_OBJECTS = [
@@ -21,30 +22,7 @@ const ROOM_OBJECTS = [
 const PRIMARY_PROMPT =
   "Redesign this room as a warm minimal Japandi interior. Replace every outdated unlocked item with a coherent catalog result, keep the sofa on the left, and leave a clear path to the windows. Read the latest scene after each change.";
 
-export const OBJECT_LABELS: Readonly<Record<SceneObjectType, string>> = {
-  sofa: "Sofa",
-  coffee_table: "Coffee table",
-  rug: "Rug",
-  floor_lamp: "Floor lamp",
-  chair: "Chair",
-  plant: "Plant",
-  side_table: "Side table",
-  bookshelf: "Bookshelf",
-  unknown: "Object",
-};
-
-/** The object rail shows initials, one pair per Scene object type. */
-export const OBJECT_ABBREVIATIONS: Readonly<Record<SceneObjectType, string>> = {
-  sofa: "SO",
-  coffee_table: "CT",
-  rug: "RG",
-  floor_lamp: "FL",
-  chair: "CH",
-  plant: "PL",
-  side_table: "SI",
-  bookshelf: "BS",
-  unknown: "OB",
-};
+export { OBJECT_ABBREVIATIONS, OBJECT_LABELS } from "./object-labels";
 
 type CopyStatus =
   | { kind: "success"; message: "Prompt copied" }
@@ -207,34 +185,13 @@ export function RoomCanvas({
             keyboard controls.
           </figcaption>
 
-          <div className={styles.canvasTopbar}>
-            {/* Captions for the mode, not controls: the figcaption above already
-                names what the stage does, so they stay out of the a11y tree. */}
-            <span
-              aria-hidden="true"
-              className="md-chip md-chip--dense md-chip--selected"
-            >
-              Photo placement
-            </span>
-            <span
-              aria-hidden="true"
-              className={`md-chip md-chip--dense ${styles.canvasTopbarGround}`}
-            >
-              Live Scene transforms
-            </span>
-          </div>
 
           {selectedObject ? (
             <div className={styles.sceneSelectionLabel} aria-hidden="true">
-              {selectedObject.product
-                ? `Previewing ${selectedObject.product.title}`
-                : `${OBJECT_LABELS[selectedObject.type]} · selected`}
+              {objectDisplayName(selectedObject)}
             </div>
           ) : null}
 
-          {selectedObject === undefined ? (
-            <p className={styles.selectionHint}>Selection cleared</p>
-          ) : null}
 
           {state.toast ? (
             <div className={styles.undoToast} role="status">
@@ -271,12 +228,12 @@ export function RoomCanvas({
             </div>
             <div className={styles.agentStatusRow}>
               <div
-                aria-label="Native WebMCP status"
+                aria-label="In-browser AI status"
                 className="md-chip md-chip--dense"
                 role="status"
               >
-                Native WebMCP:{" "}
-                {nativeWebMcpAvailable ? "Available" : "Unavailable"}
+                In-browser AI:{" "}
+                {nativeWebMcpAvailable ? "Ready" : "Not available"}
               </div>
               <LocalAgentStatus relay={localMcp} />
             </div>
