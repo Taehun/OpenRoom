@@ -59,6 +59,7 @@ const STATUS_FOR_CODE: Readonly<Record<RelayErrorCode, number>> = {
   SESSION_DISCONNECTED: 410,
   PAGE_UNAVAILABLE: 503,
   UNKNOWN_TOOL: 404,
+  BAD_REQUEST: 400,
 };
 
 type RouteName = "pair" | "calls" | "result" | "session";
@@ -246,12 +247,26 @@ export async function startRelayHttpServer(options: RelayHttpServerOptions): Pro
    */
   let activeToken: string | null = null;
   let failedPairAttempts = 0;
+  /** Version of the code the counter refers to; a new code lifts the lockout. */
+  let countedPairCodeVersion = registry.pairCodeVersion();
   /** Non-null from the first `close()` call onwards; also makes `close()` idempotent. */
   let closing: Promise<void> | null = null;
 
   const activePolls = new Set<AbortController>();
   const inFlight = new Set<ServerResponse>();
   const drainWaiters = new Set<() => void>();
+
+  /**
+   * Drops the failed-attempt count whenever the registry has minted a code since
+   * the count was taken, so a code issued directly on the registry - by the
+   * owning process rather than through this handle - lifts the lockout too.
+   */
+  function syncPairCodeVersion(): void {
+    const version = registry.pairCodeVersion();
+    if (version === countedPairCodeVersion) return;
+    countedPairCodeVersion = version;
+    failedPairAttempts = 0;
+  }
 
   function noteFailedPairAttempt(): void {
     if (failedPairAttempts >= maxPairAttempts) return;
@@ -270,14 +285,13 @@ export async function startRelayHttpServer(options: RelayHttpServerOptions): Pro
       private readonly corsOrigin: string | null,
     ) {}
 
-    private begin(status: number, closeConnection: boolean): boolean {
+    private begin(status: number): boolean {
       if (this.res.headersSent || this.res.writableEnded || this.res.destroyed) return false;
       this.res.statusCode = status;
       this.res.setHeader("Cache-Control", "no-store");
       this.res.setHeader("X-Content-Type-Options", "nosniff");
       this.res.setHeader("Vary", "Origin");
       if (this.corsOrigin !== null) this.res.setHeader("Access-Control-Allow-Origin", this.corsOrigin);
-      if (closeConnection) this.res.setHeader("Connection", "close");
       return true;
     }
 
@@ -288,32 +302,46 @@ export async function startRelayHttpServer(options: RelayHttpServerOptions): Pro
     }
 
     json(status: number, payload: unknown): void {
-      if (!this.begin(status, false)) return;
+      if (!this.begin(status)) return;
       this.res.setHeader("Content-Type", "application/json");
       this.end(JSON.stringify(payload));
     }
 
     empty(status: number, extraHeaders: Readonly<Record<string, string>> = {}): void {
-      if (!this.begin(status, false)) return;
+      if (!this.begin(status)) return;
       for (const [name, value] of Object.entries(extraHeaders)) this.res.setHeader(name, value);
       this.end(null);
     }
 
     /** Every refusal is the same normalized body: code, code as message, retryable. */
     error(status: number, code: RelayErrorCode, extraHeaders: Readonly<Record<string, string>> = {}): void {
-      if (!this.begin(status, false)) return;
+      if (!this.begin(status)) return;
       this.res.setHeader("Content-Type", "application/json");
       for (const [name, value] of Object.entries(extraHeaders)) this.res.setHeader(name, value);
       this.end(JSON.stringify(new RelayError(code).toBody()));
     }
 
-    /** 413 alone closes the connection rather than draining an oversized upload. */
-    tooLarge(code: RelayErrorCode): void {
-      if (!this.begin(413, true)) return;
+    /**
+     * 413 is the one response that tears the connection down instead of letting
+     * the rest of an oversized upload arrive. The order matters: Node destroys
+     * the socket outright - discarding the response - if `Connection: close`
+     * meets a request body it has not finished reading, so the status is sent on
+     * a normally framed response and the socket is cut only once those bytes
+     * have drained onto the wire. The body stays paused throughout, so nothing
+     * past the ceiling is ever buffered.
+     */
+    tooLarge(): void {
+      if (!this.begin(413)) return;
       this.res.setHeader("Content-Type", "application/json");
-      this.res.end(JSON.stringify(new RelayError(code).toBody()));
+      this.res.end(JSON.stringify(new RelayError("BAD_REQUEST").toBody()));
       this.res.once("finish", () => {
-        if (!this.req.destroyed) this.req.destroy();
+        const socket = this.res.socket;
+        const cut = (): void => {
+          if (!this.req.destroyed) this.req.destroy();
+          if (socket !== null && !socket.destroyed) socket.destroy();
+        };
+        if (socket === null || socket.writableLength === 0) setImmediate(cut);
+        else socket.once("drain", cut);
       });
     }
 
@@ -338,13 +366,13 @@ export async function startRelayHttpServer(options: RelayHttpServerOptions): Pro
 
   async function handlePair(req: IncomingMessage, respond: Responder, headerOrigin: string): Promise<void> {
     if (!isJsonContentType(req.headers["content-type"])) {
-      respond.error(415, "PAIR_REJECTED");
+      respond.error(415, "BAD_REQUEST");
       return;
     }
     const body = await readBody(req);
     if (body.status === "aborted") return;
     if (body.status === "too_large") {
-      respond.tooLarge("PAIR_REJECTED");
+      respond.tooLarge();
       return;
     }
 
@@ -352,13 +380,17 @@ export async function startRelayHttpServer(options: RelayHttpServerOptions): Pro
     try {
       payload = JSON.parse(body.raw);
     } catch {
-      respond.error(400, "PAIR_REJECTED");
+      respond.error(400, "BAD_REQUEST");
       return;
     }
 
     // A retired code is refused before the registry sees it, with the identical
     // response a wrong code would get, so lockout is not externally observable.
+    // The operator still hears about it, once per attempt, since the page cannot
+    // make progress until a new code is minted.
+    syncPairCodeVersion();
     if (failedPairAttempts >= maxPairAttempts) {
+      onDiagnostic("pair attempt refused; a new pair code is required");
       respond.error(403, "PAIR_REJECTED");
       return;
     }
@@ -414,13 +446,13 @@ export async function startRelayHttpServer(options: RelayHttpServerOptions): Pro
   async function handleResult(req: IncomingMessage, respond: Responder, requestId: string): Promise<void> {
     const token = authenticate(req);
     if (!isJsonContentType(req.headers["content-type"])) {
-      respond.error(415, "UNAUTHORIZED");
+      respond.error(415, "BAD_REQUEST");
       return;
     }
     const body = await readBody(req);
     if (body.status === "aborted") return;
     if (body.status === "too_large") {
-      respond.tooLarge("UNAUTHORIZED");
+      respond.tooLarge();
       return;
     }
 
@@ -428,13 +460,13 @@ export async function startRelayHttpServer(options: RelayHttpServerOptions): Pro
     try {
       payload = JSON.parse(body.raw);
     } catch {
-      respond.error(400, "UNAUTHORIZED");
+      respond.error(400, "BAD_REQUEST");
       return;
     }
 
     const parsed = RelayToolResultSchema.safeParse(payload);
     if (!parsed.success || parsed.data.requestId !== requestId) {
-      respond.error(400, "UNAUTHORIZED");
+      respond.error(400, "BAD_REQUEST");
       return;
     }
 
@@ -478,7 +510,7 @@ export async function startRelayHttpServer(options: RelayHttpServerOptions): Pro
 
     const respond = new Responder(req, res, headerOrigin);
     if (matched === null) {
-      respond.error(404, "UNAUTHORIZED");
+      respond.error(404, "BAD_REQUEST");
       return;
     }
     if (req.method === "OPTIONS") {
@@ -486,7 +518,7 @@ export async function startRelayHttpServer(options: RelayHttpServerOptions): Pro
       return;
     }
     if (req.method !== matched.method) {
-      respond.error(405, "UNAUTHORIZED", { Allow: `${matched.method}, OPTIONS` });
+      respond.error(405, "BAD_REQUEST", { Allow: `${matched.method}, OPTIONS` });
       return;
     }
 
@@ -555,8 +587,10 @@ export async function startRelayHttpServer(options: RelayHttpServerOptions): Pro
     port: address.port,
     address: address.address,
     issuePairCode() {
+      const issued = issue();
       failedPairAttempts = 0;
-      return issue();
+      countedPairCodeVersion = registry.pairCodeVersion();
+      return issued;
     },
     close() {
       if (closing !== null) return closing;

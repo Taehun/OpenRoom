@@ -99,6 +99,7 @@ export const RELAY_ERROR_CODES = [
   "SESSION_DISCONNECTED",
   "PAGE_UNAVAILABLE",
   "UNKNOWN_TOOL",
+  "BAD_REQUEST",
 ] as const;
 export type RelayErrorCode = (typeof RELAY_ERROR_CODES)[number];
 
@@ -111,6 +112,7 @@ export const RELAY_ERROR_RETRYABLE: Readonly<Record<RelayErrorCode, boolean>> = 
   SESSION_DISCONNECTED: false,
   PAGE_UNAVAILABLE: true,
   UNKNOWN_TOOL: false,
+  BAD_REQUEST: false,
 };
 
 export const RelayErrorSchema = z

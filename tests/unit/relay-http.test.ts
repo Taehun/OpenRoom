@@ -1,4 +1,6 @@
 // @vitest-environment node
+import net from "node:net";
+
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import {
@@ -107,6 +109,73 @@ function forward(): Promise<ToolResult<unknown>> {
   settled.catch(() => {});
   teardown.push(() => controller.abort());
   return settled;
+}
+
+/**
+ * Uploads a chunked body with no `Content-Length`, so the size ceiling can only
+ * be enforced while streaming. Stops writing the moment the server answers, and
+ * reports whether the upload was cut short.
+ */
+async function postChunkedBody(chunkCount: number, chunkBytes: number): Promise<{
+  raw: string;
+  bytesWritten: number;
+  bytesIntended: number;
+  serverClosed: boolean;
+}> {
+  const socket = net.connect(relay.port, "127.0.0.1");
+  socket.on("error", () => {});
+
+  const received: Buffer[] = [];
+  let closed = false;
+  socket.on("data", (chunk: Buffer) => received.push(chunk));
+  socket.on("close", () => {
+    closed = true;
+  });
+
+  await new Promise<void>((resolve, reject) => {
+    socket.once("connect", resolve);
+    socket.once("error", reject);
+  });
+
+  socket.write(
+    [
+      "POST /v1/pair HTTP/1.1",
+      `Host: 127.0.0.1:${relay.port}`,
+      `Origin: ${ORIGIN}`,
+      "Content-Type: application/json",
+      "Transfer-Encoding: chunked",
+      "",
+      "",
+    ].join("\r\n"),
+  );
+
+  const payload = "a".repeat(chunkBytes);
+  let bytesWritten = 0;
+  for (let index = 0; index < chunkCount; index += 1) {
+    if (closed || socket.destroyed || received.length > 0) break;
+    socket.write(`${chunkBytes.toString(16)}\r\n${payload}\r\n`);
+    bytesWritten += chunkBytes;
+    await new Promise((resolve) => setImmediate(resolve));
+  }
+
+  const responseBy = Date.now() + 2_000;
+  while (received.length === 0 && !closed && Date.now() < responseBy) {
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+  // The server should now cut the connection rather than drain what is left.
+  const closeBy = Date.now() + 2_000;
+  while (!closed && Date.now() < closeBy) {
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+  const serverClosed = closed;
+  socket.destroy();
+
+  return {
+    raw: Buffer.concat(received).toString("utf8"),
+    bytesWritten,
+    bytesIntended: chunkCount * chunkBytes,
+    serverClosed,
+  };
 }
 
 /** Every response, success or failure, carries the same hardening headers. */
@@ -321,6 +390,46 @@ describe("pair attempt throttling", () => {
     expect(response.status).toBe(200);
   });
 
+  it("resets the counter for a code minted straight from the registry", async () => {
+    const first = relay.issuePairCode();
+    const wrong = first.code === "111111" ? "222222" : "111111";
+    for (let attempt = 0; attempt < MAX_PAIR_ATTEMPTS; attempt += 1) {
+      await postPair(pairBody({ code: wrong }));
+    }
+    expectPairRejected(await postPair(pairBody({ code: first.code })), [first.code]);
+
+    // Task 4 may mint through the registry; the relay must notice the new code
+    // rather than staying locked out forever.
+    const second = registry.issuePairCode();
+    const response = await postPair(pairBody({ code: second.code }));
+
+    expect(response.status).toBe(200);
+  });
+
+  it("reports every refused attempt while the code is retired", async () => {
+    const issued = relay.issuePairCode();
+    const wrong = issued.code === "111111" ? "222222" : "111111";
+    for (let attempt = 0; attempt < MAX_PAIR_ATTEMPTS; attempt += 1) {
+      await postPair(pairBody({ code: wrong }));
+    }
+    diagnostics = [];
+
+    await postPair(pairBody({ code: issued.code }));
+    await postPair(pairBody({ code: wrong }));
+
+    const refusals = diagnostics.filter((line) => line.includes("pair attempt refused"));
+    expect(refusals).toHaveLength(2);
+    for (const line of refusals) expect(line).not.toContain(issued.code);
+  });
+
+  it("exposes a monotonic pair code version on the registry", () => {
+    const before = registry.pairCodeVersion();
+    registry.issuePairCode();
+    expect(registry.pairCodeVersion()).toBe(before + 1);
+    relay.issuePairCode();
+    expect(registry.pairCodeVersion()).toBe(before + 2);
+  });
+
   it("resets the counter when a fresh code is issued", async () => {
     const first = relay.issuePairCode();
     const wrong = first.code === "111111" ? "222222" : "111111";
@@ -342,8 +451,26 @@ describe("request hygiene", () => {
     const response = await postPair("x".repeat(MAX_BODY_BYTES + 1));
 
     expect(response.status).toBe(413);
-    expect(RelayErrorSchema.parse(response.body).code).toBe("PAIR_REJECTED");
+    expect(RelayErrorSchema.parse(response.body)).toEqual({
+      code: "BAD_REQUEST",
+      message: "BAD_REQUEST",
+      retryable: false,
+    });
     expectHardened(response);
+  });
+
+  it("stops reading and answers 413 for a chunked body with no Content-Length", async () => {
+    // Eight times the ceiling, so the server must cut the upload off rather than
+    // buffer it; `fetch` would set Content-Length and never reach this branch.
+    const probe = await postChunkedBody(32, 16 * 1024);
+
+    expect(probe.raw).toContain("HTTP/1.1 413");
+    expect(probe.raw).toContain("BAD_REQUEST");
+    // The response arrived before the body finished, and the server then tore
+    // the connection down instead of consuming the remaining chunks.
+    expect(probe.bytesWritten).toBeLessThan(probe.bytesIntended);
+    expect(probe.serverClosed).toBe(true);
+    expect(probe.raw).not.toContain("200 OK");
   });
 
   it("accepts a body at exactly the ceiling and still rejects it as a pair", async () => {
@@ -362,7 +489,7 @@ describe("request hygiene", () => {
     });
 
     expect(response.status).toBe(415);
-    expect(RelayErrorSchema.parse(response.body).code).toBe("PAIR_REJECTED");
+    expect(RelayErrorSchema.parse(response.body).code).toBe("BAD_REQUEST");
     expectHardened(response);
   });
 
@@ -380,7 +507,7 @@ describe("request hygiene", () => {
     const response = await postPair("{not json");
 
     expect(response.status).toBe(400);
-    expect(RelayErrorSchema.parse(response.body).code).toBe("PAIR_REJECTED");
+    expect(RelayErrorSchema.parse(response.body).code).toBe("BAD_REQUEST");
   });
 
   it("answers 405 with an Allow header for an unsupported method", async () => {
@@ -388,6 +515,7 @@ describe("request hygiene", () => {
 
     expect(response.status).toBe(405);
     expect(response.headers.get("allow")).toBe("POST, OPTIONS");
+    expect(RelayErrorSchema.parse(response.body).code).toBe("BAD_REQUEST");
     expectHardened(response);
   });
 
@@ -395,6 +523,7 @@ describe("request hygiene", () => {
     const response = await call("/v1/nope", { method: "GET", headers: { origin: ORIGIN } });
 
     expect(response.status).toBe(404);
+    expect(RelayErrorSchema.parse(response.body).code).toBe("BAD_REQUEST");
     expectHardened(response);
   });
 
@@ -600,7 +729,7 @@ describe("POST /v1/results/:requestId", () => {
     });
 
     expect(response.status).toBe(400);
-    expect(RelayErrorSchema.parse(response.body).code).toBe("UNAUTHORIZED");
+    expect(RelayErrorSchema.parse(response.body).code).toBe("BAD_REQUEST");
     void pending;
   });
 

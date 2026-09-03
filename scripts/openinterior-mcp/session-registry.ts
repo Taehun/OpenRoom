@@ -98,6 +98,7 @@ export class SessionRegistry {
   private readonly randomBytes: (length: number) => Uint8Array;
   private readonly onDiagnostic: (message: string) => void;
   private pairCode: { code: string; expiresAt: number } | null = null;
+  private pairCodeIssues = 0;
   private session: Session | null = null;
   private stopped = false;
 
@@ -115,8 +116,19 @@ export class SessionRegistry {
     this.sweepExpired();
     const expiresAt = this.now() + PAIR_CODE_TTL_MS;
     this.pairCode = { code: sixDigitCode(this.randomBytes), expiresAt };
+    this.pairCodeIssues += 1;
     this.onDiagnostic("pair code issued");
     return { code: this.pairCode.code, expiresAt };
+  }
+
+  /**
+   * How many codes this registry has ever minted. It leaks nothing about the
+   * code itself, and lets the HTTP layer notice a code issued behind its back -
+   * so a failed-attempt lockout is lifted by any new code, not only one minted
+   * through the relay.
+   */
+  pairCodeVersion(): number {
+    return this.pairCodeIssues;
   }
 
   /**

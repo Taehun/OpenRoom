@@ -201,6 +201,7 @@ describe("RelayErrorSchema", () => {
       "SESSION_DISCONNECTED",
       "PAGE_UNAVAILABLE",
       "UNKNOWN_TOOL",
+      "BAD_REQUEST",
     ]);
     expect(RELAY_ERROR_RETRYABLE).toEqual({
       PAIR_REJECTED: false,
@@ -210,6 +211,7 @@ describe("RelayErrorSchema", () => {
       SESSION_DISCONNECTED: false,
       PAGE_UNAVAILABLE: true,
       UNKNOWN_TOOL: false,
+      BAD_REQUEST: false,
     });
   });
 
