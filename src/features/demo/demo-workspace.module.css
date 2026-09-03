@@ -1032,6 +1032,14 @@
   background: var(--openroom-finish-walnut);
 }
 
+.productMaterial[data-material="4"] {
+  background: var(--openroom-finish-travertine);
+}
+
+.productMaterial[data-material="5"] {
+  background: var(--openroom-finish-steel);
+}
+
 .productMaterial::before,
 .productMaterial::after,
 .productMaterial span {

@@ -152,7 +152,11 @@ const CATEGORY_ORDER: readonly SceneObjectType[] = [
   "coffee_table",
   "chair",
   "floor_lamp",
+  // The side table is staged against a settled seat, so it follows the seating group
+  // and the lamp; the bookshelf only needs the walls, so it comes last.
+  "side_table",
   "plant",
+  "bookshelf",
 ];
 
 const MILLIMETRES_PER_METRE = 1000;
@@ -468,7 +472,7 @@ function primarySeatingHull(objects: readonly SceneObject[]): readonly PointXZ[]
 function accessoryInsideSeatingHull(objects: readonly SceneObject[]): boolean {
   const hull = primarySeatingHull(objects);
   return objects
-    .filter(({ type }) => type === "floor_lamp" || type === "plant")
+    .filter(avoidsSeatingHull)
     .some((object) =>
       pointInsideConvexHull(
         { x: object.position[0], z: object.position[2] },
@@ -735,6 +739,40 @@ function lampAdjacencyTerm(
   return proximityScore(millimetres(Math.max(lateralGap, 0)), 150, 500);
 }
 
+/**
+ * Spec catalog-expansion 4: a side table reads as staged when it stands just beside a
+ * seat's side, inside that seat's own depth band. Any edge gap the spec's band allows
+ * scores full marks; outside it the score falls away over the lamp's half-metre range.
+ */
+const SIDE_TABLE_GAP_MINIMUM_MM = 50;
+const SIDE_TABLE_GAP_MAXIMUM_MM = 250;
+
+function seatAdjacencyTerm(seat: SceneObject, table: SceneObject): number {
+  const { forward, lateral } = localAxes(seat.rotation[1]);
+  // Outside the seat's own depth band the table is somewhere else in the room, however
+  // close its lateral gap happens to read.
+  if (edgeGapAlongAxis(seat, table, forward) > 0) return 0;
+  const gapMm = millimetres(Math.max(edgeGapAlongAxis(seat, table, lateral), 0));
+  return proximityScore(
+    gapMm,
+    clamp(gapMm, SIDE_TABLE_GAP_MINIMUM_MM, SIDE_TABLE_GAP_MAXIMUM_MM),
+    500,
+  );
+}
+
+/** The best of the sofa-end and chair-side readings; 0 when the room has neither seat. */
+function sideTableAdjacencyTerm(
+  objects: readonly SceneObject[],
+  table: SceneObject,
+): number {
+  let best = 0;
+  for (const type of ["sofa", "chair"] as const) {
+    const seat = firstObject(objects, type);
+    if (seat) best = Math.max(best, seatAdjacencyTerm(seat, table));
+  }
+  return best;
+}
+
 /** Spec 8.3: a plant reads as staged when it fills a corner rather than a wall. */
 function plantCornerTerm(scene: Scene, footprint: Footprint2D): number {
   const { minimumX, maximumX, minimumZ, maximumZ } = footprintExtent(footprint);
@@ -765,6 +803,18 @@ function compositionContribution(
       : foregroundTerm(scene, footprint);
   }
   const foreground = foregroundTerm(scene, footprint);
+  if (object.type === "side_table") {
+    // With no seat to stand beside, a side table is judged like any other object: it
+    // should at least stay out of the foreground.
+    return firstObject(objects, "sofa") || firstObject(objects, "chair")
+      ? sideTableAdjacencyTerm(objects, object)
+      : foreground;
+  }
+  if (object.type === "bookshelf") {
+    // Spec catalog-expansion 4: a bookshelf reads as staged when it is back against a
+    // wall rather than adrift, and still out of the foreground.
+    return Math.round((foreground + accessoryContribution(scene, footprint)) / 2);
+  }
   return object.type === "plant"
     ? Math.round((foreground + plantCornerTerm(scene, footprint)) / 2)
     : foreground;
@@ -785,8 +835,17 @@ function compositionScore(
   return count === 0 ? 1000 : Math.round(total / count);
 }
 
-function isAccessory({ type }: SceneObject): boolean {
-  return type === "floor_lamp" || type === "plant";
+function isAccessory({ type }: Pick<SceneObject, "type">): boolean {
+  return type === "floor_lamp" || type === "plant" || type === "side_table";
+}
+
+/**
+ * Spec catalog-expansion 4: the objects the conversation group must not swallow. The
+ * accessories stage the room around the seating, and the bookshelf backs onto a wall,
+ * so none of them may end up standing inside the seating hull.
+ */
+function avoidsSeatingHull(object: Pick<SceneObject, "type">): boolean {
+  return isAccessory(object) || object.type === "bookshelf";
 }
 
 function isMovable({ locked, type }: SceneObject): boolean {
@@ -934,6 +993,8 @@ const TERM_DEPENDENCIES: Readonly<Record<SceneObjectType, readonly number[]>> = 
   chair: [TERM_CHAIR, TERM_COMPOSITION],
   floor_lamp: [TERM_COMPOSITION],
   plant: [TERM_COMPOSITION],
+  side_table: [TERM_COMPOSITION],
+  bookshelf: [TERM_COMPOSITION],
   unknown: [],
 };
 
@@ -1067,10 +1128,11 @@ const ROOM_WALLS: readonly RoomWall[] = [
 const WALL_FACING_EPSILON = 1e-6;
 
 /**
- * The walls the sofa can back onto without being turned. Its Y rotation is preserved
- * (spec 4.3), so a wall is usable only when the sofa's forward axis points away from that
- * wall, into the room: a rotation-0 sofa (forward +z) can only back onto the minimum-z
- * wall, and the side walls open up for the quarter turns that face the sofa across them.
+ * The walls an object of the given facing can back onto: a wall is usable only when the
+ * forward axis points away from it, into the room, so a rotation-0 sofa (forward +z) can
+ * only back onto the minimum-z wall, and the side walls open up for the quarter turns
+ * that face it across them. The sofa keeps its Y rotation (spec 4.3) so it asks this of
+ * one angle; the bookshelf asks it of every rotation its views allow.
  */
 function usableSofaWalls(rotationY: number): readonly RoomWall[] {
   const { forward } = localAxes(rotationY);
@@ -1130,6 +1192,74 @@ export function sofaCandidates(
         for (const z of gridSweep(minimumZ, maximumZ, object.position[2], () => true)) {
           sweep.push(candidate(object, x, z, rotationY));
         }
+      }
+    }
+    sweeps.push(sweep);
+  }
+
+  const deepest = sweeps.reduce((longest, sweep) => Math.max(longest, sweep.length), 0);
+  for (let depth = 0; depth < deepest; depth += 1) {
+    for (const sweep of sweeps) {
+      const placement = sweep[depth];
+      if (placement !== undefined) result.push(placement);
+    }
+  }
+  return result;
+}
+
+/**
+ * Spec catalog-expansion 4: the bookshelf's own candidates. Its current placement leads,
+ * then one sweep along every wall it can back onto and still face the room from, for each
+ * rotation its views allow. Positions whose footprint would stand in an opening's
+ * clearance zone are dropped here rather than left for the search to reject, so the cap
+ * is spent on walls the shelf can actually use.
+ *
+ * Exported so the wall, clearance and facing rules can be verified on the candidates
+ * themselves - which wall a search settles on is otherwise only visible through the whole
+ * scored layout.
+ */
+export function bookshelfCandidates(
+  scene: Scene,
+  object: SceneObject,
+  options?: PlacementOptions,
+): readonly ProposedPlacement[] {
+  const choices = optionsFor(object, options);
+  const result: ProposedPlacement[] = [incumbentPlacement(object, choices)];
+  const clearances = openingClearanceZones(scene);
+  const clearsOpenings = (placement: ProposedPlacement): boolean => {
+    const footprint = placementFootprint(object, placement);
+    return !clearances.some((zone) => footprintsOverlap(footprint, zone));
+  };
+
+  // One sweep list per option, drawn round-robin below. The per-object cap is a fixed 48
+  // however many orientations the views allow, so a single option's walls would otherwise
+  // spend the whole budget and the others would never be seen (spec 8.2).
+  const sweeps: ProposedPlacement[][] = [];
+  for (const option of choices) {
+    const rotationY = option.rotationY;
+    const range = usableCenterRange(scene, object, rotationY);
+    const [minimumX, maximumX] = inwardGridRange(
+      range.minimumX,
+      range.maximumX,
+      PLACEMENT_LIMITS.gridM,
+    );
+    const [minimumZ, maximumZ] = inwardGridRange(
+      range.minimumZ,
+      range.maximumZ,
+      PLACEMENT_LIMITS.gridM,
+    );
+    const sweep: ProposedPlacement[] = [];
+    for (const wall of usableSofaWalls(rotationY)) {
+      const along =
+        wall.axis === "z"
+          ? gridSweep(minimumX, maximumX, object.position[0], () => true)
+          : gridSweep(minimumZ, maximumZ, object.position[2], () => true);
+      for (const value of along) {
+        const placement =
+          wall.axis === "z"
+            ? candidate(object, value, wall.inward === 1 ? minimumZ : maximumZ, rotationY)
+            : candidate(object, wall.inward === 1 ? minimumX : maximumX, value, rotationY);
+        if (clearsOpenings(placement)) sweep.push(placement);
       }
     }
     sweeps.push(sweep);
@@ -1522,40 +1652,40 @@ const laneScratch: ProposedPlacement[][] = PERIMETER_SIDES.map(
 );
 
 /**
- * Lamp positions beside the settled sofa's ends (spec 8.2). The staged photo stands the
- * lamp at a sofa end rather than out on the perimeter, and the sofa is only settled
- * inside the search, so these cannot be hoisted into the per-scene accessory context.
- * They are emitted already inside the room and clear of the openings, exactly as the ring
+ * Accessory positions beside a settled seat's sides (spec 8.2, catalog-expansion 4). The
+ * staged photo stands the lamp at a sofa end - and the side table at a sofa end or a
+ * chair side - rather than out on the perimeter, and the seat is only settled inside the
+ * search, so these cannot be hoisted into the per-scene accessory context. They are
+ * emitted already inside the room and clear of the openings, exactly as the ring
  * positions are, because the search trusts accessory candidates on that point.
  */
-function sofaEndCandidates(
+function seatSideCandidates(
   scene: Scene,
   object: SceneObject,
-  state: SearchState,
+  seat: SceneObject,
+  gaps: readonly number[],
 ): readonly ProposedPlacement[] {
-  const sofa = firstObject(settledOf(state), "sofa");
-  if (!sofa) return [];
   const rotationY = object.rotation[1];
-  const { forward, lateral } = localAxes(sofa.rotation[1]);
+  const { forward, lateral } = localAxes(seat.rotation[1]);
   const range = usableCenterRange(scene, object, rotationY);
   const clearances = openingClearanceZones(scene);
   const lateralReach =
-    footprintRadiusAlongAxis(sofa, lateral) + footprintRadiusAlongAxis(object, lateral);
-  // Aligned with the sofa's centre, and again with its back edge: both read as "beside
-  // the sofa" and the second is what a room with a deep sofa leaves space for.
+    footprintRadiusAlongAxis(seat, lateral) + footprintRadiusAlongAxis(object, lateral);
+  // Aligned with the seat's centre, and again with its back edge: both read as "beside
+  // the seat" and the second is what a room with a deep sofa leaves space for.
   const alignments = [
     0,
-    -(footprintRadiusAlongAxis(sofa, forward) -
+    -(footprintRadiusAlongAxis(seat, forward) -
       footprintRadiusAlongAxis(object, forward)),
   ];
   const result: ProposedPlacement[] = [];
   for (const side of [-1, 1] as const) {
-    for (const gap of [0.1, 0.25]) {
+    for (const gap of gaps) {
       for (const along of alignments) {
         const offset = side * (lateralReach + gap);
         const x = quantize(
           clamp(
-            sofa.position[0] + lateral.x * offset + forward.x * along,
+            seat.position[0] + lateral.x * offset + forward.x * along,
             range.minimumX,
             range.maximumX,
           ),
@@ -1563,7 +1693,7 @@ function sofaEndCandidates(
         );
         const z = quantize(
           clamp(
-            sofa.position[2] + lateral.z * offset + forward.z * along,
+            seat.position[2] + lateral.z * offset + forward.z * along,
             range.minimumZ,
             range.maximumZ,
           ),
@@ -1580,6 +1710,37 @@ function sofaEndCandidates(
         result.push(placement);
       }
     }
+  }
+  return result;
+}
+
+/** The lamp's own family: beside the settled sofa's ends, at the spec's two gaps. */
+function sofaEndCandidates(
+  scene: Scene,
+  object: SceneObject,
+  state: SearchState,
+): readonly ProposedPlacement[] {
+  const sofa = firstObject(settledOf(state), "sofa");
+  return sofa ? seatSideCandidates(scene, object, sofa, [0.1, 0.25]) : [];
+}
+
+/**
+ * Spec catalog-expansion 4: the side table's own family, beside a settled sofa end and
+ * beside a settled chair's side. The gaps span the band the composition term rewards, so
+ * a room that cannot spare the widest still offers the tightest.
+ */
+const SIDE_TABLE_GAPS: readonly number[] = [0.05, 0.15, 0.25];
+
+function sideTableSeatCandidates(
+  scene: Scene,
+  object: SceneObject,
+  state: SearchState,
+): readonly ProposedPlacement[] {
+  const settled = settledOf(state);
+  const result: ProposedPlacement[] = [];
+  for (const type of ["sofa", "chair"] as const) {
+    const seat = firstObject(settled, type);
+    if (seat) result.push(...seatSideCandidates(scene, object, seat, SIDE_TABLE_GAPS));
   }
   return result;
 }
@@ -1644,17 +1805,18 @@ function accessoryCandidates(
   }
 
   const lead = leadsWithIncumbent ? context.incumbent : null;
-  const ends =
+  const seatSides = (
     object.type === "floor_lamp"
-      ? sofaEndCandidates(scene, object, state).filter((placement) =>
-          isFree(placementFootprint(object, placement)),
-        )
-      : [];
-  if (ends.length > 0) {
-    // The sofa ends come ahead of the ring and are kept even when the ring alone could
+      ? sofaEndCandidates(scene, object, state)
+      : object.type === "side_table"
+        ? sideTableSeatCandidates(scene, object, state)
+        : []
+  ).filter((placement) => isFree(placementFootprint(object, placement)));
+  if (seatSides.length > 0) {
+    // The seat sides come ahead of the ring and are kept even when the ring alone could
     // fill the cap; the ring gets whatever the cap has left. Both lists are handed to the
-    // millimetre dedupe, which drops an end that repeats the incumbent or a ring twin.
-    const head = lead === null ? ends : [lead, ...ends];
+    // millimetre dedupe, which drops a seat side that repeats the incumbent or a ring twin.
+    const head = lead === null ? seatSides : [lead, ...seatSides];
     const flattened = flattenPerimeterLanes(
       lanes,
       null,
@@ -1856,7 +2018,11 @@ function candidatesFor(
       break;
     case "floor_lamp":
     case "plant":
+    case "side_table":
       return accessoryCandidates(scene, object, state, accessory!, limit);
+    case "bookshelf":
+      candidates = bookshelfCandidates(scene, object, options);
+      break;
     case "unknown":
       candidates = [];
       break;
@@ -1905,7 +2071,8 @@ function admitsSettledRoot(
     }
   }
   return !settled.some(
-    (object) => isAccessory(object) && pointInsideConvexHull(objectCenter(object), hull),
+    (object) =>
+      avoidsSeatingHull(object) && pointInsideConvexHull(objectCenter(object), hull),
   );
 }
 
@@ -1946,19 +2113,19 @@ function admitsPlacement(
 
   if (!SEATING_TYPES.has(object.type)) {
     return !(
-      isAccessory(object) &&
+      avoidsSeatingHull(object) &&
       pointInsideConvexHull(footprint.center, seatingHull(state))
     );
   }
 
-  const settledAccessories = settledOf(state).filter(isAccessory);
-  if (settledAccessories.length === 0) return true;
+  const hullAvoiders = settledOf(state).filter(avoidsSeatingHull);
+  if (hullAvoiders.length === 0) return true;
   const hull = primarySeatingHull([
     ...settledOf(state),
     withPlacement(object, placement),
   ]);
-  return !settledAccessories.some((accessory) =>
-    pointInsideConvexHull(objectCenter(accessory), hull),
+  return !hullAvoiders.some((avoider) =>
+    pointInsideConvexHull(objectCenter(avoider), hull),
   );
 }
 

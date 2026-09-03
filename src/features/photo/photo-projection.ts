@@ -191,6 +191,8 @@ const VISUAL_WIDTH_BOUNDS = {
   floor_lamp: [4, 24],
   chair: [6, 38],
   plant: [6, 34],
+  side_table: [5, 26],
+  bookshelf: [8, 34],
   unknown: [6, 60],
 } as const;
 
@@ -200,6 +202,8 @@ const CONTACT_SHADOW_PROFILES = {
   floor_lamp: { widthFactor: 0.45, depthFactor: 0.45, opacity: 0.18 },
   chair: { widthFactor: 0.65, depthFactor: 0.5, opacity: 0.2 },
   plant: { widthFactor: 0.55, depthFactor: 0.5, opacity: 0.19 },
+  side_table: { widthFactor: 0.6, depthFactor: 0.5, opacity: 0.19 },
+  bookshelf: { widthFactor: 0.8, depthFactor: 0.35, opacity: 0.2 },
   unknown: { widthFactor: 0.6, depthFactor: 0.45, opacity: 0.18 },
 } as const;
 

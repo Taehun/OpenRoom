@@ -21,7 +21,9 @@ import {
   type PhotoAssetSet,
 } from "../../src/features/photo/photo-views";
 import { GENERATED_VIEW_MANIFEST } from "../../src/features/photo/photo-views.generated";
+import { modelFor, selectProvider, type ImageProvider } from "./providers";
 import {
+  buildPrompt,
   measureAnchor,
   mergeManifest,
   multipartFields,
@@ -32,14 +34,10 @@ import {
   type ViewJob,
 } from "./view-jobs";
 
-const IMAGES_EDITS_URL = "https://api.openai.com/v1/images/edits";
 const MANIFEST_PATH = "src/features/photo/photo-views.generated.ts";
 const PUBLIC_DIR = "public";
-const DEFAULT_MODEL = "gpt-image-1";
 const QUALITIES = ["low", "medium", "high"] as const;
 const DEFAULT_QUALITY: ImageRequestEnv["quality"] = "high";
-/** 429 and 5xx are retried after these waits; anything else aborts the run. */
-const RETRY_WAITS_MS = [2_000, 4_000, 8_000] as const;
 
 export interface DecodedImage {
   rgba: Uint8Array;
@@ -113,62 +111,40 @@ function localPathOf(src: string): string {
   return join(PUBLIC_DIR, src.replace(/^\//, ""));
 }
 
-function isRetryable(status: number): boolean {
-  return status === 429 || status >= 500;
-}
-
-interface EditResponse {
-  data?: { b64_json?: string }[];
-}
-
 /**
- * One `images/edits` call, retried on 429/5xx. The key travels in the header
- * only; failures report the status and the model's message, never the request.
+ * One provider call for one view. The photographed cutout always travels with
+ * the request — as the `images/edits` file for OpenAI, as an `inlineData` part
+ * for Gemini — because the generated view must match the product exactly.
  */
-async function requestView(
+function requestView(
   job: ViewJob,
   reference: Uint8Array,
   request: ImageRequestEnv,
+  provider: ImageProvider,
   key: string,
   deps: Required<Pick<GenerateViewsDeps, "fetch" | "log" | "sleep">>,
 ): Promise<Uint8Array> {
-  for (let attempt = 0; attempt <= RETRY_WAITS_MS.length; attempt += 1) {
-    const body = new FormData();
-    for (const [name, value] of multipartFields(job, request)) {
-      body.append(name, value);
-    }
-    body.append(
-      "image",
-      // Copied so the Blob owns a plain ArrayBuffer, whatever the reader returned.
-      new Blob([new Uint8Array(reference)], { type: "image/webp" }),
-      basename(job.referenceSrc),
-    );
-
-    const response = await deps.fetch(IMAGES_EDITS_URL, {
-      method: "POST",
-      headers: { Authorization: `Bearer ${key}` },
-      body,
-    });
-
-    if (!response.ok) {
-      const detail = (await response.text()).slice(0, 400);
-      const wait = RETRY_WAITS_MS[attempt];
-      if (isRetryable(response.status) && wait !== undefined) {
-        deps.log(
-          `[views] ${job.assetId}/${job.view} HTTP ${response.status}, retrying in ${wait / 1000}s`,
-        );
-        await deps.sleep(wait);
-        continue;
-      }
-      throw new Error(`HTTP ${response.status} from images/edits: ${detail}`);
-    }
-
-    const payload = (await response.json()) as EditResponse;
-    const base64 = payload.data?.[0]?.b64_json;
-    if (!base64) throw new Error("images/edits returned no image data");
-    return new Uint8Array(Buffer.from(base64, "base64"));
-  }
-  throw new Error("images/edits exhausted its retries");
+  return provider.generate(
+    {
+      prompt: buildPrompt(job),
+      aspect: job.landscape ? "3:2" : "2:3",
+      model: request.model,
+      quality: request.quality,
+      reference: {
+        bytes: reference,
+        mimeType: "image/webp",
+        filename: basename(job.referenceSrc),
+      },
+      openaiFields: multipartFields(job, request),
+    },
+    {
+      fetch: deps.fetch,
+      key,
+      log: deps.log,
+      sleep: deps.sleep,
+      label: `[views] ${job.assetId}/${job.view}`,
+    },
+  );
 }
 
 export async function runGenerateViews(
@@ -223,13 +199,14 @@ export async function runGenerateViews(
     return { exitCode: 0 };
   }
 
-  const key = deps.env.OPENAI_API_KEY?.trim();
-  if (!key) {
-    log(
-      "[views] OPENAI_API_KEY is not set. Put it in .env.local (never committed) or run with --dry-run.",
-    );
+  let provider;
+  try {
+    provider = selectProvider(deps.env);
+  } catch (error) {
+    log(`[views] ${error instanceof Error ? error.message : String(error)}`);
     return { exitCode: 2 };
   }
+  const key = deps.env[provider.keyEnv]?.trim() ?? "";
 
   const quality = readQuality(deps.env.OPENROOM_IMAGE_QUALITY);
   if (quality === null) {
@@ -238,16 +215,15 @@ export async function runGenerateViews(
     );
     return { exitCode: 2 };
   }
-  const request: ImageRequestEnv = {
-    model: deps.env.OPENROOM_IMAGE_MODEL?.trim() || DEFAULT_MODEL,
-    quality,
-  };
+  const request: ImageRequestEnv = { model: modelFor(provider, deps.env), quality };
 
   if (jobs.length === 0) {
     log("[views] nothing to generate; every registered view already exists");
     return { exitCode: 0 };
   }
-  log(`[views] model ${request.model}, quality ${request.quality}`);
+  log(
+    `[views] provider ${provider.name}, model ${request.model}, quality ${request.quality}`,
+  );
 
   const done: GeneratedViewEntry[] = [];
   const writeManifest = async () => {
@@ -258,7 +234,7 @@ export async function runGenerateViews(
   for (const job of jobs) {
     try {
       const reference = await readFile(localPathOf(job.referenceSrc));
-      const generated = await requestView(job, reference, request, key, {
+      const generated = await requestView(job, reference, request, provider, key, {
         fetch: deps.fetch,
         log,
         sleep,

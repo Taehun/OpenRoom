@@ -4,13 +4,18 @@ import {
   PHOTO_ASSETS,
   ROOM_PHOTO_ASSETS,
 } from "../../src/features/photo/photo-assets";
+import { GENERATED_PRODUCT_ASSETS } from "../../src/features/photo/photo-products.generated";
 import { GENERATED_VIEW_MANIFEST } from "../../src/features/photo/photo-views.generated";
 
 test("audits every registered room and cutout image in the browser", async ({
   page,
 }) => {
   const rooms = Object.values(ROOM_PHOTO_ASSETS);
+  // `PHOTO_ASSETS` is already the union of the 24 hand-registered cutouts and
+  // whatever `pnpm assets:products` generated, so every product cutout —
+  // photographed or generated — is audited exactly once here.
   const cutouts = Object.values(PHOTO_ASSETS);
+  const products = GENERATED_PRODUCT_ASSETS;
   // Generated views are ordinary committed cutouts: audit each one the manifest
   // registers, so a wrong dimension or a flattened alpha channel fails here.
   const generated = GENERATED_VIEW_MANIFEST.views.map((view) => ({
@@ -73,7 +78,7 @@ test("audits every registered room and cutout image in the browser", async ({
     return Promise.all(registeredAssets.map(inspect));
   }, assets);
   expect(audits, "Expected every registered asset to load").toHaveLength(
-    26 + generated.length,
+    26 + generated.length + products.length,
   );
 
   const auditById = new Map(audits.map((audit) => [audit.id, audit]));
@@ -104,10 +109,15 @@ test("audits every registered room and cutout image in the browser", async ({
       .filter(({ floorQuad }) => floorQuad !== undefined)
       .map(({ id }) => id)
       .sort(),
-  ).toEqual([
-    "geometric-flatweave-rug",
-    "seed-pattern-rug",
-    "wool-pebble-rug",
-    "woven-jute-rug",
-  ]);
+  ).toEqual(
+    [
+      "geometric-flatweave-rug",
+      "seed-pattern-rug",
+      "wool-pebble-rug",
+      "woven-jute-rug",
+      // A rug the pipeline generated carries a bbox quad; it is registered
+      // through `PHOTO_ASSETS` like any other, so it belongs in this list too.
+      ...products.filter(({ floorQuad }) => floorQuad).map(({ id }) => id),
+    ].sort(),
+  );
 });

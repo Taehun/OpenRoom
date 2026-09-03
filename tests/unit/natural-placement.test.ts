@@ -11,6 +11,7 @@ import {
   openingClearanceZones,
 } from "../../src/features/placement/footprint-geometry";
 import {
+  bookshelfCandidates,
   chairCandidates,
   flattenPerimeterLanes,
   proposeNaturalPlacement,
@@ -19,7 +20,15 @@ import {
   type EvaluatedLayout,
 } from "../../src/features/placement/natural-placement";
 import { validateAndApplyPlacement } from "../../src/features/scene/natural-placement-command";
-import { buildRotationOptions } from "../../src/features/photo/photo-views";
+import {
+  PHOTO_VIEW_SYMMETRY,
+  buildRotationOptions,
+  rotationOptionsFor,
+  type PhotoAssetSet,
+} from "../../src/features/photo/photo-views";
+import { FRONT_VECTORS } from "../../src/features/photo/photo-facing";
+import { CATEGORY_DIMENSIONS } from "../../src/features/room/room-engine";
+import { SceneSchema } from "../../src/features/scene/scene-schema";
 import {
   PLACEMENT_LIMITS,
   PLACEMENT_SCORE_WEIGHTS,
@@ -1580,5 +1589,335 @@ describe("composition without a sofa", () => {
     expect(frontScore).not.toBeNull();
     expect(backScore).not.toBeNull();
     expect(backScore!).toBeGreaterThan(frontScore!);
+  });
+});
+
+/**
+ * Spec catalog-expansion 3 and 4: the side table is an accessory staged beside a seat,
+ * and the bookshelf is a perimeter object that backs onto a clearance-free wall facing
+ * the room. Both are built from the category table rather than the catalog, so these
+ * cases hold before any product of either category exists.
+ */
+describe("side table and bookshelf placement", () => {
+  /** A bare 6.0 x 6.0 room holding whichever seed objects the case needs. */
+  function bareRoom(id: string, ...ids: string[]): Scene {
+    const scene = keepObjects(createDemoScene(), ...ids);
+    scene.id = id;
+    scene.source = "upload";
+    scene.room = { width: 6, height: 2.5, depth: 6 };
+    scene.openings = [];
+    return scene;
+  }
+
+  function catalogObject(
+    id: string,
+    type: "side_table" | "bookshelf",
+    x: number,
+    z: number,
+    rotationY = 0,
+  ): SceneObject {
+    const dimensionsM = { ...CATEGORY_DIMENSIONS[type] };
+    return {
+      id,
+      type,
+      source: "placeholder",
+      position: [x, dimensionsM.height / 2, z],
+      rotation: [0, rotationY, 0],
+      scale: [1, 1, 1],
+      dimensionsM,
+      locked: false,
+      styleTags: [],
+      addedBy: "human",
+    };
+  }
+
+  /** The edge gap between two footprints along an axis; negative when they overlap. */
+  function gapAlong(
+    first: SceneObject,
+    second: SceneObject,
+    axis: { x: number; z: number },
+  ): number {
+    const span = (object: SceneObject) =>
+      footprintProjection(objectFootprint(object), axis.x, axis.z);
+    const a = span(first);
+    const b = span(second);
+    if (b.minimum >= a.maximum) return b.minimum - a.maximum;
+    if (a.minimum >= b.maximum) return a.minimum - b.maximum;
+    return Math.max(a.minimum, b.minimum) - Math.min(a.maximum, b.maximum);
+  }
+
+  /** The seat's own axes, spelled out rather than borrowed from the solver. */
+  function seatAxes(rotationY: number) {
+    return {
+      lateral: { x: Math.cos(rotationY), z: Math.sin(rotationY) },
+      forward: { x: -Math.sin(rotationY), z: Math.cos(rotationY) },
+    };
+  }
+
+  function placedAs(object: SceneObject, placement: ProposedPlacement): SceneObject {
+    return {
+      ...object,
+      position: [...placement.position],
+      rotation: [object.rotation[0], placement.rotationY, object.rotation[2]],
+    };
+  }
+
+  function placementOf(
+    result: NaturalPlacementResult,
+    objectId: string,
+  ): ProposedPlacement {
+    if (result.kind !== "changed") throw new Error(`expected a changed proposal`);
+    const placement = result.placements.find((entry) => entry.objectId === objectId);
+    if (!placement) throw new Error(`no placement for ${objectId}`);
+    return placement;
+  }
+
+  function currentScoreOf(scene: Scene): number {
+    const result = proposeNaturalPlacement(scene);
+    if (result.kind === "failed") throw new Error(`failed: ${result.reason}`);
+    if (result.diagnostics.currentScore === null) {
+      throw new Error("the current layout broke a hard constraint");
+    }
+    return result.diagnostics.currentScore;
+  }
+
+  /** A locked sofa on the back wall and one side table wherever the case puts it. */
+  function sofaSideTableScene(x: number, z: number): Scene {
+    const scene = bareRoom("side-table-beside-sofa", "sofa_01");
+    const sofa = scene.objects[0]!;
+    sofa.position = [-1, sofa.position[1], -2.45];
+    sofa.rotation = [0, 0, 0];
+    sofa.locked = true;
+    scene.objects.push(catalogObject("side_01", "side_table", x, z));
+    return SceneSchema.parse(scene);
+  }
+
+  /** A locked chair against the left wall, turned to face the room. */
+  function chairSideTableScene(x: number, z: number): Scene {
+    const scene = bareRoom("side-table-beside-chair", "chair_01");
+    const chair = scene.objects[0]!;
+    chair.position = [-2.5, chair.position[1], 0];
+    chair.rotation = [0, -Math.PI / 2, 0];
+    chair.locked = true;
+    scene.objects.push(catalogObject("side_01", "side_table", x, z));
+    return SceneSchema.parse(scene);
+  }
+
+  /** The photographed set a `front-back` category carries: one front-quarter view. */
+  const BOOKSHELF_VIEW_SET: PhotoAssetSet = {
+    id: "test-bookshelf",
+    type: "bookshelf",
+    symmetry: PHOTO_VIEW_SYMMETRY.bookshelf,
+    views: [
+      {
+        view: "front-quarter",
+        frontVector: FRONT_VECTORS["front-quarter"],
+        src: "/photo/test-bookshelf/front-quarter.png",
+        intrinsicWidth: 512,
+        intrinsicHeight: 1024,
+        anchorX: 0.5,
+        anchorY: 0.98,
+        origin: "photographed",
+      },
+    ],
+  };
+
+  /** A 6.0 x 6.0 room whose back window the bookshelf currently stands in front of. */
+  function bookshelfScene(): Scene {
+    const scene = bareRoom("bookshelf-wall-sweep");
+    scene.openings = [
+      {
+        id: "window_back",
+        kind: "window",
+        wall: "back",
+        offset: 0.5,
+        widthM: 1.6,
+        heightM: 1.2,
+      },
+    ];
+    scene.objects.push(catalogObject("shelf_01", "bookshelf", 0, -2.7));
+    return SceneSchema.parse(scene);
+  }
+
+  /** The walls the footprint is flush against, with the direction the room lies in. */
+  function backedWalls(
+    scene: Scene,
+    object: SceneObject,
+  ): readonly { x: number; z: number }[] {
+    const { minimumX, maximumX, minimumZ, maximumZ } = footprintExtent(
+      objectFootprint(object),
+    );
+    const flush = PLACEMENT_LIMITS.roomInsetM + PLACEMENT_LIMITS.gridM + 1e-9;
+    return [
+      { gap: minimumX + scene.room.width / 2, inward: { x: 1, z: 0 } },
+      { gap: scene.room.width / 2 - maximumX, inward: { x: -1, z: 0 } },
+      { gap: minimumZ + scene.room.depth / 2, inward: { x: 0, z: 1 } },
+      { gap: scene.room.depth / 2 - maximumZ, inward: { x: 0, z: -1 } },
+    ]
+      .filter(({ gap }) => gap <= flush)
+      .map(({ inward }) => inward);
+  }
+
+  function facesRoomFromAWall(scene: Scene, object: SceneObject): boolean {
+    const { forward } = seatAxes(object.rotation[1]);
+    return backedWalls(scene, object).some(
+      (inward) => forward.x * inward.x + forward.z * inward.z > 1e-6,
+    );
+  }
+
+  it("scores a side table beside the sofa above the same table mid-floor", () => {
+    const beside = currentScoreOf(sofaSideTableScene(-2.4, -2.45));
+    const midFloor = currentScoreOf(sofaSideTableScene(0, 0));
+    expect(beside).toBeGreaterThan(midFloor);
+  });
+
+  it("stages a mid-floor side table at a sofa end", () => {
+    const scene = sofaSideTableScene(0, 0);
+    const result = proposeNaturalPlacement(scene);
+    expect(result.kind).toBe("changed");
+    const sofa = scene.objects.find(({ id }) => id === "sofa_01")!;
+    const table = placedAs(
+      scene.objects.find(({ id }) => id === "side_01")!,
+      placementOf(result, "side_01"),
+    );
+    const { lateral, forward } = seatAxes(sofa.rotation[1]);
+    expect(gapAlong(sofa, table, lateral)).toBeGreaterThanOrEqual(0.05 - 1e-9);
+    expect(gapAlong(sofa, table, lateral)).toBeLessThanOrEqual(0.25 + 1e-9);
+    // Inside the sofa's own depth band, so it reads as beside the sofa's end.
+    expect(gapAlong(sofa, table, forward)).toBeLessThanOrEqual(0);
+    // A radial category is never turned.
+    expect(placementOf(result, "side_01").rotationY).toBe(table.rotation[1]);
+  });
+
+  it("stages a mid-floor side table beside a chair when no sofa exists", () => {
+    const scene = chairSideTableScene(1.2, 1.2);
+    const result = proposeNaturalPlacement(scene);
+    expect(result.kind).toBe("changed");
+    const chair = scene.objects.find(({ id }) => id === "chair_01")!;
+    const table = placedAs(
+      scene.objects.find(({ id }) => id === "side_01")!,
+      placementOf(result, "side_01"),
+    );
+    const { lateral, forward } = seatAxes(chair.rotation[1]);
+    expect(gapAlong(chair, table, lateral)).toBeGreaterThanOrEqual(0.05 - 1e-9);
+    expect(gapAlong(chair, table, lateral)).toBeLessThanOrEqual(0.25 + 1e-9);
+    expect(gapAlong(chair, table, forward)).toBeLessThanOrEqual(0);
+  });
+
+  it("offers the six front-back options for a bookshelf and none for a side table", () => {
+    const shelf = catalogObject("shelf_01", "bookshelf", 0, 0);
+    const degrees = rotationOptionsFor(shelf, BOOKSHELF_VIEW_SET)
+      .map(({ rotationY }) => Math.round((rotationY * 180) / Math.PI))
+      .sort((first, second) => first - second);
+    expect(degrees).toEqual([-135, -45, 0, 45, 135, 180]);
+
+    // A radial category keeps the rotation it came with, whatever set it carries.
+    const table = catalogObject("side_01", "side_table", 0, 0, Math.PI / 3);
+    expect(
+      rotationOptionsFor(table, { ...BOOKSHELF_VIEW_SET, type: "side_table" }),
+    ).toEqual([{ rotationY: Math.PI / 3, fidelity: 1 }]);
+  });
+
+  it("sweeps only clearance-free walls the bookshelf can face the room from", () => {
+    const scene = bookshelfScene();
+    const shelf = scene.objects.find(({ id }) => id === "shelf_01")!;
+    const options = { rotationOptions: { shelf_01: rotationOptionsFor(shelf, BOOKSHELF_VIEW_SET) } };
+    const candidates = bookshelfCandidates(scene, shelf, options);
+    const zones = openingClearanceZones(scene);
+
+    expect(candidates.length).toBeGreaterThan(1);
+    for (const placement of candidates) {
+      const placed = placedAs(shelf, placement);
+      expect(
+        options.rotationOptions.shelf_01.some(
+          ({ rotationY }) => Math.abs(rotationY - placement.rotationY) < 1e-9,
+        ),
+      ).toBe(true);
+      expect(
+        footprintInsideRoom(
+          objectFootprint(placed),
+          scene.room,
+          PLACEMENT_LIMITS.roomInsetM,
+        ),
+      ).toBe(true);
+      // The incumbent stands in the window's clearance zone and leads the list; every
+      // swept position is clear of every zone and faces the room from its own wall.
+      if (placement === candidates[0]) continue;
+      expect(
+        zones.some((zone) => footprintsOverlap(objectFootprint(placed), zone)),
+      ).toBe(false);
+      expect(facesRoomFromAWall(scene, placed)).toBe(true);
+    }
+  });
+
+  it("moves a bookshelf out of an opening clearance onto a wall it can face the room from", () => {
+    const scene = bookshelfScene();
+    const shelf = scene.objects.find(({ id }) => id === "shelf_01")!;
+    const rotationOptions = { shelf_01: rotationOptionsFor(shelf, BOOKSHELF_VIEW_SET) };
+    const result = proposeNaturalPlacement(scene, { rotationOptions });
+    expect(result.kind).toBe("changed");
+    const placement = placementOf(result, "shelf_01");
+    const placed = placedAs(shelf, placement);
+
+    expect(
+      rotationOptions.shelf_01.some(
+        ({ rotationY }) => Math.abs(rotationY - placement.rotationY) < 1e-9,
+      ),
+    ).toBe(true);
+    expect(
+      openingClearanceZones(scene).some((zone) =>
+        footprintsOverlap(objectFootprint(placed), zone),
+      ),
+    ).toBe(false);
+    expect(facesRoomFromAWall(scene, placed)).toBe(true);
+    expect(
+      validateAndApplyPlacement(scene, result, rotationOptions),
+    ).toMatchObject({ ok: true, changed: true });
+  });
+
+  it("stays deterministic and inside the caps with both new types in the room", () => {
+    const build = (): Scene => {
+      const scene = bareRoom("catalog-caps", "sofa_01", "table_01", "chair_01", "plant_01");
+      scene.openings = [
+        {
+          id: "window_back",
+          kind: "window",
+          wall: "back",
+          offset: 0.62,
+          widthM: 1.6,
+          heightM: 1.2,
+        },
+      ];
+      scene.objects.push(catalogObject("side_01", "side_table", 0.4, 0.4));
+      scene.objects.push(catalogObject("shelf_01", "bookshelf", -0.6, 1.4));
+      return SceneSchema.parse(scene);
+    };
+    const shelf = build().objects.find(({ id }) => id === "shelf_01")!;
+    const rotationOptions = {
+      shelf_01: rotationOptionsFor(shelf, BOOKSHELF_VIEW_SET),
+    };
+    const run = () => proposeNaturalPlacement(build(), { rotationOptions });
+
+    const first = run();
+    expect(first.kind).not.toBe("failed");
+    expect(JSON.stringify(first)).toBe(JSON.stringify(run()));
+    if (first.kind === "failed") return;
+    expect(first.diagnostics.evaluatedLayouts).toBeLessThanOrEqual(
+      PLACEMENT_LIMITS.beamWidth * 8,
+    );
+
+    // Both new types are movable, non-rug objects to the command adapter.
+    if (first.kind !== "changed") return;
+    expect(first.placements.map(({ objectId }) => objectId).sort()).toEqual([
+      "chair_01",
+      "plant_01",
+      "shelf_01",
+      "side_01",
+      "sofa_01",
+      "table_01",
+    ]);
+    expect(
+      validateAndApplyPlacement(build(), first, rotationOptions),
+    ).toMatchObject({ ok: true, changed: true });
   });
 });

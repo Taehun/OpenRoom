@@ -142,7 +142,8 @@ marks a rendered view as approximate when the nearest one is more than 45° off.
 | Facing math | `src/features/photo/photo-facing.ts` |
 | View registry and selection | `src/features/photo/photo-views.ts` (`PHOTO_ASSET_SETS`) |
 | Generated view manifest | `src/features/photo/photo-views.generated.ts` |
-| Offline pipeline | `scripts/openroom-assets/` (`pnpm assets:views`) |
+| Generated product cutouts | `src/features/photo/photo-products.generated.ts` |
+| Offline pipelines | `scripts/openroom-assets/` (`pnpm assets:views`, `pnpm assets:products`) |
 
 The photographed 3/4 cutout plus its mirror already covers every facing within
 80° of the camera, so the demo works with an empty manifest. The missing views
@@ -165,6 +166,19 @@ images, an order of magnitude of a few US dollars at `quality=high`; check
 current image pricing before running it over a real catalog. Generated views are
 reviewed and committed like any other asset. See
 [docs/asset-views.md](docs/asset-views.md).
+
+The same directory holds a second, independent mode. `pnpm assets:products`
+photographs the missing **front-quarter** cutout for every catalog product that
+has no registered asset: it asks the configured provider — Gemini
+(`gemini-3.1-flash-image`) by default, OpenAI when `OPENAI_API_KEY` is the key
+present — for a three-quarter product shot on a pure white studio background,
+removes that background by flooding in from the borders so whites inside the
+product survive, feathers the alpha edge, measures the same floor anchor (plus a
+bounding-box floor quad for rugs), writes a lossless WebP into
+`public/demo/photo/products/`, and appends to `photo-products.generated.ts`.
+`PHOTO_ASSETS` is the union of the hand-registered cutouts and the generated
+ones, so a generated product is registered, audited, and composited exactly like
+a photographed one.
 
 ## Prerequisites
 
@@ -203,7 +217,8 @@ local environment file; never commit them.
 | `pnpm test:e2e:commerce` | Run the Playwright Shopify-mode journeys (port 3001). |
 | `pnpm mcp:openroom` | Start the localhost MCP companion for Claude Desktop, Claude Code, or Codex CLI. |
 | `pnpm mcp:openroom` | Start the localhost MCP companion for Claude Desktop, Claude Code, or Codex CLI. |
-| `pnpm assets:views` | Generate the missing cutout views offline (developer-run; needs `OPENAI_API_KEY`). Add `--dry-run` to only print the plan. |
+| `pnpm assets:views` | Generate the missing cutout views offline (developer-run; needs `GEMINI_API_KEY` or `OPENAI_API_KEY`). Add `--dry-run` to only print the plan. |
+| `pnpm assets:products` | Generate the missing product front-quarter cutouts offline (developer-run; same keys). Add `--dry-run` to only print the plan. |
 | `pnpm cf-typegen` | Generate Cloudflare Worker types. |
 | `pnpm dev:vinext` | Start vinext locally on port 3001. |
 | `pnpm build:vinext` | Build the vinext Cloudflare Workers target. |
@@ -258,13 +273,17 @@ bundle. OpenRoom never needs a Shopify access token.
 | `NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN` | empty | Bare store host such as `your-store.myshopify.com`. Required in `shopify` mode; a missing or invalid value falls back to demo mode, recorded in `CommerceConfig` as `not-configured` or `invalid-domain`, and the approval sheet shows that reason. |
 | `NEXT_PUBLIC_SHOPIFY_VARIANTS` | empty | Optional comma-separated `productId=gid://shopify/ProductVariant/<id>` pairs that override `src/features/commerce/shopify-variants.ts`. |
 | `ASSET_PROVIDER` | `cached` | Assets are cached; no live generation exists. |
-| `OPENAI_API_KEY` | empty | Script-only. Read from `.env.local` by `pnpm assets:views`; never bundled, never logged, never used by the app. |
-| `OPENROOM_IMAGE_MODEL` | `gpt-image-1` | Script-only. The image model the view pipeline calls. |
-| `OPENROOM_IMAGE_QUALITY` | `high` | Script-only. `low`, `medium`, or `high` for the view pipeline. |
+| `GEMINI_API_KEY` | empty | Script-only. Read from `.env.local` by the asset pipelines; never bundled, never logged, never used by the app. |
+| `OPENAI_API_KEY` | empty | Script-only. The same, for the OpenAI provider. |
+| `OPENROOM_IMAGE_PROVIDER` | see below | Script-only. `gemini` or `openai`; unset picks OpenAI when `OPENAI_API_KEY` is set, otherwise Gemini. |
+| `OPENROOM_IMAGE_MODEL_GEMINI` | `gemini-3.1-flash-image` | Script-only. The Gemini image model. |
+| `OPENROOM_IMAGE_MODEL` | `gpt-image-1` | Script-only. The OpenAI image model. |
+| `OPENROOM_IMAGE_QUALITY` | `high` | Script-only. `low`, `medium`, or `high` for the OpenAI provider. |
 
-The three `OPENAI_*`/`OPENROOM_IMAGE_*` values are read only by
-`scripts/openroom-assets/generate-views.ts` when you run `pnpm assets:views`
-by hand. No runtime code path, build step, or CI job reads them.
+Those `*_API_KEY`/`OPENROOM_IMAGE_*` values are read only by
+`scripts/openroom-assets/` when you run `pnpm assets:views` or
+`pnpm assets:products` by hand. No runtime code path, build step, or CI job
+reads them.
 
 ## Commerce integration
 

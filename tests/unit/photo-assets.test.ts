@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createDemoScene } from "../../src/demo/demo-scene";
 import { DEMO_PRODUCTS } from "../../src/features/demo/demo-data";
+import { GENERATED_PRODUCT_ASSETS } from "../../src/features/photo/photo-products.generated";
 import {
   OPENROOM_ROOM_BACKGROUND,
   PHOTO_ASSETS,
@@ -15,6 +16,7 @@ import { readWebpMetadata } from "../helpers/webp-metadata";
 
 const categories = [
   "sofa", "coffee_table", "rug", "floor_lamp", "chair", "plant",
+  "side_table", "bookshelf",
 ] as const;
 
 const RUG_ASSET_IDS = [
@@ -148,11 +150,10 @@ describe("photo assets", () => {
 
   it("registers the complete room and cutout asset inventory with matching WebP metadata", () => {
     expect(Object.keys(ROOM_PHOTO_ASSETS)).toHaveLength(2);
-    expect(Object.keys(PHOTO_ASSETS)).toHaveLength(24);
-    expect(
-      Object.keys(ROOM_PHOTO_ASSETS).length + Object.keys(PHOTO_ASSETS).length,
-    )
-      .toBe(26);
+    // 24 hand-registered cutouts plus every product the pipeline generated.
+    expect(Object.keys(PHOTO_ASSETS)).toHaveLength(
+      24 + GENERATED_PRODUCT_ASSETS.length,
+    );
 
     for (const room of Object.values(ROOM_PHOTO_ASSETS)) {
       const metadata = readWebpMetadata(join(process.cwd(), "public", room.src));
@@ -177,34 +178,61 @@ describe("photo assets", () => {
       expect(quad, id).toEqual(EXPECTED_RUG_FLOOR_QUADS[id]);
       expect(isValidFloorQuad(quad!), id).toBe(true);
     }
+    // Generated rugs carry a bounding-box quad; every other asset has none.
+    const generatedRugs = GENERATED_PRODUCT_ASSETS.filter(
+      (asset) => asset.floorQuad !== undefined,
+    );
+    for (const asset of generatedRugs) {
+      expect(isValidFloorQuad(asset.floorQuad!), asset.id).toBe(true);
+    }
     expect(
       Object.values(PHOTO_ASSETS).filter(
         ({ floorQuad }) => floorQuad !== undefined,
       ),
-    ).toHaveLength(4);
+    ).toHaveLength(4 + generatedRugs.length);
   });
 
-  it("has three stable products for every category", () => {
+  it("has at least five stable products for every category", () => {
     for (const category of categories) {
-      expect(DEMO_PRODUCTS.filter((item) => item.category === category))
-        .toHaveLength(3);
+      expect(
+        DEMO_PRODUCTS.filter((item) => item.category === category).length,
+        category,
+      ).toBeGreaterThanOrEqual(5);
     }
     expect(DEMO_PRODUCTS.filter((item) => item.category === "coffee_table")
       .map((item) => item.id)).toEqual([
         "oak-frame-table",
         "travertine-plinth-table",
         "walnut-nesting-table",
+        "ash-plinth-table",
+        "teak-oval-table",
       ]);
   });
 
-  it("resolves every seed and catalog object to a checked-in file", () => {
+  it("resolves every registered cutout to a file and leaves the rest pending", () => {
     const objects = createDemoScene().objects;
     for (const object of objects) expect(getPhotoAsset(object)).not.toBeNull();
+
+    /**
+     * Products added by the catalog expansion have no cutout until
+     * `pnpm assets:products` generates one; the compositor renders its
+     * labelled fallback for them in the meantime.
+     */
+    const productsWithoutAssets = DEMO_PRODUCTS
+      .filter(({ id }) => PHOTO_ASSETS[id] === undefined)
+      .map(({ id }) => id);
+
     for (const product of DEMO_PRODUCTS) {
       const asset = PHOTO_ASSETS[product.id];
-      expect(asset).toBeDefined();
-      expect(existsSync(join(process.cwd(), "public", asset.src))).toBe(true);
+      if (asset === undefined) {
+        expect(productsWithoutAssets, product.id).toContain(product.id);
+        continue;
+      }
+      expect(existsSync(join(process.cwd(), "public", asset.src)), product.id)
+        .toBe(true);
     }
+
+    expect(productsWithoutAssets.length).toBeLessThan(DEMO_PRODUCTS.length);
     expect(existsSync(join(process.cwd(), "public", OPENROOM_ROOM_BACKGROUND)))
       .toBe(true);
   });

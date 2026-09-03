@@ -17,6 +17,8 @@ export const SceneObjectTypeSchema = z.enum([
   "floor_lamp",
   "chair",
   "plant",
+  "side_table",
+  "bookshelf",
   "unknown",
 ]);
 
@@ -27,6 +29,8 @@ export const ProductCategorySchema = z.enum([
   "floor_lamp",
   "chair",
   "plant",
+  "side_table",
+  "bookshelf",
 ]);
 
 export const SceneProductSchema = z

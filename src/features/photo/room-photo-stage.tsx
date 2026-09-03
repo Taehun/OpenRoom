@@ -55,6 +55,8 @@ const OBJECT_LABELS: Record<SceneObject["type"], string> = {
   floor_lamp: "Floor lamp",
   chair: "Chair",
   plant: "Plant",
+  side_table: "Side table",
+  bookshelf: "Bookshelf",
   unknown: "Room object",
 };
 

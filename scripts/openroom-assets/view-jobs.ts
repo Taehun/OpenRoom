@@ -63,6 +63,8 @@ const CATEGORY_LABELS: Readonly<Record<SceneObjectType, string>> = Object.freeze
   floor_lamp: "floor lamp",
   plant: "plant",
   rug: "rug",
+  side_table: "side table",
+  bookshelf: "bookshelf",
   unknown: "furniture piece",
 });
 

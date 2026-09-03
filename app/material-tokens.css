@@ -145,6 +145,8 @@
   --openroom-finish-oak: rgb(207 174 130);
   --openroom-finish-linen: rgb(201 192 174);
   --openroom-finish-walnut: rgb(128 96 75);
+  --openroom-finish-travertine: rgb(214 201 181);
+  --openroom-finish-steel: rgb(72 74 76);
 
   /* The cast shadow under a cutout on the room photo; opacity is per object. */
   --openroom-contact-shadow: rgb(27 28 25);
