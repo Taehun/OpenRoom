@@ -3,6 +3,7 @@ import { describe, expect, test, vi } from "vitest";
 import { DEMO_PRODUCTS } from "../../src/features/demo/demo-data";
 import { createSceneStore } from "../../src/features/scene/scene-store";
 import type { SceneStore } from "../../src/features/scene/scene-store";
+import type { Scene } from "../../src/features/scene/scene-schema";
 import {
   createCoreTools,
   type ModelContextTool,
@@ -69,6 +70,20 @@ function errorCode(result: Awaited<ReturnType<ModelContextTool["execute"]>>) {
 }
 
 describe("WebMCP Core 6 handlers", () => {
+  test("finds the modern-organic coffee table by style query", async () => {
+    const store = createSceneStore();
+    const { context } = createContext(store);
+    const result = await execute(createCoreTools(context), "search_products", {
+      category: "coffee_table",
+      query: "modern",
+    });
+
+    expect(result.structuredContent.ok).toBe(true);
+    if (!result.structuredContent.ok) return;
+    expect((result.structuredContent.data as { results: CatalogProduct[] })
+      .results.map(({ id }) => id)).toEqual(["travertine-plinth-table"]);
+  });
+
   test("searches, replaces the selected table, and rejects a stale move", async () => {
     const store = createSceneStore();
     const { context } = createContext(store);
@@ -96,6 +111,8 @@ describe("WebMCP Core 6 handlers", () => {
     expect(store.getState().scene.revision).toBe(2);
     expect(store.getState().scene.objects.find(({ id }) => id === "table_01")
       ?.product?.id).toBe("travertine-plinth-table");
+    expect(store.getState().scene.objects.find(({ id }) => id === "table_01")
+      ?.assetId).toBe("travertine-plinth-table");
 
     const staleMove = await execute(tools, "move_object", {
       objectId: "lamp_01",
@@ -111,6 +128,40 @@ describe("WebMCP Core 6 handlers", () => {
       retryable: true,
     });
     expect(store.getState().scene.revision).toBe(2);
+  });
+
+  test("returns the atomically arranged sixth replacement in the strict Core 6 shape", async () => {
+    const store = createSceneStore();
+    const tools = createCoreTools(createContext(store).context);
+    const objectIds = store.getState().scene.objects.map(({ id }) => id);
+    let finalResult: Awaited<ReturnType<ModelContextTool["execute"]>> | undefined;
+
+    for (let index = 0; index < objectIds.length; index += 1) {
+      const objectId = objectIds[index]!;
+      const object = store.getState().scene.objects.find(({ id }) => id === objectId)!;
+      const product = DEMO_PRODUCTS.find(({ category }) => category === object.type)!;
+      finalResult = await execute(tools, "replace_object", {
+        objectId,
+        productId: product.id,
+        expectedRevision: index + 1,
+        expectedStateVersion: index + 1,
+      });
+      expect(finalResult.structuredContent.ok).toBe(true);
+    }
+
+    if (!finalResult || !finalResult.structuredContent.ok) {
+      throw new Error("Expected the final replacement to succeed");
+    }
+    const data = finalResult.structuredContent.data as {
+      scene: Scene;
+      message: string;
+    };
+    expect(finalResult.structuredContent.sceneRevision).toBe(7);
+    expect(finalResult.structuredContent.stateVersion).toBe(7);
+    expect(data.scene).toEqual(store.getState().scene);
+    expect(data.scene.revision).toBe(7);
+    expect(Object.keys(data).sort()).toEqual(["message", "scene"]);
+    expect("placementOutcome" in data).toBe(false);
   });
 
   test("rejects a revision ABA with the monotonic state version", async () => {

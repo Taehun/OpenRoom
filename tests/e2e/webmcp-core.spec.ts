@@ -30,6 +30,15 @@ declare global {
   }
 }
 
+const CORE_6 = [
+  "add_scene_to_cart",
+  "get_scene",
+  "get_selection",
+  "move_object",
+  "replace_object",
+  "search_products",
+] as const;
+
 test("completes WebMCP Core 6 against the shared demo Scene", async ({
   page,
 }) => {
@@ -76,14 +85,14 @@ test("completes WebMCP Core 6 against the shared demo Scene", async ({
   appOrigin = new URL(page.url()).origin;
   await expect
     .poll(() =>
-      page.evaluate(() => Object.keys(window.__webMcpTools).length),
+      page.evaluate(() => Object.keys(window.__webMcpTools).sort()),
     )
-    .toBe(6);
+    .toEqual([...CORE_6]);
   await expect
     .poll(() =>
-      page.evaluate(() => window.__webMcpActiveToolNames.size),
+      page.evaluate(() => [...window.__webMcpActiveToolNames].sort()),
     )
-    .toBe(6);
+    .toEqual([...CORE_6]);
 
   const selection = await page.evaluate(() =>
     window.__webMcpTools.get_selection?.execute(
@@ -116,7 +125,12 @@ test("completes WebMCP Core 6 against the shared demo Scene", async ({
 
   const replacement = await page.evaluate((productId) =>
     window.__webMcpTools.replace_object?.execute(
-      { productId, expectedRevision: 1, expectedStateVersion: 1 },
+      {
+        objectId: "table_01",
+        productId,
+        expectedRevision: 1,
+        expectedStateVersion: 1,
+      },
       { signal: new AbortController().signal },
     ), results?.results[1]?.id);
   expect(replacement?.structuredContent).toMatchObject({
@@ -128,7 +142,38 @@ test("completes WebMCP Core 6 against the shared demo Scene", async ({
   await expect(diagnostics).toContainText(
     "Revision 2 · table_01 · travertine-plinth-table",
   );
+  await expect(
+    page.locator('[data-object-id="table_01"] img'),
+  ).toHaveAttribute(
+    "src",
+    "/demo/photo/products/travertine-plinth-table.webp",
+  );
+  const sceneAfterReplacement = await page.evaluate(() =>
+    window.__webMcpTools.get_scene?.execute(
+      {},
+      { signal: new AbortController().signal },
+    ),
+  );
+  const sceneData = sceneAfterReplacement?.structuredContent.data as
+    | {
+        objects: Array<{
+          id: string;
+          product?: { id: string };
+          source: string;
+        }>;
+      }
+    | undefined;
+  expect(
+    sceneData?.objects.filter((object) => object.source === "product"),
+  ).toEqual([
+    expect.objectContaining({
+      id: "table_01",
+      product: expect.objectContaining({ id: "travertine-plinth-table" }),
+    }),
+  ]);
 
+  const lamp = page.locator('[data-object-id="lamp_01"]');
+  const lampStyleBeforeStaleMove = await lamp.getAttribute("style");
   const staleMove = await page.evaluate(() =>
     window.__webMcpTools.move_object?.execute(
       {
@@ -152,6 +197,16 @@ test("completes WebMCP Core 6 against the shared demo Scene", async ({
   await expect(diagnostics).toContainText(
     "Revision 2 · table_01 · travertine-plinth-table",
   );
+  const sceneAfterStaleMove = await page.evaluate(() =>
+    window.__webMcpTools.get_scene?.execute(
+      {},
+      { signal: new AbortController().signal },
+    ),
+  );
+  expect(sceneAfterStaleMove?.structuredContent.data).toEqual(
+    sceneAfterReplacement?.structuredContent.data,
+  );
+  expect(await lamp.getAttribute("style")).toBe(lampStyleBeforeStaleMove);
 
   await page.evaluate(() => {
     const fetch = window.fetch;

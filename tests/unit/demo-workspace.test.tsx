@@ -1,6 +1,7 @@
 import {
   act,
   cleanup,
+  fireEvent,
   render,
   screen,
   waitFor,
@@ -8,13 +9,25 @@ import {
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, expect, test, vi } from "vitest";
+import { createDemoScene } from "../../src/demo/demo-scene";
 import { DemoWorkspace } from "../../src/features/demo/demo-workspace";
+import { createSceneStore } from "../../src/features/scene/scene-store";
 import type { ModelContextTool } from "../../src/webmcp/tool-handlers";
+import { completedProductScene } from "../helpers/natural-placement-fixtures";
 
 interface CapturedRegistration {
   signal: AbortSignal;
   tool: ModelContextTool;
 }
+
+const CORE_6 = [
+  "add_scene_to_cart",
+  "get_scene",
+  "get_selection",
+  "move_object",
+  "replace_object",
+  "search_products",
+] as const;
 
 afterEach(() => {
   cleanup();
@@ -40,6 +53,12 @@ test("connects the Core 6 journey to the shared Scene and approval UI", async ()
   const { unmount } = render(<DemoWorkspace />);
 
   await waitFor(() => expect(registrations).toHaveLength(6));
+  expect(registrations.map(({ tool }) => tool.name).sort()).toEqual([
+    ...CORE_6,
+  ]);
+  expect(
+    screen.getByRole("status", { name: "Native WebMCP status" }),
+  ).toHaveTextContent("Available");
   const tool = (name: ModelContextTool["name"]) => {
     const descriptor = registrations.find(
       (registration) => registration.tool.name === name,
@@ -102,7 +121,7 @@ test("moves from object inspection to product preview", async () => {
   await user.click(screen.getByRole("button", { name: "Find alternatives" }));
 
   const products = screen.getByRole("region", {
-    name: "Tables for your room",
+    name: "Coffee tables for your room",
   });
   expect(within(products).getAllByRole("article")).toHaveLength(3);
 
@@ -117,21 +136,169 @@ test("moves from object inspection to product preview", async () => {
   ).toHaveTextContent("Revision 2 · table_01 · oak-frame-table");
 });
 
-test("exposes the interactive 3D room and its accessible object controls", () => {
+test("exposes six photo controls and six object-rail controls", () => {
   render(<DemoWorkspace />);
 
+  const stage = screen.getByRole("region", { name: "Editable room photo" });
+  const objectRail = screen.getByRole("region", { name: "Objects in room" });
+  expect(stage).toBeVisible();
+  expect(objectRail).toBeVisible();
   expect(
-    screen.getByRole("region", { name: "Interactive 3D room" }),
+    within(stage).getAllByRole("button", {
+      name: /sofa|coffee table|rug|floor lamp|chair|plant/i,
+    }),
+  ).toHaveLength(6);
+  expect(
+    within(objectRail).getAllByRole("button", {
+      name: /sofa|coffee table|rug|floor lamp|chair|plant/i,
+    }),
+  ).toHaveLength(6);
+  expect(
+    screen.queryByRole("button", { name: /run agent move/i }),
+  ).not.toBeInTheDocument();
+  expect(
+    screen.getByRole("button", { name: "Copy redesign prompt" }),
   ).toBeVisible();
-  expect(screen.getByRole("region", { name: "Objects in room" })).toBeVisible();
-  expect(screen.getByRole("button", { name: "Coffee table" })).toBeVisible();
+  expect(
+    screen.getByRole("status", { name: "Native WebMCP status" }),
+  ).toHaveTextContent("Unavailable");
+});
+
+test("arranges through Human UI and one Undo restores the Scene", async () => {
+  const user = userEvent.setup();
+  render(<DemoWorkspace />);
+  const before = screen.getByRole("status", { name: "Scene diagnostics" }).textContent;
+
+  await user.click(screen.getByRole("button", { name: "Arrange naturally" }));
+  expect(screen.getByRole("status", { name: "Placement status" }))
+    .toHaveTextContent("Placement improved");
+  expect(screen.getByRole("button", { name: "Undo placement" })).toBeVisible();
+  expect(screen.getByRole("status", { name: "Scene diagnostics" }).textContent)
+    .not.toBe(before);
+
+  await user.click(screen.getByRole("button", { name: "Undo placement" }));
+  expect(screen.getByRole("status", { name: "Scene diagnostics" }).textContent)
+    .toBe(before);
+});
+
+// A later commit owns the top of the history stack, so `Undo placement` would pop that
+// command rather than the arrangement (spec §4.2/§5.3). The affordance must disappear
+// with the notice it belongs to.
+test("drops the Undo placement affordance after a later keyboard move", async () => {
+  const user = userEvent.setup();
+  const store = createSceneStore();
+  render(<DemoWorkspace store={store} />);
+  const stage = screen.getByRole("region", { name: "Editable room photo" });
+
+  await user.click(screen.getByRole("button", { name: "Arrange naturally" }));
+  expect(screen.getByRole("button", { name: "Undo placement" })).toBeVisible();
+
+  act(() => {
+    store.getState().selectObject("table_01");
+    store.getState().setToolMode("move");
+  });
+  const table = within(stage).getByRole("button", { name: "Coffee table" });
+  const revision = store.getState().scene.revision;
+  fireEvent.keyDown(table, { key: "ArrowRight" });
+
+  expect(store.getState().scene.revision).toBe(revision + 1);
+  expect(
+    screen.queryByRole("button", { name: "Undo placement" }),
+  ).not.toBeInTheDocument();
+  expect(
+    screen.queryByRole("status", { name: "Placement status" }),
+  ).not.toBeInTheDocument();
+});
+
+test("disables natural arrangement while a pointer transform is active", () => {
+  render(<DemoWorkspace />);
+  const stage = screen.getByRole("region", { name: "Editable room photo" });
+  vi.spyOn(stage, "getBoundingClientRect").mockReturnValue({
+    bottom: 550,
+    height: 450,
+    left: 100,
+    right: 900,
+    top: 100,
+    width: 800,
+    x: 100,
+    y: 100,
+    toJSON: () => ({}),
+  });
+
+  fireEvent.pointerDown(within(stage).getByRole("button", { name: "Coffee table" }), {
+    pointerId: 1,
+    clientX: 500,
+    clientY: 300,
+  });
+
+  expect(screen.getByRole("button", { name: "Arrange naturally" })).toBeDisabled();
+});
+
+test("disables natural arrangement when every scene object is locked", () => {
+  const scene = createDemoScene();
+  for (const object of scene.objects) object.locked = true;
+  const store = createSceneStore(scene);
+  render(<DemoWorkspace store={store} />);
+
+  expect(screen.getByRole("button", { name: "Arrange naturally" })).toBeDisabled();
+});
+
+test.each([
+  {
+    name: "an unchanged proposal",
+    proposePlacement: () => ({
+      kind: "unchanged" as const,
+      reason: "already-safe" as const,
+      diagnostics: { currentScore: 10, proposedScore: 10, evaluatedLayouts: 1 },
+    }),
+    message: "Current placement is already the safest option",
+  },
+  {
+    name: "a failed proposal",
+    proposePlacement: () => ({
+      kind: "failed" as const,
+      reason: "no-valid-layout" as const,
+    }),
+    message: "Could not improve placement; the room was left unchanged",
+  },
+])("shows the exact status and no Undo for $name", async ({ proposePlacement, message }) => {
+  const user = userEvent.setup();
+  const store = createSceneStore(completedProductScene(), { proposePlacement });
+  const revision = store.getState().scene.revision;
+  render(<DemoWorkspace store={store} />);
+
+  await user.click(screen.getByRole("button", { name: "Arrange naturally" }));
+
+  expect(screen.getByRole("status", { name: "Placement status" }))
+    .toHaveTextContent(message);
+  expect(screen.queryByRole("button", { name: "Undo placement" })).not.toBeInTheDocument();
+  expect(store.getState().scene.revision).toBe(revision);
+});
+
+test("shows three alternatives for the selected chair category", async () => {
+  const user = userEvent.setup();
+  render(<DemoWorkspace />);
+
+  const stage = screen.getByRole("region", { name: "Editable room photo" });
+  await user.click(within(stage).getByRole("button", { name: "Chair" }));
+  await user.click(screen.getByRole("button", { name: "Find alternatives" }));
+
+  const products = screen.getByRole("region", {
+    name: "Chairs for your room",
+  });
+  expect(within(products).getAllByRole("article")).toHaveLength(3);
+  expect(within(products).getByText("Ash Lounge Chair")).toBeVisible();
+  expect(within(products).getByText("Boucle Barrel Chair")).toBeVisible();
+  expect(within(products).getByText("Cognac Sling Chair")).toBeVisible();
+  expect(within(products).queryByText("Oak Frame Table")).not.toBeInTheDocument();
 });
 
 test("uses Scene selection without incrementing revision", async () => {
   const user = userEvent.setup();
   render(<DemoWorkspace />);
 
-  await user.click(screen.getByRole("button", { name: "Chair" }));
+  const objectRail = screen.getByRole("region", { name: "Objects in room" });
+  await user.click(within(objectRail).getByRole("button", { name: "Chair" }));
 
   expect(screen.getByText("Lounge chair")).toBeVisible();
   expect(screen.getByText("Revision 1")).toBeVisible();
@@ -215,7 +382,10 @@ test("Escape closes the cart before clearing the selected object", async () => {
   const user = userEvent.setup();
   render(<DemoWorkspace />);
 
-  const coffeeTable = screen.getByRole("button", { name: "Coffee table" });
+  const objectRail = screen.getByRole("region", { name: "Objects in room" });
+  const coffeeTable = within(objectRail).getByRole("button", {
+    name: "Coffee table",
+  });
   expect(coffeeTable).toHaveAttribute("aria-pressed", "true");
 
   await user.click(screen.getByRole("button", { name: "View cart" }));
@@ -250,28 +420,130 @@ test("activates move and rotate tools for Scene transforms", async () => {
   expect(move).toHaveAttribute("aria-pressed", "false");
 });
 
-test("runs the Agent move and supports keyboard undo", async () => {
+test("copies prompt guidance without changing Scene revision or state version", async () => {
+  const registrations: CapturedRegistration[] = [];
+  Object.defineProperty(document, "modelContext", {
+    configurable: true,
+    value: {
+      async registerTool(
+        tool: ModelContextTool,
+        options?: { signal?: AbortSignal },
+      ) {
+        if (!options?.signal) throw new Error("Expected a registration signal");
+        registrations.push({ signal: options.signal, tool });
+      },
+    },
+  });
   const user = userEvent.setup();
+  const writeText = vi
+    .spyOn(navigator.clipboard, "writeText")
+    .mockResolvedValue(undefined);
+  render(<DemoWorkspace />);
+  await waitFor(() => expect(registrations).toHaveLength(6));
+  const getScene = registrations.find(
+    ({ tool }) => tool.name === "get_scene",
+  )?.tool;
+  if (!getScene) throw new Error("Missing get_scene");
+  const signal = new AbortController().signal;
+  const before = await getScene.execute({}, { signal });
+
+  await user.click(
+    screen.getByRole("button", { name: "Copy redesign prompt" }),
+  );
+
+  expect(writeText).toHaveBeenCalledWith(
+    "Redesign this room as a warm minimal Japandi interior. Replace every outdated unlocked item with a coherent catalog result, keep the sofa on the left, and leave a clear path to the windows. Read the latest scene after each change.",
+  );
+  expect(screen.getByRole("status", { name: "Prompt copy status" }))
+    .toHaveTextContent("Prompt copied");
+  expect(screen.getByText("Prompt copied")).toBeVisible();
+  const after = await getScene.execute({}, { signal });
+  expect(after.structuredContent.sceneRevision).toBe(
+    before.structuredContent.sceneRevision,
+  );
+  expect(after.structuredContent.stateVersion).toBe(
+    before.structuredContent.stateVersion,
+  );
+});
+
+test("reports rejected prompt copies without changing Scene revision or state version", async () => {
+  const registrations: CapturedRegistration[] = [];
+  Object.defineProperty(document, "modelContext", {
+    configurable: true,
+    value: {
+      async registerTool(
+        tool: ModelContextTool,
+        options?: { signal?: AbortSignal },
+      ) {
+        if (!options?.signal) throw new Error("Expected a registration signal");
+        registrations.push({ signal: options.signal, tool });
+      },
+    },
+  });
+  const user = userEvent.setup();
+  vi.spyOn(navigator.clipboard, "writeText").mockRejectedValueOnce(
+    new DOMException("Denied", "NotAllowedError"),
+  );
+  render(<DemoWorkspace />);
+  await waitFor(() => expect(registrations).toHaveLength(6));
+  const getScene = registrations.find(
+    ({ tool }) => tool.name === "get_scene",
+  )?.tool;
+  if (!getScene) throw new Error("Missing get_scene");
+  const signal = new AbortController().signal;
+  const before = await getScene.execute({}, { signal });
+
+  await user.click(
+    screen.getByRole("button", { name: "Copy redesign prompt" }),
+  );
+
+  expect(screen.getByRole("status", { name: "Prompt copy status" }))
+    .toHaveTextContent("Could not copy. Select and copy the prompt manually.");
+  const after = await getScene.execute({}, { signal });
+  expect(after.structuredContent.sceneRevision).toBe(
+    before.structuredContent.sceneRevision,
+  );
+  expect(after.structuredContent.stateVersion).toBe(
+    before.structuredContent.stateVersion,
+  );
+});
+
+test("keeps the latest copy result visible when attempts settle in reverse order", async () => {
+  let rejectFirstCopy!: (reason?: unknown) => void;
+  let resolveSecondCopy!: () => void;
+  const firstCopy = new Promise<void>((_, reject) => {
+    rejectFirstCopy = reject;
+  });
+  const secondCopy = new Promise<void>((resolve) => {
+    resolveSecondCopy = resolve;
+  });
+  const user = userEvent.setup();
+  const writeText = vi
+    .spyOn(navigator.clipboard, "writeText")
+    .mockReturnValueOnce(firstCopy)
+    .mockReturnValueOnce(secondCopy);
   render(<DemoWorkspace />);
 
-  await user.click(screen.getByRole("button", { name: "Run Agent move" }));
-  expect(
-    screen.getByRole("heading", { name: "Agent activity" }),
-  ).toBeVisible();
-  expect(screen.getByText("get_scene")).toBeVisible();
-  expect(screen.getByText("move_object")).toBeVisible();
-  expect(screen.getByText("Lamp moved to match your layout")).toBeVisible();
-  expect(screen.getByText("Revision 2")).toBeVisible();
+  const copyPrompt = screen.getByRole("button", {
+    name: "Copy redesign prompt",
+  });
+  await user.click(copyPrompt);
+  await user.click(copyPrompt);
+  expect(writeText).toHaveBeenCalledTimes(2);
 
-  await user.click(screen.getByRole("button", { name: "Floor lamp" }));
-  expect(screen.getByText("X 2.31 · Y 0.80 · Z −2.13")).toBeVisible();
+  await act(async () => {
+    resolveSecondCopy();
+    await Promise.resolve();
+  });
+  expect(screen.getByRole("status", { name: "Prompt copy status" }))
+    .toHaveTextContent("Prompt copied");
 
-  await user.keyboard("{Control>}z{/Control}");
-  expect(
-    screen.getByRole("heading", { name: "Object inspector" }),
-  ).toBeVisible();
-  expect(screen.getByText("Revision 1")).toBeVisible();
-  expect(screen.getByText("X 2.73 · Y 0.80 · Z −2.13")).toBeVisible();
+  await act(async () => {
+    rejectFirstCopy(new DOMException("Denied", "NotAllowedError"));
+    await Promise.resolve();
+  });
+  expect(screen.getByRole("status", { name: "Prompt copy status" }))
+    .toHaveTextContent("Prompt copied");
 });
 
 test("Reset Demo restores the canonical inspector state", async () => {

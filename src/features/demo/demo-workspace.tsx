@@ -13,6 +13,7 @@ import {
   useSceneStore,
   useSceneStoreApi,
 } from "../scene/scene-context";
+import type { SceneStore } from "../scene/scene-store";
 import { CartApprovalSheet } from "./cart-approval-sheet";
 import { ContextPanel } from "./context-panel";
 import { createInitialDemoState, demoReducer } from "./demo-state";
@@ -24,9 +25,9 @@ import styles from "./demo-workspace.module.css";
 import type { ToolContext } from "../../webmcp/tool-context";
 import { useWebMcpTools } from "../../webmcp/use-webmcp-tools";
 
-export function DemoWorkspace() {
+export function DemoWorkspace({ store }: { store?: SceneStore } = {}) {
   return (
-    <SceneStoreProvider>
+    <SceneStoreProvider store={store}>
       <DemoWorkspaceContent />
     </SceneStoreProvider>
   );
@@ -126,23 +127,6 @@ function DemoWorkspaceContent() {
           expectedRevision: store.scene.revision,
           actor: "human",
           command: { type: "replace", objectId, product: sceneProduct },
-        });
-        if (result.ok) dispatch(action);
-        return;
-      }
-
-      if (action.type === "run-agent-move") {
-        const lamp = store.scene.objects.find(({ id }) => id === "lamp_01");
-        if (!lamp) return;
-
-        const result = store.applyCommand({
-          expectedRevision: store.scene.revision,
-          actor: "agent",
-          command: {
-            type: "move",
-            objectId: lamp.id,
-            position: { x: lamp.position[0] - 0.42, z: lamp.position[2] },
-          },
         });
         if (result.ok) dispatch(action);
         return;

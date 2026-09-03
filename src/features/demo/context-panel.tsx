@@ -130,19 +130,34 @@ function ProductsPanel({
   dispatch: Dispatch<DemoAction>;
   scene: Scene;
 }) {
-  const tableProductId = scene.objects.find(({ id }) => id === "table_01")
-    ?.product?.id;
+  const selectedObject = scene.objects.find(
+    ({ id }) => id === scene.selectedObjectId,
+  );
+  const alternatives = selectedObject
+    ? DEMO_PRODUCTS.filter(({ category }) => category === selectedObject.type)
+    : [];
+  const categoryHeading = selectedObject
+    ? {
+        sofa: "Sofas for your room",
+        coffee_table: "Coffee tables for your room",
+        rug: "Rugs for your room",
+        floor_lamp: "Floor lamps for your room",
+        chair: "Chairs for your room",
+        plant: "Plants for your room",
+        unknown: "Products for your room",
+      }[selectedObject.type]
+    : "Products for your room";
 
   return (
     <section
       aria-labelledby="products-title"
-      aria-label="Tables for your room"
+      aria-label={categoryHeading}
       className={styles.productsPanel}
     >
       <div className={styles.panelHeadingWithAction}>
         <div>
           <span className={styles.panelEyebrow}>Product alternatives</span>
-          <h2 id="products-title">Tables for your room</h2>
+          <h2 id="products-title">{categoryHeading}</h2>
         </div>
         <button
           className={styles.textButton}
@@ -157,8 +172,8 @@ function ProductsPanel({
       </p>
 
       <div className={styles.productList}>
-        {DEMO_PRODUCTS.map((product, index) => {
-          const isPreviewing = product.id === tableProductId;
+        {alternatives.map((product, index) => {
+          const isPreviewing = product.id === selectedObject?.product?.id;
 
           return (
             <article
@@ -227,44 +242,22 @@ function ActivityPanel({
         </button>
       </div>
 
-      <blockquote className={styles.agentPrompt}>
-        “Move the lamp to work with this layout.”
-      </blockquote>
-
-      <ol className={styles.activityList}>
-        <li>
-          <span className={styles.activityIcon} aria-hidden="true">
-            01
-          </span>
-          <div>
-            <strong>get_scene</strong>
-            <p>Read 6 objects from revision {scene.revision - 1}.</p>
-          </div>
-          <span className={styles.completeState}>Complete</span>
-        </li>
-        <li>
-          <span className={styles.activityIcon} aria-hidden="true">
-            02
-          </span>
-          <div>
-            <strong>move_object</strong>
-            <p>Moved floor_lamp_01 by 42 cm.</p>
-          </div>
-          <span className={styles.completeState}>Complete</span>
-        </li>
-      </ol>
+      <p className={styles.agentPrompt}>
+        Real agent actions appear through the active agent surface.
+      </p>
 
       <div className={styles.revisionCard}>
         <span className={styles.revisionSpark} aria-hidden="true">
           <NookIcon name="sparkles" size={17} />
         </span>
         <span>
-          <small>Scene committed</small>
-          <strong>Agent result · rev {scene.revision}</strong>
+          <small>Scene diagnostics</small>
+          <strong>Current Scene · rev {scene.revision}</strong>
         </span>
       </div>
       <p className={styles.activityDisclosure}>
-        This activity is deterministic UI. No Agent or provider was called.
+        Ask the agent to read the latest Scene after each change, then use the
+        revision above to confirm that the workspace received it.
       </p>
     </section>
   );

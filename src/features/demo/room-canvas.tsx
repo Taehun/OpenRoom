@@ -1,5 +1,6 @@
-import dynamic from "next/dynamic";
-import type { Dispatch, FormEvent } from "react";
+import { type Dispatch, useRef, useState, useSyncExternalStore } from "react";
+import { getDocumentModelContext } from "../../webmcp/register-tools";
+import { RoomPhotoStage } from "../photo/room-photo-stage";
 import { useSceneStore } from "../scene/scene-context";
 import type { Scene } from "../scene/scene-schema";
 import type { DemoAction, DemoState } from "./demo-types";
@@ -15,15 +16,38 @@ const ROOM_OBJECTS = [
   { id: "plant_01", label: "Plant", abbreviation: "PL" },
 ] as const;
 
-const SceneCanvas = dynamic(
-  () => import("../scene/scene-canvas").then((module) => module.SceneCanvas),
-  {
-    ssr: false,
-    loading: () => (
-      <div className={styles.sceneLoading}>Building your room…</div>
-    ),
-  },
-);
+const PRIMARY_PROMPT =
+  "Redesign this room as a warm minimal Japandi interior. Replace every outdated unlocked item with a coherent catalog result, keep the sofa on the left, and leave a clear path to the windows. Read the latest scene after each change.";
+
+const OBJECT_LABELS = {
+  sofa: "Sofa",
+  coffee_table: "Coffee table",
+  rug: "Rug",
+  floor_lamp: "Floor lamp",
+  chair: "Chair",
+  plant: "Plant",
+  unknown: "Object",
+} as const;
+
+type CopyStatus =
+  | { kind: "success"; message: "Prompt copied" }
+  | {
+      kind: "error";
+      message: "Could not copy. Select and copy the prompt manually.";
+    }
+  | null;
+
+function subscribeToNativeWebMcp() {
+  return () => undefined;
+}
+
+function getNativeWebMcpSnapshot() {
+  return getDocumentModelContext() !== null;
+}
+
+function getServerNativeWebMcpSnapshot() {
+  return false;
+}
 
 interface RoomCanvasProps {
   dispatch: Dispatch<DemoAction>;
@@ -34,16 +58,37 @@ interface RoomCanvasProps {
 export function RoomCanvas({ dispatch, scene, state }: RoomCanvasProps) {
   const toolMode = useSceneStore((store) => store.toolMode);
   const setToolMode = useSceneStore((store) => store.setToolMode);
+  const arrangeNaturally = useSceneStore((store) => store.arrangeNaturally);
+  const isTransforming = useSceneStore((store) => store.isTransforming);
+  const placementNotice = useSceneStore((store) => store.placementNotice);
+  const nativeWebMcpAvailable = useSyncExternalStore(
+    subscribeToNativeWebMcp,
+    getNativeWebMcpSnapshot,
+    getServerNativeWebMcpSnapshot,
+  );
+  const [copyStatus, setCopyStatus] = useState<CopyStatus>(null);
+  const copyRequestId = useRef(0);
   const selectedObject = scene.objects.find(
     ({ id }) => id === scene.selectedObjectId,
   );
-  const previewProduct = scene.objects.find(
-    ({ id }) => id === "table_01",
-  )?.product;
 
-  function runAgentMove(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    dispatch({ type: "run-agent-move" });
+  async function copyPrompt() {
+    const requestId = copyRequestId.current + 1;
+    copyRequestId.current = requestId;
+
+    try {
+      await navigator.clipboard.writeText(PRIMARY_PROMPT);
+      if (copyRequestId.current === requestId) {
+        setCopyStatus({ kind: "success", message: "Prompt copied" });
+      }
+    } catch {
+      if (copyRequestId.current === requestId) {
+        setCopyStatus({
+          kind: "error",
+          message: "Could not copy. Select and copy the prompt manually.",
+        });
+      }
+    }
   }
 
   return (
@@ -130,29 +175,55 @@ export function RoomCanvas({ dispatch, scene, state }: RoomCanvasProps) {
       <main className={styles.canvas} aria-label="Room canvas">
         <figure className={styles.roomFigure}>
           <div
-            aria-label="Interactive 3D room"
             className={styles.sceneViewport}
-            role="region"
+            onClick={() => dispatch({ type: "show-inspector" })}
           >
-            <SceneCanvas
-              onObjectSelected={() => dispatch({ type: "show-inspector" })}
-            />
+            <RoomPhotoStage />
           </div>
           <figcaption className={styles.visuallyHidden}>
-            Approximate interactive room visualization. Use the object list as
-            a non-WebGL control path.
+            Edit catalog cutouts directly over the room photo with pointer or
+            keyboard controls.
           </figcaption>
 
           <div className={styles.canvasTopbar}>
-            <span className={styles.demoBadge}>Deterministic demo</span>
-            <span>Approximate visualization</span>
+            <span className={styles.demoBadge}>Photo placement</span>
+            <span>Live Scene transforms</span>
+            <button
+              className={styles.arrangeButton}
+              disabled={
+                isTransforming || scene.objects.every(({ locked }) => locked)
+              }
+              onClick={() => arrangeNaturally()}
+              type="button"
+            >
+              Arrange naturally
+            </button>
           </div>
+
+          {placementNotice ? (
+            <div
+              aria-atomic="true"
+              aria-label="Placement status"
+              className={styles.placementStatus}
+              role="status"
+            >
+              <span>{placementNotice.message}</span>
+              {placementNotice.kind === "manual-arranged" ? (
+                <button
+                  onClick={() => dispatch({ type: "undo" })}
+                  type="button"
+                >
+                  Undo placement
+                </button>
+              ) : null}
+            </div>
+          ) : null}
 
           {selectedObject ? (
             <div className={styles.sceneSelectionLabel} aria-hidden="true">
-              {selectedObject.id === "table_01" && previewProduct
-                ? `Previewing ${previewProduct.title}`
-                : `${ROOM_OBJECTS.find(({ id }) => id === selectedObject.id)?.label ?? "Object"} · selected`}
+              {selectedObject.product
+                ? `Previewing ${selectedObject.product.title}`
+                : `${OBJECT_LABELS[selectedObject.type]} · selected`}
             </div>
           ) : null}
 
@@ -176,22 +247,52 @@ export function RoomCanvas({ dispatch, scene, state }: RoomCanvasProps) {
           ) : null}
         </figure>
 
-        <form className={styles.composer} onSubmit={runAgentMove}>
+        <section
+          aria-label="Agent prompt guidance"
+          className={styles.composer}
+        >
           <span className={styles.composerIcon} aria-hidden="true">
             <NookIcon name="sparkles" />
           </span>
-          <label className={styles.visuallyHidden} htmlFor="agent-prompt">
-            Agent instruction
-          </label>
-          <input
-            defaultValue="Move the lamp to work with this layout."
-            id="agent-prompt"
-            type="text"
-          />
-          <button className={styles.agentButton} type="submit">
-            Run Agent move
+          <div className={styles.promptGuidance}>
+            <p>{PRIMARY_PROMPT}</p>
+            <div className={styles.promptSuggestions}>
+              <span>Modern organic, soft neutral textures</span>
+              <span>Mid-century, warm walnut and brass</span>
+            </div>
+            <div
+              aria-label="Native WebMCP status"
+              className={styles.webMcpStatus}
+              role="status"
+            >
+              Native WebMCP: {nativeWebMcpAvailable ? "Available" : "Unavailable"}
+            </div>
+            <small>
+              Copy this guidance into an active agent surface; this workspace
+              does not simulate agent actions.
+            </small>
+          </div>
+          <button
+            className={styles.agentButton}
+            onClick={copyPrompt}
+            type="button"
+          >
+            Copy redesign prompt
           </button>
-        </form>
+          {copyStatus ? (
+            <span
+              aria-label="Prompt copy status"
+              className={
+                copyStatus.kind === "success"
+                  ? styles.copyStatusSuccess
+                  : styles.copyStatusError
+              }
+              role="status"
+            >
+              {copyStatus.message}
+            </span>
+          ) : null}
+        </section>
       </main>
     </div>
   );

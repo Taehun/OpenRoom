@@ -27,12 +27,6 @@ export function demoReducer(state: DemoState, action: DemoAction): DemoState {
       return { ...state, mode: "inspector", toast: null };
     case "preview-product":
       return { ...state, mode: "products", toast: null };
-    case "run-agent-move":
-      return {
-        ...state,
-        mode: "activity",
-        toast: { message: "Lamp moved to match your layout" },
-      };
     case "open-cart":
       return { ...state, isCartOpen: true, cartDraft: action.draft ?? null };
     case "close-cart":
