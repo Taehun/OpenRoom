@@ -36,6 +36,17 @@ const CART_TOTAL_MINOR = CART_ITEMS.reduce(
   0,
 );
 
+function configurationNotice(config: CommerceContext["config"]): string | null {
+  if (config.provider !== "demo") return null;
+  if (config.reason === "not-configured") {
+    return "Shopify checkout is not configured. Set NEXT_PUBLIC_COMMERCE_PROVIDER=shopify and NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN, then rebuild.";
+  }
+  if (config.reason === "invalid-domain") {
+    return "Shopify checkout is disabled: NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN must be a bare host such as your-store.myshopify.com. Rebuild after fixing it.";
+  }
+  return null;
+}
+
 interface SheetLine {
   key: string;
   productId: string;
@@ -105,6 +116,7 @@ export function CartApprovalSheet({
     commerce.config.provider === "shopify" ? commerce.config.storeDomain : null;
   const buttonLabel =
     draft && !isShopify ? "Approve Scene cart" : "Continue to Shopify";
+  const notice = configurationNotice(commerce.config);
 
   useEffect(() => {
     closeButtonRef.current?.focus();
@@ -230,6 +242,8 @@ export function CartApprovalSheet({
               : "UI-only approval. Continuing closes this sheet and creates no external cart or network request."}
           </p>
         </div>
+
+        {notice ? <p className={styles.sheetNotice}>{notice}</p> : null}
 
         {isShopify && !canCheckout ? (
           <p className={styles.sheetNotice} role="status">

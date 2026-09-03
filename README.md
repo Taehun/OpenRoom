@@ -148,7 +148,7 @@ one. Nook never needs a Shopify access token.
 | Variable | Default | Purpose |
 | --- | --- | --- |
 | `NEXT_PUBLIC_COMMERCE_PROVIDER` | `demo` | `demo` keeps cart approval local with zero requests; `shopify` enables checkout on your store. |
-| `NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN` | empty | Bare store host such as `your-store.myshopify.com`. Required in `shopify` mode; a missing or invalid value falls back to demo mode, recorded in `CommerceConfig` as `not-configured` or `invalid-domain`, and the approval sheet stays in its demo form. |
+| `NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN` | empty | Bare store host such as `your-store.myshopify.com`. Required in `shopify` mode; a missing or invalid value falls back to demo mode, recorded in `CommerceConfig` as `not-configured` or `invalid-domain`, and the approval sheet shows that reason. |
 | `NEXT_PUBLIC_SHOPIFY_VARIANTS` | empty | Optional comma-separated `productId=gid://shopify/ProductVariant/<id>` pairs that override `src/features/commerce/shopify-variants.ts`. |
 | `ASSET_PROVIDER` | `cached` | Assets are cached; no live generation exists. |
 

@@ -1,10 +1,12 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import type { CommerceContext } from "../../src/features/commerce/commerce-types";
 import { CartApprovalSheet } from "../../src/features/demo/cart-approval-sheet";
 import type { CartApprovalDraft } from "../../src/webmcp/tool-context";
 import {
   DEMO_COMMERCE,
+  FIXTURE_VARIANTS,
   PLACEHOLDER_STORE_DOMAIN,
   SHOPIFY_COMMERCE,
 } from "../helpers/commerce-fixtures";
@@ -176,5 +178,56 @@ describe("CartApprovalSheet in shopify mode", () => {
         "No item in this cart is mapped to a Shopify variant yet.",
       ),
     ).toBeVisible();
+  });
+});
+
+describe("CartApprovalSheet configuration reasons", () => {
+  function demoCommerce(
+    reason: "default" | "not-configured" | "invalid-domain",
+  ): CommerceContext {
+    return { config: { provider: "demo", reason }, variants: FIXTURE_VARIANTS };
+  }
+
+  it("explains an unconfigured Shopify provider", () => {
+    render(
+      <CartApprovalSheet
+        commerce={demoCommerce("not-configured")}
+        dispatch={vi.fn()}
+      />,
+    );
+    expect(
+      screen.getByText(
+        "Shopify checkout is not configured. Set NEXT_PUBLIC_COMMERCE_PROVIDER=shopify and NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN, then rebuild.",
+      ),
+    ).toBeVisible();
+  });
+
+  it("explains an invalid store domain", () => {
+    render(
+      <CartApprovalSheet
+        commerce={demoCommerce("invalid-domain")}
+        dispatch={vi.fn()}
+      />,
+    );
+    expect(
+      screen.getByText(
+        "Shopify checkout is disabled: NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN must be a bare host such as your-store.myshopify.com. Rebuild after fixing it.",
+      ),
+    ).toBeVisible();
+  });
+
+  it("stays silent and demo-only when commerce is simply off", () => {
+    const dispatch = vi.fn();
+    render(
+      <CartApprovalSheet
+        commerce={demoCommerce("default")}
+        dispatch={dispatch}
+      />,
+    );
+    expect(screen.queryByText(/Shopify checkout is/)).toBeNull();
+    fireEvent.click(
+      screen.getByRole("button", { name: "Continue to Shopify · $626" }),
+    );
+    expect(dispatch).toHaveBeenCalledWith({ type: "confirm-demo-cart" });
   });
 });
