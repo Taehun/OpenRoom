@@ -116,10 +116,14 @@
 
 /* ----------------------------------------------------------------- banner */
 
-/* Both extra rows sit in the banner's second column, under the title. */
+/*
+ * Both extra rows sit in the banner's second column. The facts line comes
+ * last, quiet and after the instruction, so the browser is never named on two
+ * adjacent lines.
+ */
 .bannerFacts {
   grid-column: 2;
-  margin: 0;
+  margin: 4px 0 0;
   color: var(--md-sys-color-on-surface-variant);
   font-size: var(--md-sys-typescale-body-small-size);
   font-weight: var(--md-sys-typescale-body-small-weight);

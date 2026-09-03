@@ -10,9 +10,10 @@ import {
 import { CORE_TOOL_MANIFEST } from "../../webmcp/core-tool-manifest";
 import styles from "./home.module.css";
 
-/** Same-route query switch; it must load a new document, so never a `Link`. */
-const DASHBOARD_HREF = "/?view=dashboard";
+const HERO_HEADING_ID = "openroom-heading";
+/** The bar's jump target; `.connect` carries the sticky bar's scroll margin. */
 const CONNECT_SECTION_ID = "connect-an-ai-app";
+const CONNECT_HEADING_ID = "connect-an-ai-app-heading";
 const REPO_URL = "https://github.com/Taehun/OpenRoom";
 
 /**
@@ -191,9 +192,6 @@ function StatusBanner({
       <p className="md-banner-title" role="status">
         {title}
       </p>
-      {status === null ? null : (
-        <p className={styles.bannerFacts}>{bannerFacts(status)}</p>
-      )}
       {body === null ? null : <p className="md-banner-body">{body}</p>}
       {status?.kind === "flag-required" ? (
         <p className={styles.bannerCode}>
@@ -201,9 +199,13 @@ function StatusBanner({
         </p>
       ) : null}
       {status === null ? null : (
+        <p className={styles.bannerFacts}>{bannerFacts(status)}</p>
+      )}
+      {status === null ? null : (
         <div className="md-banner-actions">
           {status.kind === "ready" ? (
-            <a className="md-button md-button--filled" href={DASHBOARD_HREF}>
+            // eslint-disable-next-line @next/next/no-html-link-for-pages -- same-route query switch must reload: a soft navigation leaves this guide on screen without the Chromium Navigation API.
+            <a className="md-button md-button--filled" href="/?view=dashboard">
               Open the dashboard
             </a>
           ) : (
@@ -270,9 +272,10 @@ function ConnectCard({ card }: { card: ConnectCardContent }) {
           )}
         </ol>
       )}
+      {/* eslint-disable-next-line @next/next/no-html-link-for-pages -- same-route query switch must reload: a soft navigation leaves this guide on screen without the Chromium Navigation API. */}
       <a
         className={`md-button md-button--text ${styles.connectLink}`}
-        href={DASHBOARD_HREF}
+        href="/?view=dashboard"
       >
         Open the dashboard
       </a>
@@ -290,6 +293,9 @@ export function WebMcpGuide({ onCheckAgain, status }: WebMcpGuideProps) {
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 0);
+    // A hash target or a restored scroll position means the page can already
+    // be scrolled before the first scroll event ever fires.
+    onScroll();
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
@@ -312,9 +318,11 @@ export function WebMcpGuide({ onCheckAgain, status }: WebMcpGuideProps) {
       </header>
 
       <main className={styles.guide}>
-        <section className={styles.hero}>
+        <section aria-labelledby={HERO_HEADING_ID} className={styles.hero}>
           <div className={styles.heroCopy}>
-            <h1 className={styles.heroTitle}>OpenRoom</h1>
+            <h1 className={styles.heroTitle} id={HERO_HEADING_ID}>
+              OpenRoom
+            </h1>
             <p className={styles.heroTagline}>
               AI Room Planner &amp; Furniture Shopping
             </p>
@@ -343,10 +351,11 @@ export function WebMcpGuide({ onCheckAgain, status }: WebMcpGuideProps) {
         <StatusBanner onCheckAgain={onCheckAgain} status={status} />
 
         <section
-          aria-labelledby={CONNECT_SECTION_ID}
+          aria-labelledby={CONNECT_HEADING_ID}
           className={styles.connect}
+          id={CONNECT_SECTION_ID}
         >
-          <h2 className={styles.sectionTitle} id={CONNECT_SECTION_ID}>
+          <h2 className={styles.sectionTitle} id={CONNECT_HEADING_ID}>
             Connect an AI app
           </h2>
           <div className={styles.connectGrid}>
