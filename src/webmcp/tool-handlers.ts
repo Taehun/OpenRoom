@@ -2,6 +2,12 @@ import type { ZodIssue } from "zod";
 
 import { enrichCartDraft } from "../features/commerce/shopify-cart";
 import {
+  facingOf,
+  normalizeFacing,
+  rotationYOf,
+  roundFacing,
+} from "../features/photo/photo-facing";
+import {
   SceneObjectSchema,
   SceneSchema,
   type CommandResult,
@@ -18,6 +24,7 @@ import {
   replaceObjectInputSchema,
   searchProductsInputSchema,
   type CoreToolName,
+  type ToolSceneObject,
 } from "./tool-contracts";
 import {
   CatalogProductSchema,
@@ -207,6 +214,15 @@ function sceneProduct(product: CatalogProduct): SceneProduct {
   };
 }
 
+/**
+ * Orientation reaches the model as a facing vector: `rotation[1]` stays the
+ * only stored value, and every object a tool hands back carries the derived
+ * unit vector alongside it.
+ */
+function withFacing(object: SceneObject): ToolSceneObject {
+  return { ...object, facing: roundFacing(facingOf(object.rotation[1])) };
+}
+
 function draftFor(scene: Scene, objects: readonly SceneObject[]): CartApprovalDraft {
   const items = objects.flatMap((object) => {
     if (object.source !== "product" || !object.product) return [];
@@ -248,7 +264,10 @@ export function createCoreTools(context: ToolContext): readonly ModelContextTool
       "get_scene",
       snapshot.scene.revision,
       snapshot.stateVersion,
-      snapshot.scene,
+      {
+        ...snapshot.scene,
+        objects: snapshot.scene.objects.map(withFacing),
+      },
       "Scene returned.",
     );
   }
@@ -274,7 +293,7 @@ export function createCoreTools(context: ToolContext): readonly ModelContextTool
       "get_selection",
       snapshot.scene.revision,
       snapshot.stateVersion,
-      SceneObjectSchema.parse(selection),
+      withFacing(SceneObjectSchema.parse(selection)),
       "Selection returned.",
     );
   }
@@ -405,6 +424,17 @@ export function createCoreTools(context: ToolContext): readonly ModelContextTool
     );
     if (isToolError(objectId)) return objectId;
     signal.throwIfAborted();
+    // A facing vector is the same orientation in the model's frame: converting
+    // it here keeps the store, history, and conflict handling untouched. The
+    // input contract has already rejected a zero-length or doubled-up value.
+    const requestedFacing =
+      parsed.data.facing === undefined
+        ? null
+        : normalizeFacing(parsed.data.facing);
+    const rotationYDegrees =
+      requestedFacing === null
+        ? parsed.data.rotationYDegrees
+        : (rotationYOf(requestedFacing) * 180) / Math.PI;
     const result = context.applyCommand({
       expectedRevision: parsed.data.expectedRevision,
       actor: "agent",
@@ -412,7 +442,7 @@ export function createCoreTools(context: ToolContext): readonly ModelContextTool
         type: "move",
         objectId,
         position: parsed.data.position,
-        rotationYDegrees: parsed.data.rotationYDegrees,
+        rotationYDegrees,
       },
     });
     const latestStateVersion = context.getStateVersion();

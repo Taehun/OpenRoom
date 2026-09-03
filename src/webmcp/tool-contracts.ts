@@ -1,5 +1,10 @@
 import { z } from "zod";
-import { ProductCategorySchema } from "../features/scene/scene-schema";
+import { normalizeFacing } from "../features/photo/photo-facing";
+import {
+  ProductCategorySchema,
+  SceneObjectSchema,
+  SceneSchema,
+} from "../features/scene/scene-schema";
 
 export const CORE_TOOL_NAMES = [
   "get_scene",
@@ -19,6 +24,13 @@ const expectedRevision = z.number().int().min(1);
 const expectedStateVersion = z.number().int().min(1);
 const coordinate = z.number().finite().min(-20).max(20);
 const rotationYDegrees = z.number().finite().min(-360).max(360).optional();
+const facing = z
+  .object({
+    x: z.number().finite(),
+    z: z.number().finite(),
+  })
+  .strict()
+  .optional();
 const limit = z.number().int().min(1).max(3).default(3);
 
 export const getSceneInputSchema = z.object({}).strict();
@@ -58,10 +70,28 @@ export const moveObjectInputSchema = z
     objectId: objectId.optional(),
     position,
     rotationYDegrees,
+    facing,
     expectedRevision,
     expectedStateVersion,
   })
-  .strict();
+  .strict()
+  .superRefine((input, context) => {
+    if (input.facing === undefined) return;
+    if (input.rotationYDegrees !== undefined) {
+      context.addIssue({
+        code: "custom",
+        path: ["facing"],
+        message: "Provide either facing or rotationYDegrees, not both",
+      });
+    }
+    if (normalizeFacing(input.facing) === null) {
+      context.addIssue({
+        code: "custom",
+        path: ["facing"],
+        message: "facing must be a non-zero finite XZ vector",
+      });
+    }
+  });
 export type MoveObjectInput = z.infer<typeof moveObjectInputSchema>;
 
 export const addSceneToCartInputSchema = z
@@ -79,6 +109,23 @@ export const addSceneToCartInputSchema = z
   })
   .strict();
 export type AddSceneToCartInput = z.infer<typeof addSceneToCartInputSchema>;
+
+/**
+ * Tool output shapes. Every object a tool returns carries the facing derived
+ * from `rotation[1]`; the stored `SceneSchema` stays free of it, so nothing
+ * can persist a second source of truth for orientation.
+ */
+export const FacingSchema = z.object({ x: z.number(), z: z.number() }).strict();
+export const ToolSceneObjectSchema = SceneObjectSchema.extend({
+  facing: FacingSchema,
+});
+// `safeExtend` is what Zod 4 requires to overwrite a key on a schema that
+// carries refinements; the Scene's `selectedObjectId` check keeps running.
+export const ToolSceneSchema = SceneSchema.safeExtend({
+  objects: z.array(ToolSceneObjectSchema),
+});
+export type ToolSceneObject = z.infer<typeof ToolSceneObjectSchema>;
+export type ToolScene = z.infer<typeof ToolSceneSchema>;
 
 type JsonSchema = {
   type: "object";
@@ -138,6 +185,17 @@ export const MOVE_OBJECT_JSON_SCHEMA = {
       additionalProperties: false,
     },
     rotationYDegrees: { type: "number", minimum: -360, maximum: 360 },
+    facing: {
+      type: "object",
+      description:
+        "Unit XZ direction the object's front points; {x:0,z:1} faces the camera side (front wall), {x:0,z:-1} faces the back wall. Mutually exclusive with rotationYDegrees.",
+      properties: {
+        x: { type: "number" },
+        z: { type: "number" },
+      },
+      required: ["x", "z"],
+      additionalProperties: false,
+    },
     expectedRevision: { type: "integer", minimum: 1 },
     expectedStateVersion: { type: "integer", minimum: 1 },
   },

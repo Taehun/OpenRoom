@@ -36,5 +36,15 @@
       "Unmapped products appear in commerce.skipped and are not sent anywhere",
       "OpenInterior makes no external request; the agent calls update_cart and get_cart on the store MCP itself"
     ]
+  },
+  {
+    "id": "face-the-sofa",
+    "prompt": "Turn the chair to face the sofa",
+    "expectedTools": ["get_scene", "move_object"],
+    "assertions": [
+      "move_object is called with facing pointing from the chair centre toward the sofa centre",
+      "The returned scene's chair facing matches the requested direction within 0.01",
+      "rotationYDegrees is not sent together with facing"
+    ]
   }
 ]
