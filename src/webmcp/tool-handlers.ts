@@ -1,5 +1,6 @@
 import type { ZodIssue } from "zod";
 
+import { cartDraftForScene } from "../features/commerce/scene-cart";
 import { enrichCartDraft } from "../features/commerce/shopify-cart";
 import {
   facingOf,
@@ -31,7 +32,6 @@ import {
 } from "./tool-contracts";
 import {
   CatalogProductSchema,
-  type CartApprovalDraft,
   type CatalogProduct,
   type ToolContext,
 } from "./tool-context";
@@ -236,28 +236,6 @@ function withSceneFacing(scene: Scene): ToolScene {
   return {
     ...scene,
     objects: scene.objects.map((object) => withFacing(scene, object)),
-  };
-}
-
-function draftFor(scene: Scene, objects: readonly SceneObject[]): CartApprovalDraft {
-  const items = objects.flatMap((object) => {
-    if (object.source !== "product" || !object.product) return [];
-    return [{
-      objectId: object.id,
-      productId: object.product.id,
-      demoVariantId: object.product.variantId,
-      title: object.product.title,
-      quantity: 1 as const,
-      price: object.product.price,
-    }];
-  });
-
-  return {
-    id: `scene-${scene.id}-rev-${scene.revision}`,
-    sceneId: scene.id,
-    sceneRevision: scene.revision,
-    items,
-    totalMinor: items.reduce((total, item) => total + item.price.amountMinor, 0),
   };
 }
 
@@ -547,7 +525,7 @@ export function createCoreTools(context: ToolContext): readonly ModelContextTool
         (object): object is SceneObject => object !== undefined,
       );
     }
-    const baseDraft = draftFor(snapshot.scene, objects);
+    const baseDraft = cartDraftForScene(snapshot.scene, objects);
     if (baseDraft.items.length === 0) {
       return toolError(
         "add_scene_to_cart",

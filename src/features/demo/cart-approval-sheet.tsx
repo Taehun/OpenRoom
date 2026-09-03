@@ -6,18 +6,17 @@ import {
   type Dispatch,
   type KeyboardEvent,
 } from "react";
-import { CART_ITEMS } from "./demo-data";
 import type { DemoAction } from "./demo-types";
 import { OpenRoomIcon } from "./open-room-icon";
 import styles from "./demo-workspace.module.css";
 import type { CartApprovalDraft } from "../../webmcp/tool-context";
 import type { CommerceContext, CommerceDraft } from "../commerce/commerce-types";
-import { buildCommerceDraft } from "../commerce/shopify-cart";
 
 interface CartApprovalSheetProps {
   commerce: CommerceContext;
   dispatch: Dispatch<DemoAction>;
-  draft?: CartApprovalDraft | null;
+  /** The room, as a cart. Every opener builds it with `cartDraftForScene`. */
+  draft: CartApprovalDraft;
   openWindow?: (url: string) => Window | null;
 }
 
@@ -44,11 +43,6 @@ export function openInNewTab(url: string): Window | null {
 function formatPrice(priceMinor: number) {
   return `$${Math.round(priceMinor / 100).toLocaleString("en-US")}`;
 }
-
-const CART_TOTAL_MINOR = CART_ITEMS.reduce(
-  (total, item) => total + item.priceMinor,
-  0,
-);
 
 function configurationNotice(config: CommerceContext["config"]): string | null {
   if (config.provider !== "demo") return null;
@@ -81,32 +75,21 @@ export function CartApprovalSheet({
 
   const lines = useMemo<SheetLine[]>(
     () =>
-      draft
-        ? draft.items.map((item) => ({
-            key: item.objectId,
-            productId: item.productId,
-            title: item.title,
-            detail: `Qty ${item.quantity} · Scene product`,
-            priceMinor: item.price.amountMinor,
-          }))
-        : CART_ITEMS.map((item) => ({
-            key: item.id,
-            productId: item.id,
-            title: item.name,
-            detail: "Qty 1 · Demo fixture",
-            priceMinor: item.priceMinor,
-          })),
+      draft.items.map((item) => ({
+        key: item.objectId,
+        productId: item.productId,
+        title: item.title,
+        detail: `Qty ${item.quantity}`,
+        priceMinor: item.price.amountMinor,
+      })),
     [draft],
   );
+  const isEmpty = lines.length === 0;
 
-  const commerceDraft = useMemo<CommerceDraft | null>(() => {
-    if (!isShopify) return null;
-    if (draft) return draft.commerce ?? null;
-    return buildCommerceDraft(
-      commerce,
-      CART_ITEMS.map(({ id }) => ({ productId: id, quantity: 1 })),
-    );
-  }, [commerce, draft, isShopify]);
+  const commerceDraft = useMemo<CommerceDraft | null>(
+    () => (isShopify ? (draft.commerce ?? null) : null),
+    [draft, isShopify],
+  );
 
   const mappedProductIds = useMemo(
     () => new Set(commerceDraft?.lines.map(({ productId }) => productId) ?? []),
@@ -122,17 +105,13 @@ export function CartApprovalSheet({
     ? lines
         .filter(({ productId }) => mappedProductIds.has(productId))
         .reduce((total, line) => total + line.priceMinor, 0)
-    : (draft?.totalMinor ?? CART_TOTAL_MINOR);
+    : draft.totalMinor;
   const total = formatPrice(totalMinor);
   const checkoutUrl = commerceDraft?.checkoutPermalink ?? null;
   const canCheckout = isShopify && checkoutUrl !== null;
   const storeDomain =
     commerce.config.provider === "shopify" ? commerce.config.storeDomain : null;
-  const buttonLabel = isShopify
-    ? "Continue to Shopify"
-    : draft
-      ? "Approve Scene cart"
-      : "Approve demo cart";
+  const buttonLabel = isShopify ? "Continue to Shopify" : "Approve demo cart";
   const notice = configurationNotice(commerce.config);
 
   useEffect(() => {
@@ -211,33 +190,40 @@ export function CartApprovalSheet({
           </button>
         </header>
 
-        <p className={styles.sheetIntro}>
-          {isShopify
-            ? "Approving opens Shopify checkout in a new tab. OpenRoom sends nothing itself."
-            : draft
-              ? `OpenRoom has prepared ${draft.items.length} Scene item${draft.items.length === 1 ? "" : "s"} from Scene revision ${draft.sceneRevision} for your approval. Nothing has been sent to Shopify.`
-              : "OpenRoom has prepared these four fixtures for your approval. Nothing leaves this page in demo mode."}
-        </p>
+        {isEmpty ? null : (
+          <p className={styles.sheetIntro}>
+            {isShopify
+              ? "Approving opens Shopify checkout in a new tab. OpenRoom sends nothing itself."
+              : `OpenRoom has prepared ${draft.items.length} Scene item${draft.items.length === 1 ? "" : "s"} from Scene revision ${draft.sceneRevision} for your approval. Nothing has been sent to Shopify.`}
+          </p>
+        )}
 
-        <ul className={styles.cartItems}>
-          {lines.map((line, index) => (
-            <li key={line.key}>
-              <span className={styles.cartThumbnail} aria-hidden="true">
-                {String(index + 1).padStart(2, "0")}
-              </span>
-              <span className={styles.cartItemCopy}>
-                <strong>{line.title}</strong>
-                <small>{line.detail}</small>
-                {isShopify && skippedProductIds.has(line.productId) ? (
-                  <small className={styles.cartSkipped}>
-                    Not mapped to a Shopify variant
-                  </small>
-                ) : null}
-              </span>
-              <strong>{formatPrice(line.priceMinor)}</strong>
-            </li>
-          ))}
-        </ul>
+        {isEmpty ? (
+          <p className={styles.cartEmpty}>
+            Nothing to order yet. Add products with Find alternatives or ask
+            your AI app.
+          </p>
+        ) : (
+          <ul className={styles.cartItems}>
+            {lines.map((line, index) => (
+              <li key={line.key}>
+                <span className={styles.cartThumbnail} aria-hidden="true">
+                  {String(index + 1).padStart(2, "0")}
+                </span>
+                <span className={styles.cartItemCopy}>
+                  <strong>{line.title}</strong>
+                  <small>{line.detail}</small>
+                  {isShopify && skippedProductIds.has(line.productId) ? (
+                    <small className={styles.cartSkipped}>
+                      Not mapped to a Shopify variant
+                    </small>
+                  ) : null}
+                </span>
+                <strong>{formatPrice(line.priceMinor)}</strong>
+              </li>
+            ))}
+          </ul>
+        )}
 
         <div className={styles.cartTotal}>
           <span>
@@ -262,7 +248,7 @@ export function CartApprovalSheet({
 
         {notice ? <p className={styles.sheetNotice}>{notice}</p> : null}
 
-        {isShopify && !canCheckout ? (
+        {isShopify && !isEmpty && !canCheckout ? (
           <p className={styles.sheetNotice} role="status">
             No item in this cart is mapped to a Shopify variant yet.
           </p>
@@ -279,14 +265,14 @@ export function CartApprovalSheet({
 
         <div className={styles.sheetActions}>
           <button
-            aria-label={`${buttonLabel} · ${total}`}
+            aria-label={isEmpty ? buttonLabel : `${buttonLabel} · ${total}`}
             className={styles.commerceButton}
-            disabled={isShopify && !canCheckout}
+            disabled={isEmpty || (isShopify && !canCheckout)}
             onClick={handleContinue}
             type="button"
           >
             <span>{buttonLabel}</span>
-            <strong>{total}</strong>
+            {isEmpty ? null : <strong>{total}</strong>}
           </button>
           <button
             className={styles.cancelButton}

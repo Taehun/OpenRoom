@@ -50,9 +50,11 @@ post-mount availability event, so this package intentionally does not poll,
 monkey-patch, or dynamically re-register; unsupported documents keep the human
 editor.
 
-Cart operations open a visible, local approval sheet. In the default `demo`
-mode the original human four-item `$626 USD` fixture and product-backed WebMCP
-Scene drafts both emit no external cart write or network request. Shopify
+Cart operations open a visible, local approval sheet, and the sheet is always
+the room: the header's View cart button and `add_scene_to_cart` build the same
+draft from the room's product-backed objects, so a room holding no catalog
+product opens an honest empty state instead of a fixture. In the default `demo`
+mode approving emits no external cart write or network request. Shopify
 checkout is available through cart permalinks and the store's Storefront MCP
 endpoint, with no server route, no access token, and no request made by
 OpenRoom itself; see [Commerce integration](#commerce-integration). A

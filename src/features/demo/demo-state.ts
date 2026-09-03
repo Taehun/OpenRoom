@@ -1,7 +1,7 @@
 import type { DemoAction, DemoState } from "./demo-types";
 
 export type { DemoAction, DemoProduct, DemoState } from "./demo-types";
-export { CART_ITEMS, DEMO_PRODUCTS } from "./demo-data";
+export { DEMO_PRODUCTS } from "./demo-data";
 
 const INITIAL_STATE: DemoState = {
   mode: "inspector",

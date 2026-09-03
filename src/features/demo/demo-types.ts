@@ -7,12 +7,6 @@ export interface DemoProduct extends SceneProduct {
   description: string;
 }
 
-export interface DemoCartItem {
-  id: string;
-  name: string;
-  priceMinor: number;
-}
-
 export interface DemoToast {
   message: string;
 }

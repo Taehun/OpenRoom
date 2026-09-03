@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { CART_ITEMS, DEMO_PRODUCTS } from "../../src/features/demo/demo-data";
+import { DEMO_PRODUCTS } from "../../src/features/demo/demo-data";
 import {
   SHOPIFY_VARIANTS,
   loadShopifyVariants,
@@ -13,11 +13,8 @@ const GID_A = "gid://shopify/ProductVariant/1001";
 const GID_B = "gid://shopify/ProductVariant/1002";
 
 describe("SHOPIFY_VARIANTS", () => {
-  it("lists every catalog product and fixture cart item, unmapped by default", () => {
-    const expectedKeys = [
-      ...DEMO_PRODUCTS.map(({ id }) => id),
-      ...CART_ITEMS.map(({ id }) => id),
-    ].sort();
+  it("lists every catalog product, and nothing else, unmapped by default", () => {
+    const expectedKeys = DEMO_PRODUCTS.map(({ id }) => id).sort();
     expect(Object.keys(SHOPIFY_VARIANTS).sort()).toEqual(expectedKeys);
     expect(Object.values(SHOPIFY_VARIANTS).every((gid) => gid === null)).toBe(true);
   });
