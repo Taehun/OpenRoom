@@ -30,10 +30,27 @@ declare global {
   }
 }
 
-/** Records every request the context makes that is not the app or the store. */
-function watchRequests(page: Page) {
+/**
+ * Stubs the store domain and records the traffic. Every journey must call this
+ * before navigating: the route is what keeps a request to the store inside the
+ * browser, and `foreign` deliberately whitelists that domain, so a journey that
+ * only watched would let a real request reach Shopify and still see `foreign`
+ * empty. Registered on the context, so popups are covered too.
+ */
+async function watchNetwork(page: Page) {
+  const storeRequests: string[] = [];
   const foreign: string[] = [];
   const consoleErrors: string[] = [];
+  await page.context().route(`https://${STORE}/**`, (route) => {
+    storeRequests.push(route.request().url());
+    return route.fulfill({
+      status: 200,
+      contentType: "text/html",
+      // The inline icon keeps Chromium from issuing a second /favicon.ico hit,
+      // so `storeRequests` stays an exact record of what the app opened.
+      body: '<title>stub</title><link rel="icon" href="data:,">',
+    });
+  });
   page.context().on("request", (request) => {
     const url = request.url();
     if (!url.startsWith(APP_ORIGIN) && !url.startsWith(`https://${STORE}`)) {
@@ -45,7 +62,7 @@ function watchRequests(page: Page) {
       consoleErrors.push(`${message.type()}: ${message.text()}`);
     }
   });
-  return { foreign, consoleErrors };
+  return { storeRequests, foreign, consoleErrors };
 }
 
 async function captureModelContextTools(page: Page) {
@@ -81,18 +98,7 @@ test("opens a Shopify cart permalink in a new tab without any request from Nook"
   context,
   page,
 }) => {
-  const storeRequests: string[] = [];
-  await context.route(`https://${STORE}/**`, (route) => {
-    storeRequests.push(route.request().url());
-    return route.fulfill({
-      status: 200,
-      contentType: "text/html",
-      // The inline icon keeps Chromium from issuing a second /favicon.ico hit,
-      // so `storeRequests` stays an exact record of what the app opened.
-      body: '<title>stub</title><link rel="icon" href="data:,">',
-    });
-  });
-  const { foreign, consoleErrors } = watchRequests(page);
+  const { storeRequests, foreign, consoleErrors } = await watchNetwork(page);
 
   await page.goto("/demo");
   await page.getByRole("button", { name: "View cart" }).click();
@@ -153,7 +159,7 @@ test("opens a Shopify cart permalink in a new tab without any request from Nook"
 test("returns Shopify lines and the store MCP endpoint from add_scene_to_cart", async ({
   page,
 }) => {
-  const { foreign, consoleErrors } = watchRequests(page);
+  const { storeRequests, foreign, consoleErrors } = await watchNetwork(page);
   await captureModelContextTools(page);
 
   await page.goto("/demo");
@@ -212,7 +218,9 @@ test("returns Shopify lines and the store MCP endpoint from add_scene_to_cart", 
     dialog.getByRole("button", { name: "Continue to Shopify · $169" }),
   ).toBeEnabled();
 
-  // Building the draft is local: nothing left the app origin.
+  // Building the draft is local: nothing left the app origin, and nothing was
+  // sent to the store — the permalink is data on the draft, not a request.
+  expect(storeRequests).toEqual([]);
   expect(foreign).toEqual([]);
   expect(consoleErrors).toEqual([]);
 });
