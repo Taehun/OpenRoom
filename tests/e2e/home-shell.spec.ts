@@ -52,8 +52,9 @@ test("guides a browser without WebMCP to the flag and the demo", async ({
   await expect(
     banner.getByRole("button", { name: "Copy flag address" }),
   ).toBeVisible();
+  // The hero link comes first; the banner and connect cards repeat the label.
   await expect(
-    page.getByRole("link", { name: "Open the demo" }),
+    page.getByRole("link", { name: "Open the demo" }).first(),
   ).toHaveAttribute("href", "/demo");
 
   // Claude Desktop and Claude Code reach the Scene through the local
@@ -120,7 +121,8 @@ test("renders the workspace as the dashboard when WebMCP is present", async ({
   await expect(
     banner.getByRole("link", { name: "Open the demo" }),
   ).toHaveAttribute("href", "/?view=dashboard");
+  // The hero link comes first; the banner and connect cards repeat the label.
   await expect(
-    page.getByRole("link", { name: "Open the demo" }),
+    page.getByRole("link", { name: "Open the demo" }).first(),
   ).toHaveAttribute("href", "/demo");
 });
