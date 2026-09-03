@@ -527,7 +527,7 @@ test("opens a pairing dialog with the accessible code and port fields", async ()
   expect(dialog).toBeVisible();
   expect(
     within(dialog).getByText(
-      "Run pnpm mcp:openroom in the repository and type the six-digit code it prints.",
+      "Type the six-digit code the companion wrote to ~/openroom-mcp.log.",
     ),
   ).toBeVisible();
 
@@ -537,7 +537,7 @@ test("opens a pairing dialog with the accessible code and port fields", async ()
   expect(code).toHaveAttribute("maxLength", "6");
   expect(code).toHaveAttribute("autoComplete", "off");
   expect(code).toHaveAccessibleDescription(
-    "Run pnpm mcp:openroom in the repository and type the six-digit code it prints.",
+    "Type the six-digit code the companion wrote to ~/openroom-mcp.log.",
   );
 
   // The relay port is an expert setting, folded behind a closed disclosure.

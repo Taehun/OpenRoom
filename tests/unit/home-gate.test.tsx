@@ -122,6 +122,11 @@ describe("the one-screen guide", () => {
     ).toHaveLength(3);
     expect(within(connect).getByText(CONNECT_COMMANDS.claude)).toBeVisible();
     expect(within(connect).getByText(CONNECT_COMMANDS.codex)).toBeVisible();
+    // Each CLI card tails the log the registered command appends to.
+    expect(within(connect).getAllByText(CONNECT_COMMANDS.log)).toHaveLength(2);
+    // The client starts the companion, so the guide never asks the reader to
+    // run a second one: that fails with EADDRINUSE or pairs nothing.
+    expect(within(connect).queryByText("pnpm mcp:openroom")).toBeNull();
 
     expect(screen.getByRole("link", { name: "Open the demo" })).toHaveAttribute(
       "href",
@@ -228,10 +233,12 @@ describe("the one-screen guide", () => {
     });
     const copies = within(claudeCard).getAllByRole("button", { name: "Copy" });
     expect(copies).toHaveLength(2);
+    // The client launches the companion: the first step registers it behind
+    // the stderr-log wrapper, the second tails that log for the pair code.
     await user.click(copies[0]!);
-    expect(writeText).toHaveBeenLastCalledWith(CONNECT_COMMANDS.start);
-    await user.click(copies[1]!);
     expect(writeText).toHaveBeenLastCalledWith(CONNECT_COMMANDS.claude);
+    await user.click(copies[1]!);
+    expect(writeText).toHaveBeenLastCalledWith(CONNECT_COMMANDS.log);
   });
 
   it("lists the six agent tools from the core manifest", () => {

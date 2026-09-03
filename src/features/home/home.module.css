@@ -217,16 +217,20 @@
 }
 
 /*
- * A command wraps only at its spaces: every token (`--dir`, `<repo>`,
- * `mcp:openroom`) stays whole, and nothing scrolls or clips. `.md-code` keeps
- * its default wrapping for the inline spans elsewhere in the guide.
+ * A command wraps at its spaces first, so tokens (`--dir`, `<repo>`,
+ * `mcp:openroom`) stay whole wherever they fit; `overflow-wrap: anywhere` is
+ * the fallback for the one token too long for a narrow card — the quoted
+ * `2>>"$HOME/openroom-mcp.log"` redirect — so nothing scrolls or clips at
+ * 390 px. The text is unchanged, so the copy buttons still write the exact
+ * command. `.md-code` keeps its default wrapping for the inline spans
+ * elsewhere in the guide.
  */
 .commandRow code {
   flex: 0 1 auto;
   min-width: 0;
   max-width: 100%;
   white-space: pre-wrap;
-  overflow-wrap: normal;
+  overflow-wrap: anywhere;
   word-break: normal;
   line-height: 1.5;
 }
