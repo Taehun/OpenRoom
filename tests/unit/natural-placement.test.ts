@@ -1566,3 +1566,19 @@ describe("rotation options", () => {
     });
   });
 });
+
+describe("composition without a sofa", () => {
+  it("still keeps a lamp out of the foreground when no sofa exists", () => {
+    const scene = createDemoScene();
+    scene.objects = scene.objects.filter(({ type }) => type !== "sofa");
+    const lamp = scene.objects.find(({ type }) => type === "floor_lamp")!;
+    const front = { ...scene, objects: scene.objects.map((o) => (o.id === lamp.id ? { ...o, position: [-2.0, o.position[1], scene.room.depth / 2 - 0.3] as [number, number, number] } : o)) };
+    const back = { ...scene, objects: scene.objects.map((o) => (o.id === lamp.id ? { ...o, position: [-2.0, o.position[1], -scene.room.depth / 2 + 0.3] as [number, number, number] } : o)) };
+    const scoreOf = (s: typeof scene) => proposeNaturalPlacement(s).kind === "failed" ? null : (proposeNaturalPlacement(s) as { diagnostics: { currentScore: number | null } }).diagnostics.currentScore;
+    const frontScore = scoreOf(front);
+    const backScore = scoreOf(back);
+    expect(frontScore).not.toBeNull();
+    expect(backScore).not.toBeNull();
+    expect(backScore!).toBeGreaterThan(frontScore!);
+  });
+});

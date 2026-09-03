@@ -756,8 +756,14 @@ function compositionContribution(
   objects: readonly SceneObject[],
   object: SceneObject,
 ): number {
-  if (object.type === "floor_lamp") return lampAdjacencyTerm(objects, object);
   const footprint = objectFootprint(object);
+  if (object.type === "floor_lamp") {
+    // With no sofa to stand beside, a lamp is judged like any other object: it
+    // should at least stay out of the foreground.
+    return firstObject(objects, "sofa")
+      ? lampAdjacencyTerm(objects, object)
+      : foregroundTerm(scene, footprint);
+  }
   const foreground = foregroundTerm(scene, footprint);
   return object.type === "plant"
     ? Math.round((foreground + plantCornerTerm(scene, footprint)) / 2)

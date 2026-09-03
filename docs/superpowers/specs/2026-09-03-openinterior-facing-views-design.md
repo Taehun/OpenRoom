@@ -357,7 +357,8 @@ entry), times 1000, rounded.
   `room.depth / 2 - 1.0`, falling linearly to 0 at `room.depth / 2 - 0.1`;
 - lamp adjacency (floor lamps only, replaces the foreground term for them at
   weight 1:1): proximity of the lateral edge gap to a sofa end to 0.15m over
-  0.5m, 0 when there is no sofa or the lamp is not within the sofa's depth band;
+  0.5m, 0 when the lamp is not within the sofa's depth band; when the scene has
+  no sofa the lamp falls back to the foreground term like any other object;
 - plant corner term (plants only, 1:1 with the foreground term): 1 when both
   the `x` and `z` wall gaps are at most 0.3m, 0.5 when one is, else 0.
 
