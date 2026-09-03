@@ -48,8 +48,8 @@ Views come from the asset's symmetry class (`PHOTO_VIEW_SYMMETRY`):
 | Category | Symmetry | Generated views |
 | --- | --- | --- |
 | `sofa`, `chair`, `unknown` | `none` | `side`, `back-quarter`, `back` |
-| `coffee_table` | `front-back` | `side` (one image serves a facing and its opposite) |
-| `floor_lamp`, `plant`, `rug` | `radial` | none — one image serves every facing |
+| `coffee_table`, `bookshelf` | `front-back` | `side` (one image serves a facing and its opposite) |
+| `floor_lamp`, `plant`, `rug`, `side_table` | `radial` | none — one image serves every facing |
 
 `pnpm assets:views --dry-run` prints the exact job list for the current catalog
 (the unit tests pin that count through `EXPECTED_VIEW_JOBS`).
