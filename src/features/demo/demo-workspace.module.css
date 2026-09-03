@@ -124,6 +124,7 @@
 .previewButton,
 .previewButtonActive,
 .agentButton,
+.pairButton,
 .commerceButton,
 .cancelButton,
 .toolButton,
@@ -142,6 +143,9 @@
 .previewButton:focus-visible,
 .previewButtonActive:focus-visible,
 .agentButton:focus-visible,
+.pairButton:focus-visible,
+.pairSecondaryButton:focus-visible,
+.localAgentField input:focus-visible,
 .commerceButton:focus-visible,
 .cancelButton:focus-visible,
 .toolButton:focus-visible,
@@ -746,7 +750,7 @@
   align-items: start;
   gap: 10px;
   min-height: 128px;
-  padding: 13px 14px 13px 18px;
+  padding: 8px 14px 8px 18px;
   border-top: 1px solid var(--warm-divider);
   background: var(--paper);
 }
@@ -761,23 +765,37 @@
   color: var(--moss);
 }
 
+/*
+ * Two columns so the example prompts and the native WebMCP status share a row.
+ * Everything else spans the full width. The photo stage is centred in whatever
+ * height this section leaves, so a row saved here is two pixels of clearance
+ * won back under the placement status band.
+ */
 .promptGuidance {
   display: grid;
-  gap: 5px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 3px 10px;
   min-width: 0;
+}
+
+.promptGuidance > p,
+.promptGuidance > .localAgent,
+.promptGuidance > small {
+  grid-column: 1 / -1;
 }
 
 .promptGuidance p {
   margin: 0;
   font-size: 0.71rem;
-  line-height: 1.4;
+  line-height: 1.3;
 }
 
 .promptGuidance small,
 .webMcpStatus {
   color: var(--muted-text);
   font-size: 0.61rem;
-  line-height: 1.35;
+  line-height: 1.3;
 }
 
 .promptSuggestions {
@@ -787,7 +805,7 @@
 }
 
 .promptSuggestions span {
-  padding: 3px 6px;
+  padding: 2px 6px;
   border: 1px solid var(--warm-divider);
   border-radius: 999px;
   color: var(--moss);
@@ -813,6 +831,78 @@
 
 .agentButton:hover {
   background: #4e5b40;
+}
+
+.localAgent {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+}
+
+.localAgentField {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--muted-text);
+  font-size: 0.59rem;
+}
+
+.localAgentField input {
+  width: 74px;
+  min-height: 24px;
+  padding: 2px 6px;
+  border: 1px solid var(--warm-divider);
+  border-radius: 5px;
+  background: var(--paper);
+  color: var(--ink);
+  font-size: 0.62rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.localAgentPort input {
+  width: 62px;
+}
+
+.pairButton,
+.pairSecondaryButton {
+  min-height: 26px;
+  padding: 0 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.6rem;
+  font-weight: 700;
+}
+
+.pairButton {
+  background: var(--moss);
+  color: white;
+}
+
+.pairButton:hover:not(:disabled) {
+  background: #4e5b40;
+}
+
+.pairButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.38;
+}
+
+.pairSecondaryButton {
+  border: 1px solid var(--warm-divider);
+  background: transparent;
+  color: var(--ink);
+  font-weight: 650;
+}
+
+.pairSecondaryButton:hover {
+  background: var(--limestone);
+}
+
+.pairNote {
+  color: var(--muted-text);
+  font-size: 0.59rem;
+  line-height: 1.35;
 }
 
 .copyStatusSuccess,

@@ -24,6 +24,7 @@ import { WorkspaceHeader } from "./workspace-header";
 import styles from "./demo-workspace.module.css";
 import type { ToolContext } from "../../webmcp/tool-context";
 import { useWebMcpTools } from "../../webmcp/use-webmcp-tools";
+import { useLocalMcpRelay } from "../../local-mcp/use-local-mcp-relay";
 import { ACTIVE_COMMERCE } from "../commerce/commerce-runtime";
 import type { CommerceContext } from "../commerce/commerce-types";
 
@@ -116,6 +117,7 @@ function DemoWorkspaceContent({
   );
 
   useWebMcpTools(toolContext);
+  const localMcp = useLocalMcpRelay(toolContext);
 
   const routeAction = useCallback<Dispatch<DemoAction>>(
     (action) => {
@@ -218,7 +220,12 @@ function DemoWorkspaceContent({
           least 1280px wide for the complete atelier.
         </div>
         <div className={styles.workspaceBody}>
-          <RoomCanvas dispatch={routeAction} scene={scene} state={state} />
+          <RoomCanvas
+            dispatch={routeAction}
+            localMcp={localMcp}
+            scene={scene}
+            state={state}
+          />
           <ContextPanel dispatch={routeAction} scene={scene} state={state} />
         </div>
 

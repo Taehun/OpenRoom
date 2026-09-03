@@ -58,9 +58,11 @@ export function WorkspaceHeader({
 
       <div className={styles.headerActions}>
         {guideHref ? (
-          <Link className={styles.quietButton} href={guideHref}>
+          // Same-route query switch: a soft navigation would leave the
+          // workspace mounted in browsers without the Navigation API.
+          <a className={styles.quietButton} href={guideHref}>
             <span>Guide</span>
-          </Link>
+          </a>
         ) : null}
         <button
           className={styles.quietButton}

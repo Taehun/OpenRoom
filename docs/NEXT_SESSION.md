@@ -392,3 +392,25 @@ implemented.
 
 Merging, pushing, opening a pull request, and deploying remain the branch
 owner's decision.
+
+## Local MCP companion
+
+Added on branch `feat/local-mcp-companion`; this supersedes the "plan-only" note
+above. `pnpm mcp:openinterior` runs `scripts/openinterior-mcp/server.ts`: an
+official MCP SDK v2 stdio server that advertises exactly the Core 6 from
+`src/webmcp/core-tool-manifest.ts` and forwards every `tools/call` to one
+explicitly paired browser page over a `127.0.0.1` relay. The process keeps no
+Scene state, prints its port and single-use pair code to stderr only, and tears
+the relay down once on `SIGINT`, `SIGTERM`, or stdin close.
+
+- `OPENINTERIOR_MCP_PORT` (`0` or `1024`-`65535`, default `43110`) and
+  `OPENINTERIOR_ALLOWED_ORIGINS` (exact, comma separated) configure it.
+- `tests/integration/local-mcp-companion.test.ts` drives the real spawned
+  process with the official `@modelcontextprotocol/client`; it now runs as part
+  of `pnpm test` (`tests/integration/**/*.test.ts` was added to the Vitest
+  include).
+- Setup for Claude Desktop, Claude Code, and Codex CLI is in
+  `docs/local-mcp.md`; the surface matrix is in the README.
+- The pair code is single use, but exactly one is always live: the companion
+  mints a replacement after five failed attempts and whenever a paired page
+  disconnects or misses its heartbeat, so re-pairing never needs a restart.

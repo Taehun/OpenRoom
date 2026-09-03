@@ -11,7 +11,7 @@ import {
 } from "../../webmcp/browser-compatibility";
 import styles from "./home.module.css";
 
-/** Copied from `src/webmcp/tool-handlers.ts`; keep both in step. */
+/** Copied from `src/webmcp/core-tool-manifest.ts`; keep both in step. */
 const CORE_TOOLS: ReadonlyArray<{
   name: CoreToolName;
   description: string;
@@ -203,6 +203,16 @@ export function WebMcpGuide({ onCheckAgain, status }: WebMcpGuideProps) {
             >
               Check again
             </button>
+            <p className={styles.companionNote}>
+              Using Claude Desktop or Claude Code?{" "}
+              {/* eslint-disable-next-line @next/next/no-html-link-for-pages --
+                  same-route query switch must reload: a soft navigation leaves
+                  this guide on screen without the Chromium Navigation API. */}
+              <a className={styles.inlineLink} href="/?view=dashboard">
+                Open the dashboard
+              </a>{" "}
+              and pair with the local companion.
+            </p>
           </>
         )}
       </section>

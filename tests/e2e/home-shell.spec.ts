@@ -57,6 +57,30 @@ test("guides a browser without WebMCP to the flag and the demo", async ({
   await expect(
     page.getByRole("link", { name: "Open the demo" }),
   ).toHaveAttribute("href", "/demo");
+
+  // Claude Desktop and Claude Code reach the Scene through the local
+  // companion, so this browser must still be able to open the dashboard.
+  const dashboard = card.getByRole("link", { name: "Open the dashboard" });
+  await expect(dashboard).toBeVisible();
+  await expect(dashboard).toHaveAttribute("href", "/?view=dashboard");
+  await dashboard.click();
+
+  await expect(page.getByRole("main", { name: "Room canvas" })).toBeVisible();
+  await expect(
+    page.getByRole("status", { name: "Claude connection status" }),
+  ).toHaveText("Claude: Not connected");
+  await expect(page.getByLabel("Pairing code")).toBeVisible();
+
+  await page.getByRole("link", { name: "Guide" }).click();
+  await expect(
+    page.getByRole("region", { name: "WebMCP compatibility" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("heading", {
+      level: 1,
+      name: "The room becomes the storefront.",
+    }),
+  ).toBeVisible();
 });
 
 test("renders the workspace as the dashboard when WebMCP is present", async ({

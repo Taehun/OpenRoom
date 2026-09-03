@@ -9,13 +9,8 @@ import {
   type SceneObject,
   type SceneProduct,
 } from "../features/scene/scene-schema";
+import { CORE_TOOL_MANIFEST } from "./core-tool-manifest";
 import {
-  ADD_SCENE_TO_CART_JSON_SCHEMA,
-  GET_SCENE_JSON_SCHEMA,
-  GET_SELECTION_JSON_SCHEMA,
-  MOVE_OBJECT_JSON_SCHEMA,
-  REPLACE_OBJECT_JSON_SCHEMA,
-  SEARCH_PRODUCTS_JSON_SCHEMA,
   addSceneToCartInputSchema,
   getSceneInputSchema,
   getSelectionInputSchema,
@@ -54,6 +49,8 @@ export interface ModelContextTool {
     options: ModelContextToolExecutionOptions,
   ): Promise<ToolResult<unknown>>;
 }
+
+type ToolExecutor = ModelContextTool["execute"];
 
 interface ContextSnapshot {
   scene: Scene;
@@ -203,299 +200,299 @@ function draftFor(scene: Scene, objects: readonly SceneObject[]): CartApprovalDr
 }
 
 export function createCoreTools(context: ToolContext): readonly ModelContextTool[] {
-  return [
-    {
-      name: "get_scene",
-      description: "Return the current validated Scene.",
-      inputSchema: GET_SCENE_JSON_SCHEMA,
-      annotations: { readOnlyHint: true, untrustedContentHint: true },
-      async execute(input, { signal }) {
-        const snapshot = currentState(context, signal);
-        const parsed = getSceneInputSchema.safeParse(input);
-        if (!parsed.success) {
-          return invalidInputResult(
-            "get_scene",
-            snapshot.scene.revision,
-            snapshot.stateVersion,
-            parsed.error,
-          );
-        }
-        return toolSuccess(
-          "get_scene",
-          snapshot.scene.revision,
-          snapshot.stateVersion,
-          snapshot.scene,
-          "Scene returned.",
-        );
+  async function executeGetScene(
+    input: unknown,
+    { signal }: ModelContextToolExecutionOptions,
+  ): Promise<ToolResult<unknown>> {
+    const snapshot = currentState(context, signal);
+    const parsed = getSceneInputSchema.safeParse(input);
+    if (!parsed.success) {
+      return invalidInputResult(
+        "get_scene",
+        snapshot.scene.revision,
+        snapshot.stateVersion,
+        parsed.error,
+      );
+    }
+    return toolSuccess(
+      "get_scene",
+      snapshot.scene.revision,
+      snapshot.stateVersion,
+      snapshot.scene,
+      "Scene returned.",
+    );
+  }
+
+  async function executeGetSelection(
+    input: unknown,
+    { signal }: ModelContextToolExecutionOptions,
+  ): Promise<ToolResult<unknown>> {
+    const snapshot = currentState(context, signal);
+    const parsed = getSelectionInputSchema.safeParse(input);
+    if (!parsed.success) {
+      return invalidInputResult(
+        "get_selection",
+        snapshot.scene.revision,
+        snapshot.stateVersion,
+        parsed.error,
+      );
+    }
+    signal.throwIfAborted();
+    const selection = context.getSelection();
+    if (selection === null) return noSelectionResult("get_selection", snapshot);
+    return toolSuccess(
+      "get_selection",
+      snapshot.scene.revision,
+      snapshot.stateVersion,
+      SceneObjectSchema.parse(selection),
+      "Selection returned.",
+    );
+  }
+
+  async function executeSearchProducts(
+    input: unknown,
+    { signal }: ModelContextToolExecutionOptions,
+  ): Promise<ToolResult<unknown>> {
+    const snapshot = currentState(context, signal);
+    const parsed = searchProductsInputSchema.safeParse(input);
+    if (!parsed.success) {
+      return invalidInputResult(
+        "search_products",
+        snapshot.scene.revision,
+        snapshot.stateVersion,
+        parsed.error,
+      );
+    }
+    signal.throwIfAborted();
+    const products = CatalogProductSchema.array().safeParse(
+      context.searchProducts(parsed.data),
+    );
+    if (!products.success) {
+      return catalogFailure("search_products", snapshot, products.error.issues);
+    }
+    return toolSuccess(
+      "search_products",
+      snapshot.scene.revision,
+      snapshot.stateVersion,
+      { results: products.data },
+      "Products returned.",
+    );
+  }
+
+  async function executeReplaceObject(
+    input: unknown,
+    { signal }: ModelContextToolExecutionOptions,
+  ): Promise<ToolResult<unknown>> {
+    const snapshot = currentState(context, signal);
+    const parsed = replaceObjectInputSchema.safeParse(input);
+    if (!parsed.success) {
+      return invalidInputResult(
+        "replace_object",
+        snapshot.scene.revision,
+        snapshot.stateVersion,
+        parsed.error,
+      );
+    }
+    const conflict = stateVersionConflict(
+      "replace_object",
+      snapshot,
+      parsed.data.expectedStateVersion,
+    );
+    if (conflict) return conflict;
+    const objectId = targetObjectId(
+      context,
+      "replace_object",
+      parsed.data.objectId,
+      snapshot,
+      signal,
+    );
+    if (isToolError(objectId)) return objectId;
+    signal.throwIfAborted();
+    const rawProduct = context.resolveProduct(parsed.data.productId);
+    if (rawProduct === undefined) {
+      return toolError(
+        "replace_object",
+        snapshot.scene.revision,
+        snapshot.stateVersion,
+        "PRODUCT_NOT_FOUND",
+        "The requested product was not found.",
+        false,
+      );
+    }
+    const product = CatalogProductSchema.safeParse(rawProduct);
+    if (!product.success) {
+      return catalogFailure("replace_object", snapshot, product.error.issues);
+    }
+    signal.throwIfAborted();
+    const result = context.applyCommand({
+      expectedRevision: parsed.data.expectedRevision,
+      actor: "agent",
+      command: {
+        type: "replace",
+        objectId,
+        product: sceneProduct(product.data),
       },
-    },
-    {
-      name: "get_selection",
-      description: "Return the currently selected Scene object.",
-      inputSchema: GET_SELECTION_JSON_SCHEMA,
-      annotations: { readOnlyHint: true, untrustedContentHint: true },
-      async execute(input, { signal }) {
-        const snapshot = currentState(context, signal);
-        const parsed = getSelectionInputSchema.safeParse(input);
-        if (!parsed.success) {
-          return invalidInputResult(
-            "get_selection",
-            snapshot.scene.revision,
-            snapshot.stateVersion,
-            parsed.error,
-          );
-        }
-        signal.throwIfAborted();
-        const selection = context.getSelection();
-        if (selection === null) return noSelectionResult("get_selection", snapshot);
-        return toolSuccess(
-          "get_selection",
-          snapshot.scene.revision,
-          snapshot.stateVersion,
-          SceneObjectSchema.parse(selection),
-          "Selection returned.",
-        );
+    });
+    const latestStateVersion = context.getStateVersion();
+    if (!result.ok) {
+      return commandFailure("replace_object", result, latestStateVersion);
+    }
+    return toolSuccess(
+      "replace_object",
+      result.scene.revision,
+      latestStateVersion,
+      { scene: SceneSchema.parse(result.scene), message: result.message },
+      result.message,
+    );
+  }
+
+  async function executeMoveObject(
+    input: unknown,
+    { signal }: ModelContextToolExecutionOptions,
+  ): Promise<ToolResult<unknown>> {
+    const snapshot = currentState(context, signal);
+    const parsed = moveObjectInputSchema.safeParse(input);
+    if (!parsed.success) {
+      return invalidInputResult(
+        "move_object",
+        snapshot.scene.revision,
+        snapshot.stateVersion,
+        parsed.error,
+      );
+    }
+    const conflict = stateVersionConflict(
+      "move_object",
+      snapshot,
+      parsed.data.expectedStateVersion,
+    );
+    if (conflict) return conflict;
+    const objectId = targetObjectId(
+      context,
+      "move_object",
+      parsed.data.objectId,
+      snapshot,
+      signal,
+    );
+    if (isToolError(objectId)) return objectId;
+    signal.throwIfAborted();
+    const result = context.applyCommand({
+      expectedRevision: parsed.data.expectedRevision,
+      actor: "agent",
+      command: {
+        type: "move",
+        objectId,
+        position: parsed.data.position,
+        rotationYDegrees: parsed.data.rotationYDegrees,
       },
-    },
-    {
-      name: "search_products",
-      description: "Search the local product catalog in deterministic order.",
-      inputSchema: SEARCH_PRODUCTS_JSON_SCHEMA,
-      annotations: { readOnlyHint: true, untrustedContentHint: true },
-      async execute(input, { signal }) {
-        const snapshot = currentState(context, signal);
-        const parsed = searchProductsInputSchema.safeParse(input);
-        if (!parsed.success) {
-          return invalidInputResult(
-            "search_products",
-            snapshot.scene.revision,
-            snapshot.stateVersion,
-            parsed.error,
-          );
-        }
-        signal.throwIfAborted();
-        const products = CatalogProductSchema.array().safeParse(
-          context.searchProducts(parsed.data),
-        );
-        if (!products.success) {
-          return catalogFailure("search_products", snapshot, products.error.issues);
-        }
-        return toolSuccess(
-          "search_products",
-          snapshot.scene.revision,
-          snapshot.stateVersion,
-          { results: products.data },
-          "Products returned.",
-        );
+    });
+    const latestStateVersion = context.getStateVersion();
+    if (!result.ok) return commandFailure("move_object", result, latestStateVersion);
+    return toolSuccess(
+      "move_object",
+      result.scene.revision,
+      latestStateVersion,
+      {
+        scene: SceneSchema.parse(result.scene),
+        message: result.message,
+        adjustedToFit: result.adjustedToFit ?? false,
+        appliedPosition: result.appliedPosition,
       },
-    },
-    {
-      name: "replace_object",
-      description: "Replace an explicit or selected Scene object with a catalog product.",
-      inputSchema: REPLACE_OBJECT_JSON_SCHEMA,
-      annotations: { readOnlyHint: false, untrustedContentHint: true },
-      async execute(input, { signal }) {
-        const snapshot = currentState(context, signal);
-        const parsed = replaceObjectInputSchema.safeParse(input);
-        if (!parsed.success) {
-          return invalidInputResult(
-            "replace_object",
-            snapshot.scene.revision,
-            snapshot.stateVersion,
-            parsed.error,
-          );
-        }
-        const conflict = stateVersionConflict(
-          "replace_object",
-          snapshot,
-          parsed.data.expectedStateVersion,
-        );
-        if (conflict) return conflict;
-        const objectId = targetObjectId(
-          context,
-          "replace_object",
-          parsed.data.objectId,
-          snapshot,
-          signal,
-        );
-        if (isToolError(objectId)) return objectId;
-        signal.throwIfAborted();
-        const rawProduct = context.resolveProduct(parsed.data.productId);
-        if (rawProduct === undefined) {
-          return toolError(
-            "replace_object",
-            snapshot.scene.revision,
-            snapshot.stateVersion,
-            "PRODUCT_NOT_FOUND",
-            "The requested product was not found.",
-            false,
-          );
-        }
-        const product = CatalogProductSchema.safeParse(rawProduct);
-        if (!product.success) {
-          return catalogFailure("replace_object", snapshot, product.error.issues);
-        }
-        signal.throwIfAborted();
-        const result = context.applyCommand({
-          expectedRevision: parsed.data.expectedRevision,
-          actor: "agent",
-          command: {
-            type: "replace",
-            objectId,
-            product: sceneProduct(product.data),
-          },
-        });
-        const latestStateVersion = context.getStateVersion();
-        if (!result.ok) {
-          return commandFailure("replace_object", result, latestStateVersion);
-        }
-        return toolSuccess(
-          "replace_object",
-          result.scene.revision,
-          latestStateVersion,
-          { scene: SceneSchema.parse(result.scene), message: result.message },
-          result.message,
-        );
-      },
-    },
-    {
-      name: "move_object",
-      description: "Move an explicit or selected Scene object.",
-      inputSchema: MOVE_OBJECT_JSON_SCHEMA,
-      annotations: { readOnlyHint: false, untrustedContentHint: true },
-      async execute(input, { signal }) {
-        const snapshot = currentState(context, signal);
-        const parsed = moveObjectInputSchema.safeParse(input);
-        if (!parsed.success) {
-          return invalidInputResult(
-            "move_object",
-            snapshot.scene.revision,
-            snapshot.stateVersion,
-            parsed.error,
-          );
-        }
-        const conflict = stateVersionConflict(
-          "move_object",
-          snapshot,
-          parsed.data.expectedStateVersion,
-        );
-        if (conflict) return conflict;
-        const objectId = targetObjectId(
-          context,
-          "move_object",
-          parsed.data.objectId,
-          snapshot,
-          signal,
-        );
-        if (isToolError(objectId)) return objectId;
-        signal.throwIfAborted();
-        const result = context.applyCommand({
-          expectedRevision: parsed.data.expectedRevision,
-          actor: "agent",
-          command: {
-            type: "move",
-            objectId,
-            position: parsed.data.position,
-            rotationYDegrees: parsed.data.rotationYDegrees,
-          },
-        });
-        const latestStateVersion = context.getStateVersion();
-        if (!result.ok) return commandFailure("move_object", result, latestStateVersion);
-        return toolSuccess(
-          "move_object",
-          result.scene.revision,
-          latestStateVersion,
-          {
-            scene: SceneSchema.parse(result.scene),
-            message: result.message,
-            adjustedToFit: result.adjustedToFit ?? false,
-            appliedPosition: result.appliedPosition,
-          },
-          result.message,
-        );
-      },
-    },
-    {
-      name: "add_scene_to_cart",
-      description: "Open a local approval draft for product-backed Scene objects.",
-      inputSchema: ADD_SCENE_TO_CART_JSON_SCHEMA,
-      annotations: { readOnlyHint: false, untrustedContentHint: true },
-      async execute(input, { signal }) {
-        const snapshot = currentState(context, signal);
-        const parsed = addSceneToCartInputSchema.safeParse(input);
-        if (!parsed.success) {
-          return invalidInputResult(
-            "add_scene_to_cart",
-            snapshot.scene.revision,
-            snapshot.stateVersion,
-            parsed.error,
-          );
-        }
-        const stateConflict = stateVersionConflict(
-          "add_scene_to_cart",
-          snapshot,
-          parsed.data.expectedStateVersion,
-        );
-        if (stateConflict) return stateConflict;
-        if (snapshot.scene.revision !== parsed.data.expectedRevision) {
-          return toolError(
-            "add_scene_to_cart",
-            snapshot.scene.revision,
-            snapshot.stateVersion,
-            "SCENE_REVISION_CONFLICT",
-            "The Scene changed; retry with the latest state.",
-            true,
-            {
-              latestRevision: snapshot.scene.revision,
-              latestStateVersion: snapshot.stateVersion,
-            },
-          );
-        }
-        let objects: readonly SceneObject[];
-        if (parsed.data.objectIds === undefined) {
-          objects = snapshot.scene.objects.filter(
-            (object) => object.source === "product" && object.addedBy !== "seed",
-          );
-        } else {
-          const foundObjects = parsed.data.objectIds.map((objectId) =>
-            snapshot.scene.objects.find(({ id }) => id === objectId),
-          );
-          if (foundObjects.some((object) => object === undefined)) {
-            return toolError(
-              "add_scene_to_cart",
-              snapshot.scene.revision,
-              snapshot.stateVersion,
-              "OBJECT_NOT_FOUND",
-              "A requested Scene object was not found.",
-              false,
-            );
-          }
-          objects = foundObjects.filter(
-            (object): object is SceneObject => object !== undefined,
-          );
-        }
-        const baseDraft = draftFor(snapshot.scene, objects);
-        if (baseDraft.items.length === 0) {
-          return toolError(
-            "add_scene_to_cart",
-            snapshot.scene.revision,
-            snapshot.stateVersion,
-            "NO_CART_ITEMS",
-            "No eligible product-backed Scene objects are available.",
-            false,
-          );
-        }
-        const draft = enrichCartDraft(context.commerce, baseDraft);
-        signal.throwIfAborted();
-        context.openCartApproval(draft);
-        return toolSuccess(
+      result.message,
+    );
+  }
+
+  async function executeAddSceneToCart(
+    input: unknown,
+    { signal }: ModelContextToolExecutionOptions,
+  ): Promise<ToolResult<unknown>> {
+    const snapshot = currentState(context, signal);
+    const parsed = addSceneToCartInputSchema.safeParse(input);
+    if (!parsed.success) {
+      return invalidInputResult(
+        "add_scene_to_cart",
+        snapshot.scene.revision,
+        snapshot.stateVersion,
+        parsed.error,
+      );
+    }
+    const stateConflict = stateVersionConflict(
+      "add_scene_to_cart",
+      snapshot,
+      parsed.data.expectedStateVersion,
+    );
+    if (stateConflict) return stateConflict;
+    if (snapshot.scene.revision !== parsed.data.expectedRevision) {
+      return toolError(
+        "add_scene_to_cart",
+        snapshot.scene.revision,
+        snapshot.stateVersion,
+        "SCENE_REVISION_CONFLICT",
+        "The Scene changed; retry with the latest state.",
+        true,
+        {
+          latestRevision: snapshot.scene.revision,
+          latestStateVersion: snapshot.stateVersion,
+        },
+      );
+    }
+    let objects: readonly SceneObject[];
+    if (parsed.data.objectIds === undefined) {
+      objects = snapshot.scene.objects.filter(
+        (object) => object.source === "product" && object.addedBy !== "seed",
+      );
+    } else {
+      const foundObjects = parsed.data.objectIds.map((objectId) =>
+        snapshot.scene.objects.find(({ id }) => id === objectId),
+      );
+      if (foundObjects.some((object) => object === undefined)) {
+        return toolError(
           "add_scene_to_cart",
           snapshot.scene.revision,
           snapshot.stateVersion,
-          { draft },
-          "Cart approval is ready.",
+          "OBJECT_NOT_FOUND",
+          "A requested Scene object was not found.",
+          false,
         );
-      },
-    },
-  ];
+      }
+      objects = foundObjects.filter(
+        (object): object is SceneObject => object !== undefined,
+      );
+    }
+    const baseDraft = draftFor(snapshot.scene, objects);
+    if (baseDraft.items.length === 0) {
+      return toolError(
+        "add_scene_to_cart",
+        snapshot.scene.revision,
+        snapshot.stateVersion,
+        "NO_CART_ITEMS",
+        "No eligible product-backed Scene objects are available.",
+        false,
+      );
+    }
+    const draft = enrichCartDraft(context.commerce, baseDraft);
+    signal.throwIfAborted();
+    context.openCartApproval(draft);
+    return toolSuccess(
+      "add_scene_to_cart",
+      snapshot.scene.revision,
+      snapshot.stateVersion,
+      { draft },
+      "Cart approval is ready.",
+    );
+  }
+
+  const executors: Record<CoreToolName, ToolExecutor> = {
+    get_scene: executeGetScene,
+    get_selection: executeGetSelection,
+    search_products: executeSearchProducts,
+    replace_object: executeReplaceObject,
+    move_object: executeMoveObject,
+    add_scene_to_cart: executeAddSceneToCart,
+  };
+
+  return CORE_TOOL_MANIFEST.map((entry) => ({
+    ...entry,
+    annotations: { ...entry.annotations },
+    execute: executors[entry.name],
+  }));
 }

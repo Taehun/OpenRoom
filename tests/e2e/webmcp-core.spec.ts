@@ -1,5 +1,7 @@
 import { expect, test } from "@playwright/test";
 
+import { CORE_TOOL_MANIFEST } from "../../src/webmcp/core-tool-manifest";
+
 interface BrowserToolResult {
   structuredContent: {
     ok: boolean;
@@ -16,6 +18,7 @@ interface BrowserToolResult {
 
 interface BrowserTool {
   name: string;
+  description: string;
   execute(
     input: unknown,
     options: { signal: AbortSignal },
@@ -101,6 +104,20 @@ test("completes WebMCP Core 6 against the shared demo Scene", async ({
       page.evaluate(() => [...window.__webMcpActiveToolNames].sort()),
     )
     .toEqual([...CORE_6]);
+  // Native registration and the local MCP companion must serve one manifest:
+  // whatever the page registers here is exactly what `tools/list` reports over
+  // stdio, so a description edited on only one side fails here.
+  expect(
+    await page.evaluate(() =>
+      Object.values(window.__webMcpTools)
+        .map((tool) => [tool.name, tool.description] as const)
+        .sort((left, right) => left[0].localeCompare(right[0])),
+    ),
+  ).toEqual(
+    CORE_TOOL_MANIFEST.map((entry) => [entry.name, entry.description]).sort(
+      (left, right) => left[0].localeCompare(right[0]),
+    ),
+  );
 
   const selection = await page.evaluate(() =>
     window.__webMcpTools.get_selection?.execute(
