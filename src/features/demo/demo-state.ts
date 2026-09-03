@@ -36,8 +36,12 @@ export function demoReducer(state: DemoState, action: DemoAction): DemoState {
         ...state,
         isCartOpen: false,
         cartDraft: null,
-        announcement: "Demo only — no external cart was created.",
+        announcement: "Demo approved — nothing was ordered.",
       };
+    case "clear-announcement":
+      return state.announcement === null
+        ? state
+        : { ...state, announcement: null };
     case "open-external-checkout":
       return {
         ...state,

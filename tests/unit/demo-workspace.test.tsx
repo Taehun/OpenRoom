@@ -252,6 +252,37 @@ test("opens an empty cart for a room that holds no catalog product yet", async (
   ).toBeDisabled();
 });
 
+test("dismisses the approval announcement after four seconds", () => {
+  vi.useFakeTimers();
+  try {
+    render(<DemoWorkspace />);
+    // Synchronous events only: userEvent's own timers would stall under fake
+    // timers, and the reducer path is the same either way.
+    fireEvent.click(screen.getByRole("button", { name: "Find alternatives" }));
+    fireEvent.click(
+      screen.getByRole("button", { name: "Place Oak Frame Table in room" }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "View cart" }));
+    const sheet = screen.getByRole("dialog", { name: "Review your room" });
+    fireEvent.click(
+      within(sheet).getByRole("button", { name: "Approve demo cart · $169" }),
+    );
+    const announcement = "Demo approved — nothing was ordered.";
+    expect(screen.getByText(announcement)).toBeVisible();
+
+    act(() => {
+      vi.advanceTimersByTime(3999);
+    });
+    expect(screen.getByText(announcement)).toBeVisible();
+    act(() => {
+      vi.advanceTimersByTime(1);
+    });
+    expect(screen.queryByText(announcement)).toBeNull();
+  } finally {
+    vi.useRealTimers();
+  }
+});
+
 test("counts the room's products in the badge and approves them without an external cart request", async () => {
   const fetchSpy = vi.spyOn(globalThis, "fetch");
   const user = userEvent.setup();
@@ -278,7 +309,7 @@ test("counts the room's products in the badge and approves them without an exter
     screen.queryByRole("dialog", { name: "Review your room" }),
   ).not.toBeInTheDocument();
   expect(
-    screen.getByText("Demo only — no external cart was created."),
+    screen.getByText("Demo approved — nothing was ordered."),
   ).toBeVisible();
   expect(viewCart).toHaveFocus();
   expect(fetchSpy).not.toHaveBeenCalled();

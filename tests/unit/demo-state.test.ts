@@ -65,8 +65,17 @@ describe("demoReducer", () => {
 
     expect(confirmed.isCartOpen).toBe(false);
     expect(confirmed.announcement).toBe(
-      "Demo only — no external cart was created.",
+      "Demo approved — nothing was ordered.",
     );
+  });
+
+  test("clears the announcement once and returns the same state when there is none", () => {
+    const opened = demoReducer(createInitialDemoState(), { type: "open-cart" });
+    const confirmed = demoReducer(opened, { type: "confirm-demo-cart" });
+    const cleared = demoReducer(confirmed, { type: "clear-announcement" });
+    expect(cleared.announcement).toBeNull();
+    expect(cleared.isCartOpen).toBe(false);
+    expect(demoReducer(cleared, { type: "clear-announcement" })).toBe(cleared);
   });
 
   test("clears an Agent cart draft without changing the fixture cart mode", () => {

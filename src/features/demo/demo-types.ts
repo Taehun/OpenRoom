@@ -28,6 +28,7 @@ export type DemoAction =
   | { type: "open-cart"; draft?: CartApprovalDraft }
   | { type: "close-cart" }
   | { type: "confirm-demo-cart" }
+  | { type: "clear-announcement" }
   | { type: "open-external-checkout"; itemCount: number }
   | { type: "undo" }
   | { type: "reset" };

@@ -30,6 +30,9 @@ import { cartDraftForScene } from "../commerce/scene-cart";
 import { enrichCartDraft } from "../commerce/shopify-cart";
 import type { CommerceContext } from "../commerce/commerce-types";
 
+/** How long an approval announcement stays on screen. */
+const ANNOUNCEMENT_MS = 4000;
+
 interface DemoWorkspaceProps {
   store?: SceneStore;
   commerce?: CommerceContext;
@@ -61,6 +64,17 @@ function DemoWorkspaceContent({
     undefined,
     createInitialDemoState,
   );
+
+  // The approval announcement is a toast, not a banner: it reads once through
+  // the live region and leaves before it can cover the next action.
+  useEffect(() => {
+    if (state.announcement === null) return;
+    const timer = window.setTimeout(
+      () => dispatch({ type: "clear-announcement" }),
+      ANNOUNCEMENT_MS,
+    );
+    return () => window.clearTimeout(timer);
+  }, [state.announcement]);
   const sceneStore = useSceneStoreApi();
   const scene = useSceneStore((store) => store.scene);
   const historyLength = useSceneStore((store) => store.history.length);
