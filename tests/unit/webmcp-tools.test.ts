@@ -144,7 +144,7 @@ describe("WebMCP Core 6 handlers", () => {
     expect(store.getState().scene.revision).toBe(2);
   });
 
-  test("returns the atomically arranged sixth replacement in the strict Core 6 shape", async () => {
+  test("returns the sixth replacement in the strict Core 6 shape", async () => {
     const store = createSceneStore();
     const tools = createCoreTools(createContext(store).context);
     const objectIds = store.getState().scene.objects.map(({ id }) => id);
@@ -187,7 +187,6 @@ describe("WebMCP Core 6 handlers", () => {
     ).toBe(false);
     expect(data.scene.revision).toBe(7);
     expect(Object.keys(data).sort()).toEqual(["message", "scene"]);
-    expect("placementOutcome" in data).toBe(false);
   });
 
   test("rejects a revision ABA with the monotonic state version", async () => {

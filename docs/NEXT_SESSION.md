@@ -1,5 +1,21 @@
 # Nook Next Session Handoff
 
+> **2026-09-04 — Natural placement is unwired (owner decision).** The
+> "Arrange naturally" control, the `Undo placement` affordance, the placement
+> status band and its five notice strings, and the automatic arrangement that
+> ran when a redesign completed were all removed from the app and the Scene
+> store on `feat/remove-arrange`. Everything below this note is a historical
+> record of how that feature behaved while it was wired up.
+>
+> What remains is the pure solver as an unwired library:
+> `src/features/placement/*`, `src/features/scene/natural-placement-command.ts`,
+> `buildRotationOptions` in `src/features/photo/photo-views.ts`, and their unit
+> tests (`tests/unit/natural-placement.test.ts`, `placement-geometry.test.ts`,
+> `circulation.test.ts`, `photo-views.test.ts`). Nothing in `app/`, `src/webmcp/`,
+> or the Scene store calls it; a `replace_object` now only swaps the product and
+> never moves anything. Re-wiring it means adding a caller back, not restoring
+> deleted solver code.
+
 Snapshot: 2026-09-03 KST. This is the **final natural-placement verification
 record**. It replaces the interim handoff that was written before Task 7.
 
