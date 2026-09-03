@@ -10,8 +10,8 @@ import {
   parseManifestModule,
   planJobs,
   renderManifestModule,
-} from "../../scripts/openinterior-assets/view-jobs";
-import { runGenerateViews } from "../../scripts/openinterior-assets/generate-views";
+} from "../../scripts/openroom-assets/view-jobs";
+import { runGenerateViews } from "../../scripts/openroom-assets/generate-views";
 import {
   GeneratedViewManifestSchema,
   PHOTO_ASSET_SETS,

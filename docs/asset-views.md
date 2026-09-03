@@ -1,6 +1,6 @@
 # Asset views: the offline `gpt-image-1` pipeline
 
-OpenInterior ships one photographed 3/4-view cutout per product. That view and
+OpenRoom ships one photographed 3/4-view cutout per product. That view and
 its mirror already show every facing within 80° of the camera, so the demo is
 complete without any generated asset. The remaining views — a profile, a rear
 three-quarter, and a straight back — are produced **once, offline**, by
@@ -67,8 +67,8 @@ exists), never from `.env` and never from any bundle:
 | Variable | Default | Purpose |
 | --- | --- | --- |
 | `OPENAI_API_KEY` | — | Required outside `--dry-run`. Sent as `Authorization: Bearer …` and never logged. |
-| `OPENINTERIOR_IMAGE_MODEL` | `gpt-image-1` | The image model to call. |
-| `OPENINTERIOR_IMAGE_QUALITY` | `high` | `low`, `medium`, or `high`. |
+| `OPENROOM_IMAGE_MODEL` | `gpt-image-1` | The image model to call. |
+| `OPENROOM_IMAGE_QUALITY` | `high` | `low`, `medium`, or `high`. |
 
 ## Prompt
 

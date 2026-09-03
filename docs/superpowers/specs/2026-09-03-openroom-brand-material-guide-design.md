@@ -122,6 +122,7 @@ no JavaScript:
 - `.md-dialog`: native `<dialog>` styled surface-container-high, corner
   extra-large, 24px padding, headline-small title, actions right-aligned;
   backdrop `rgba(0,0,0,.32)`.
+- Shipped set (final review): `.md-button` (`--filled --tonal --outlined --text --dense`), `.md-card` (`--outlined`), `.md-chip` (`--selected --dense`), `.md-top-app-bar`, `.md-wordmark`, `.md-banner`, `.md-code`, `.md-dialog`; `.md-nav-rail`, `.md-card--filled`, and `.md-card--elevated` were dropped as unused.
 
 ## 6. Guide (browser without WebMCP)
 

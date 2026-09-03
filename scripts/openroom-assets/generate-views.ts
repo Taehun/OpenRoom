@@ -231,15 +231,15 @@ export async function runGenerateViews(
     return { exitCode: 2 };
   }
 
-  const quality = readQuality(deps.env.OPENINTERIOR_IMAGE_QUALITY);
+  const quality = readQuality(deps.env.OPENROOM_IMAGE_QUALITY);
   if (quality === null) {
     log(
-      `[views] OPENINTERIOR_IMAGE_QUALITY must be one of ${QUALITIES.join(", ")}`,
+      `[views] OPENROOM_IMAGE_QUALITY must be one of ${QUALITIES.join(", ")}`,
     );
     return { exitCode: 2 };
   }
   const request: ImageRequestEnv = {
-    model: deps.env.OPENINTERIOR_IMAGE_MODEL?.trim() || DEFAULT_MODEL,
+    model: deps.env.OPENROOM_IMAGE_MODEL?.trim() || DEFAULT_MODEL,
     quality,
   };
 

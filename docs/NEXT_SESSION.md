@@ -417,8 +417,8 @@ the relay down once on `SIGINT`, `SIGTERM`, or stdin close.
 
 ## Facing vectors and views (2026-09-04)
 
-Spec: `docs/superpowers/specs/2026-09-03-openinterior-facing-views-design.md`;
-plan: `docs/superpowers/plans/2026-09-03-openinterior-facing-views.md`.
+Spec: `docs/superpowers/specs/2026-09-03-openroom-facing-views-design.md`;
+plan: `docs/superpowers/plans/2026-09-03-openroom-facing-views.md`.
 
 What changed:
 
@@ -439,13 +439,14 @@ What changed:
   by the command adapter), scores view fidelity and composition, flanks the
   sofa with the chair, parks the lamp beside a sofa end and the plant in a back
   corner. Profile version 2; p95 8.7 ms on a production build.
-- `pnpm assets:views` (`scripts/openinterior-assets/`) plans and performs
+- `pnpm assets:views` (`scripts/openroom-assets/`) plans and performs
   gpt-image-1 edits offline for the missing views (28 jobs for the demo
   catalog), writes anchored WebPs beside the originals and rewrites the
   manifest module. Key only in `.env.local`; never runs in CI; the app never
   imports it. See `docs/asset-views.md`.
 
-Accepted staged composition (spec 8.5, pinned by unit tests): sofa (-1.3,
+Accepted staged composition (spec 8.5, pinned by unit tests; the poor-journey
+scene the browser journey drives — the seed scene's table is in the spec): sofa (-1.3,
 -1.1) at -45°, table (-0.3, 0.1), rug (-0.3, 0.2) at -45°, chair (0.8, -1.0)
 at +45° (mirrored view), lamp (-2.6, 0.0), plant (-2.4, -1.7). A sofa square on
 the back wall is unreachable in the demo room because of the window clearance.

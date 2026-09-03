@@ -142,7 +142,7 @@ marks a rendered view as approximate when the nearest one is more than 45° off.
 | Facing math | `src/features/photo/photo-facing.ts` |
 | View registry and selection | `src/features/photo/photo-views.ts` (`PHOTO_ASSET_SETS`) |
 | Generated view manifest | `src/features/photo/photo-views.generated.ts` |
-| Offline pipeline | `scripts/openinterior-assets/` (`pnpm assets:views`) |
+| Offline pipeline | `scripts/openroom-assets/` (`pnpm assets:views`) |
 
 The photographed 3/4 cutout plus its mirror already covers every facing within
 80° of the camera, so the demo works with an empty manifest. The missing views
@@ -202,7 +202,7 @@ local environment file; never commit them.
 | `pnpm test:e2e` | Run the Playwright demo-mode end-to-end tests (port 3000). |
 | `pnpm test:e2e:commerce` | Run the Playwright Shopify-mode journeys (port 3001). |
 | `pnpm mcp:openroom` | Start the localhost MCP companion for Claude Desktop, Claude Code, or Codex CLI. |
-| `pnpm mcp:openinterior` | Start the localhost MCP companion for Claude Desktop, Claude Code, or Codex CLI. |
+| `pnpm mcp:openroom` | Start the localhost MCP companion for Claude Desktop, Claude Code, or Codex CLI. |
 | `pnpm assets:views` | Generate the missing cutout views offline (developer-run; needs `OPENAI_API_KEY`). Add `--dry-run` to only print the plan. |
 | `pnpm cf-typegen` | Generate Cloudflare Worker types. |
 | `pnpm dev:vinext` | Start vinext locally on port 3001. |
@@ -259,11 +259,11 @@ bundle. OpenRoom never needs a Shopify access token.
 | `NEXT_PUBLIC_SHOPIFY_VARIANTS` | empty | Optional comma-separated `productId=gid://shopify/ProductVariant/<id>` pairs that override `src/features/commerce/shopify-variants.ts`. |
 | `ASSET_PROVIDER` | `cached` | Assets are cached; no live generation exists. |
 | `OPENAI_API_KEY` | empty | Script-only. Read from `.env.local` by `pnpm assets:views`; never bundled, never logged, never used by the app. |
-| `OPENINTERIOR_IMAGE_MODEL` | `gpt-image-1` | Script-only. The image model the view pipeline calls. |
-| `OPENINTERIOR_IMAGE_QUALITY` | `high` | Script-only. `low`, `medium`, or `high` for the view pipeline. |
+| `OPENROOM_IMAGE_MODEL` | `gpt-image-1` | Script-only. The image model the view pipeline calls. |
+| `OPENROOM_IMAGE_QUALITY` | `high` | Script-only. `low`, `medium`, or `high` for the view pipeline. |
 
-The three `OPENAI_*`/`OPENINTERIOR_IMAGE_*` values are read only by
-`scripts/openinterior-assets/generate-views.ts` when you run `pnpm assets:views`
+The three `OPENAI_*`/`OPENROOM_IMAGE_*` values are read only by
+`scripts/openroom-assets/generate-views.ts` when you run `pnpm assets:views`
 by hand. No runtime code path, build step, or CI job reads them.
 
 ## Commerce integration

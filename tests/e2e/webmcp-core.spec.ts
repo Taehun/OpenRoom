@@ -333,7 +333,7 @@ test("completes WebMCP Core 6 against the shared demo Scene", async ({
   expect(chair?.rotation[1]).toBeCloseTo(Math.PI / 2, 9);
   expect(chair?.facing).toEqual({ x: -1, z: 0 });
 
-  await page.getByRole("link", { name: "OpenInterior home" }).click();
+  await page.getByRole("link", { name: "OpenRoom home" }).click();
   await expect(page).toHaveURL("/");
   // `/` is the dashboard whenever WebMCP is present, so it remounts the
   // workspace: exactly six registrations stay live. A `/demo` unmount that

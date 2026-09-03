@@ -493,8 +493,8 @@
   left: 4px;
   padding: 4px 6px;
   border-radius: 999px;
-  background: rgba(146, 106, 42, 0.92);
-  color: var(--paper);
+  background: color-mix(in srgb, var(--md-sys-color-tertiary) 92%, transparent);
+  color: var(--md-sys-color-on-tertiary);
   font-size: 0.58rem;
   font-weight: 750;
   line-height: 1;
