@@ -1,7 +1,7 @@
-# Nook
+# OpenInterior
 
-Nook is a browser-based photo compositor for exploring and furnishing a room
-with deterministic catalog products.
+OpenInterior is a browser-based photo compositor for exploring and furnishing
+a room with deterministic catalog products.
 
 ## Status
 
@@ -46,18 +46,18 @@ Cart operations open a visible, local approval sheet. In the default `demo`
 mode the original human four-item `$626 USD` fixture and product-backed WebMCP
 Scene drafts both emit no external cart write or network request. Shopify
 checkout is available through cart permalinks and the store's Storefront MCP
-endpoint, with no server route, no access token, and no request made by Nook
-itself; see [Commerce integration](#commerce-integration). The planned local
-Claude MCP companion is not implemented in this branch. Tripo/R2/D1
-integrations, upload, analysis, persistence, and server-side cart writes remain
-future work.
+endpoint, with no server route, no access token, and no request made by
+OpenInterior itself; see [Commerce integration](#commerce-integration). The
+planned local Claude MCP companion is not implemented in this branch.
+Tripo/R2/D1 integrations, upload, analysis, persistence, and server-side cart
+writes remain future work.
 
 ## Photo architecture and assets
 
 | Layer | Source | Invariant |
 | --- | --- | --- |
-| Room | `public/demo/photo/nook-room-empty.webp` | Fixed 16:9 background for editing. |
-| Reference | `public/demo/photo/nook-room-before.webp` | Original mismatched room reference. |
+| Room | `public/demo/photo/openinterior-room-empty.webp` | Fixed 16:9 background for editing. |
+| Reference | `public/demo/photo/openinterior-room-before.webp` | Original mismatched room reference. |
 | Seed cutouts | `public/demo/photo/seed/` | Six transparent WebPs, one for each canonical object. |
 | Catalog cutouts | `public/demo/photo/products/` | Eighteen transparent WebPs, three per category. |
 | Calibration | `src/features/photo/photo-calibration.ts` | Maps room `x/z` to stable stage coordinates. |
@@ -147,7 +147,7 @@ time: both `next build` (`pnpm build:next`) and `vinext build` (`pnpm build`)
 read them from the environment that runs the build, so set them there and
 rebuild to change them. `ASSET_PROVIDER` is a reserved value that nothing reads
 today. Cloudflare Worker `vars` are runtime-only and never reach the client
-bundle. Nook never needs a Shopify access token.
+bundle. OpenInterior never needs a Shopify access token.
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
@@ -161,8 +161,8 @@ integrations and are unused by any code today.
 
 ## Commerce integration
 
-Nook has no backend and stores no credentials. Two paths use one static mapping
-from demo product ids to Shopify variant GIDs:
+OpenInterior has no backend and stores no credentials. Two paths use one
+static mapping from demo product ids to Shopify variant GIDs:
 
 1. **Human checkout.** In `shopify` mode, `Continue to Shopify` in the approval
    sheet opens a cart permalink (`https://<store>/cart/<variantId>:<qty>,...`)
@@ -174,8 +174,8 @@ from demo product ids to Shopify variant GIDs:
    `checkoutPermalink`, and `mcpEndpoint` (`https://<store>/api/mcp`). Connect
    Claude, ChatGPT, or any MCP client to that endpoint (Shopify's Storefront MCP
    needs no authentication), let it call `update_cart` with the returned
-   `merchandise_id` lines, then `get_cart` for the checkout URL. Nook itself
-   makes no request.
+   `merchandise_id` lines, then `get_cart` for the checkout URL. OpenInterior
+   itself makes no request.
 
 Setup:
 

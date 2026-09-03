@@ -4,7 +4,7 @@ import { RoomPhotoStage } from "../photo/room-photo-stage";
 import { useSceneStore } from "../scene/scene-context";
 import type { Scene } from "../scene/scene-schema";
 import type { DemoAction, DemoState } from "./demo-types";
-import { NookIcon } from "./nook-icon";
+import { OpenInteriorIcon } from "./open-interior-icon";
 import styles from "./demo-workspace.module.css";
 
 const ROOM_OBJECTS = [
@@ -107,7 +107,7 @@ export function RoomCanvas({ dispatch, scene, state }: RoomCanvasProps) {
             title="Select"
             type="button"
           >
-            <NookIcon name="select" />
+            <OpenInteriorIcon name="select" />
             <span>Select</span>
           </button>
           <button
@@ -120,7 +120,7 @@ export function RoomCanvas({ dispatch, scene, state }: RoomCanvasProps) {
             title="Move selected object"
             type="button"
           >
-            <NookIcon name="move" />
+            <OpenInteriorIcon name="move" />
             <span>Move</span>
           </button>
           <button
@@ -135,7 +135,7 @@ export function RoomCanvas({ dispatch, scene, state }: RoomCanvasProps) {
             title="Rotate selected object"
             type="button"
           >
-            <NookIcon name="rotate" />
+            <OpenInteriorIcon name="rotate" />
             <span>Rotate</span>
           </button>
         </div>
@@ -234,7 +234,7 @@ export function RoomCanvas({ dispatch, scene, state }: RoomCanvasProps) {
           {state.toast ? (
             <div className={styles.undoToast} role="status">
               <span className={styles.toastCheck} aria-hidden="true">
-                <NookIcon name="check" size={16} />
+                <OpenInteriorIcon name="check" size={16} />
               </span>
               <span>{state.toast.message}</span>
               <button
@@ -252,7 +252,7 @@ export function RoomCanvas({ dispatch, scene, state }: RoomCanvasProps) {
           className={styles.composer}
         >
           <span className={styles.composerIcon} aria-hidden="true">
-            <NookIcon name="sparkles" />
+            <OpenInteriorIcon name="sparkles" />
           </span>
           <div className={styles.promptGuidance}>
             <p>{PRIMARY_PROMPT}</p>
