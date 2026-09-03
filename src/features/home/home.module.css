@@ -38,10 +38,6 @@
   padding-inline: var(--guide-gutter) calc(var(--guide-gutter) - 16px);
 }
 
-.wordmark {
-  font-weight: var(--md-sys-typescale-title-medium-weight);
-}
-
 .guide {
   display: grid;
   width: 100%;
@@ -162,6 +158,7 @@
   display: flex;
   flex-direction: column;
   align-items: flex-start;
+  min-width: 0;
 }
 
 .connectTitle {
@@ -190,6 +187,10 @@
   margin: 10px 0 12px;
   padding-left: 18px;
   list-style: decimal;
+  /* `align-items: flex-start` would otherwise size the list to its widest
+     command, and a `pre` command is wider than the card. */
+  width: 100%;
+  min-width: 0;
 }
 
 .steps li + li {
@@ -207,9 +208,17 @@
   gap: 6px;
 }
 
+/*
+ * A command is one line: `white-space: pre` keeps `mcp:openroom` and the repo
+ * path from breaking mid-token, and the row scrolls sideways instead of the
+ * page. `.md-code` keeps wrapping for the inline spans elsewhere in the guide.
+ */
 .commandRow code {
   flex: 0 1 auto;
   min-width: 0;
+  max-width: 100%;
+  overflow-x: auto;
+  white-space: pre;
 }
 
 .stepCopy {

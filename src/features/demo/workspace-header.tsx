@@ -32,7 +32,7 @@ export function WorkspaceHeader({
   return (
     <header className={styles.header}>
       <div className={styles.brandBlock}>
-        <Link className={styles.brand} href="/" aria-label="OpenRoom home">
+        <Link className="md-wordmark" href="/" aria-label="OpenRoom home">
           OpenRoom
         </Link>
         <span className={styles.headerDivider} aria-hidden="true" />

@@ -307,7 +307,7 @@ export function WebMcpGuide({ onCheckAgain, status }: WebMcpGuideProps) {
         data-scrolled={scrolled ? "true" : "false"}
       >
         <div className={styles.appBarInner}>
-          <span className={styles.wordmark}>OpenRoom</span>
+          <span className="md-wordmark">OpenRoom</span>
           <a
             className="md-button md-button--text"
             href={`#${CONNECT_SECTION_ID}`}

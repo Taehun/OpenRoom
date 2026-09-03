@@ -195,10 +195,22 @@ export function RoomCanvas({
           </figcaption>
 
           <div className={styles.canvasTopbar}>
-            <span className={styles.demoBadge}>Photo placement</span>
-            <span>Live Scene transforms</span>
+            {/* Captions for the mode, not controls: the figcaption above already
+                names what the stage does, so they stay out of the a11y tree. */}
+            <span
+              aria-hidden="true"
+              className="md-chip md-chip--dense md-chip--selected"
+            >
+              Photo placement
+            </span>
+            <span
+              aria-hidden="true"
+              className={`md-chip md-chip--dense ${styles.canvasTopbarGround}`}
+            >
+              Live Scene transforms
+            </span>
             <button
-              className={styles.arrangeButton}
+              className={`md-button md-button--outlined md-button--dense ${styles.canvasTopbarGround}`}
               disabled={
                 isTransforming || scene.objects.every(({ locked }) => locked)
               }

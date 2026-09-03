@@ -9,7 +9,14 @@ import { describe, expect, it } from "vitest";
  */
 const tokens = readFileSync("app/material-tokens.css", "utf8");
 
+/*
+ * Every stylesheet the two surfaces ship, not just the CSS modules: the global
+ * sheets carry the component classes and the base layer, so a raw literal there
+ * would defeat the token system exactly as one in a module would.
+ */
 const MODULE_STYLESHEETS = [
+  "app/globals.css",
+  "app/material-components.css",
   "src/features/demo/demo-workspace.module.css",
   "src/features/home/home.module.css",
 ];
@@ -33,7 +40,7 @@ describe("material tokens", () => {
       expect(tokens).toContain(line);
   });
 
-  it("leaves no hex color in the module stylesheets", () => {
+  it("leaves no hex color in the surface stylesheets", () => {
     for (const file of MODULE_STYLESHEETS) {
       expect(readFileSync(file, "utf8")).not.toMatch(/#[0-9a-fA-F]{3,8}\b/);
     }
@@ -45,7 +52,7 @@ describe("material tokens", () => {
    * past it; a genuinely black or white scrim or photo shadow is the only
    * other exception, and must say which it is on the same line.
    */
-  it("keeps raw color literals out of the module stylesheets", () => {
+  it("keeps raw color literals out of the surface stylesheets", () => {
     for (const file of MODULE_STYLESHEETS) {
       const offenders = readFileSync(file, "utf8")
         .split("\n")
