@@ -4,7 +4,8 @@ const STORE = "openroom-placeholder.myshopify.com";
 const APP_ORIGIN = "http://127.0.0.1:3001";
 const FIXTURE_PERMALINK = `https://${STORE}/cart/1001:1,1002:1`;
 // app/globals.css:10 — --terracotta: #c8784e
-const TERRACOTTA = "rgb(200, 120, 78)";
+// --md-sys-color-tertiary (#8A5A3C), the role skipped lines are painted with.
+const TERTIARY = "rgb(138, 90, 60)";
 
 interface BrowserToolResult {
   structuredContent: {
@@ -122,7 +123,7 @@ test("opens a Shopify cart permalink in a new tab without any request from OpenR
   // Guards the `.cartItemCopy small.cartSkipped` specificity fix (ec23001):
   // jsdom cannot observe the cascade, so the marker must be verified as
   // terracotta in a real engine, and distinct from the muted `Qty …` line.
-  await expect(skipped.first()).toHaveCSS("color", TERRACOTTA);
+  await expect(skipped.first()).toHaveCSS("color", TERTIARY);
   const skippedColor = await skipped
     .first()
     .evaluate((node) => getComputedStyle(node).color);
