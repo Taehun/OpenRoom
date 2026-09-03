@@ -11,6 +11,7 @@ import { OpenRoomIcon } from "./open-room-icon";
 import styles from "./demo-workspace.module.css";
 import type { CartApprovalDraft } from "../../webmcp/tool-context";
 import type { CommerceContext, CommerceDraft } from "../commerce/commerce-types";
+import { PHOTO_ASSETS } from "../photo/photo-assets";
 
 interface CartApprovalSheetProps {
   commerce: CommerceContext;
@@ -194,7 +195,7 @@ export function CartApprovalSheet({
           <p className={styles.sheetIntro}>
             {isShopify
               ? "Approving opens Shopify checkout in a new tab. OpenRoom sends nothing itself."
-              : `OpenRoom has prepared ${draft.items.length} Scene item${draft.items.length === 1 ? "" : "s"} from Scene revision ${draft.sceneRevision} for your approval. Nothing has been sent to Shopify.`}
+              : `${draft.items.length} item${draft.items.length === 1 ? "" : "s"} from your room ${draft.items.length === 1 ? "is" : "are"} ready for approval. Nothing is ordered until you approve.`}
           </p>
         )}
 
@@ -208,7 +209,19 @@ export function CartApprovalSheet({
             {lines.map((line, index) => (
               <li key={line.key}>
                 <span className={styles.cartThumbnail} aria-hidden="true">
-                  {String(index + 1).padStart(2, "0")}
+                  {PHOTO_ASSETS[line.productId] ? (
+                    // The product's own cutout; a number only when no image
+                    // is registered.
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      alt=""
+                      decoding="async"
+                      loading="lazy"
+                      src={PHOTO_ASSETS[line.productId]!.src}
+                    />
+                  ) : (
+                    String(index + 1).padStart(2, "0")
+                  )}
                 </span>
                 <span className={styles.cartItemCopy}>
                   <strong>{line.title}</strong>
@@ -242,7 +255,7 @@ export function CartApprovalSheet({
           <p>
             {isShopify && storeDomain
               ? `Checkout opens on ${storeDomain} in a new tab. OpenRoom stores no Shopify credentials and makes no request of its own.`
-              : "UI-only approval. Continuing closes this sheet and creates no external cart or network request."}
+              : "Demo only: approving closes this sheet and orders nothing."}
           </p>
         </div>
 
