@@ -110,7 +110,9 @@ test("connects the Core 6 journey to the shared Scene and approval UI", async ()
   expect(within(sheet).getAllByRole("listitem")).toHaveLength(1);
   expect(within(sheet).getByText("Travertine Plinth Table")).toBeVisible();
   expect(within(sheet).getByText("$249 USD")).toBeVisible();
-  expect(within(sheet).getByText(/Scene revision 2/)).toBeVisible();
+  expect(
+    within(sheet).getByText("1 item from your room is ready for approval. Nothing is ordered until you approve."),
+  ).toBeVisible();
   expect(fetchSpy).not.toHaveBeenCalled();
 
   unmount();
