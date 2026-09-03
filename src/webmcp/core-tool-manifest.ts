@@ -18,7 +18,18 @@ export interface CoreToolManifestEntry {
   };
 }
 
-export const CORE_TOOL_MANIFEST = [
+/**
+ * Recursively freezes the manifest at module load: descriptors handed to a
+ * `document.modelContext` host alias this state, and a host mutation must not
+ * be able to change `canonicalManifestJson()` or the pairing hash mid-session.
+ */
+function deepFreeze<T>(value: T): T {
+  if (typeof value !== "object" || value === null) return value;
+  for (const nested of Object.values(value)) deepFreeze(nested);
+  return Object.freeze(value);
+}
+
+export const CORE_TOOL_MANIFEST = deepFreeze([
   {
     name: "get_scene",
     description: "Return the current validated Scene.",
@@ -55,7 +66,7 @@ export const CORE_TOOL_MANIFEST = [
     inputSchema: ADD_SCENE_TO_CART_JSON_SCHEMA,
     annotations: { readOnlyHint: false, untrustedContentHint: true },
   },
-] as const satisfies readonly CoreToolManifestEntry[];
+] as const satisfies readonly CoreToolManifestEntry[]);
 
 function canonicalize(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(canonicalize);

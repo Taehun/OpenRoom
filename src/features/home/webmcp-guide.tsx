@@ -11,7 +11,7 @@ import {
 } from "../../webmcp/browser-compatibility";
 import styles from "./home.module.css";
 
-/** Copied from `src/webmcp/tool-handlers.ts`; keep both in step. */
+/** Copied from `src/webmcp/core-tool-manifest.ts`; keep both in step. */
 const CORE_TOOLS: ReadonlyArray<{
   name: CoreToolName;
   description: string;

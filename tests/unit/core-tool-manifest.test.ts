@@ -68,6 +68,33 @@ describe("Core 6 manifest", () => {
     expect(digest).toBe(digest.toLowerCase());
   });
 
+  it("deep-freezes every manifest entry", () => {
+    for (const entry of CORE_TOOL_MANIFEST) {
+      expect(Object.isFrozen(entry)).toBe(true);
+      expect(Object.isFrozen(entry.annotations)).toBe(true);
+      expect(Object.isFrozen(entry.inputSchema)).toBe(true);
+    }
+    expect(
+      Object.isFrozen(
+        (CORE_TOOL_MANIFEST[4].inputSchema as { properties: { position: object } })
+          .properties.position,
+      ),
+    ).toBe(true);
+  });
+
+  it("hands descriptors their own annotations so hosts cannot mutate the manifest", async () => {
+    const hashBefore = await getCoreToolManifestHash();
+    const canonicalBefore = canonicalManifestJson();
+    const [tool] = createCoreTools(fakeToolContext());
+
+    expect(tool.annotations).not.toBe(CORE_TOOL_MANIFEST[0].annotations);
+    tool.annotations.readOnlyHint = !tool.annotations.readOnlyHint;
+
+    expect(CORE_TOOL_MANIFEST[0].annotations.readOnlyHint).toBe(true);
+    expect(canonicalManifestJson()).toBe(canonicalBefore);
+    expect(await getCoreToolManifestHash()).toBe(hashBefore);
+  });
+
   it("keeps annotations exact for read-only and mutating tools", () => {
     const annotationsFor = (name: string) =>
       CORE_TOOL_MANIFEST.find((entry) => entry.name === name)?.annotations;

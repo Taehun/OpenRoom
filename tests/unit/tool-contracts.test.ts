@@ -102,26 +102,44 @@ const ZOD_INPUT_SCHEMAS: Record<CoreToolName, z.ZodType> = {
   add_scene_to_cart: addSceneToCartInputSchema,
 };
 
-const CONTRACT_PARITY_CASES: readonly (readonly [CoreToolName, unknown, boolean])[] = [
-  ["get_scene", {}, true],
-  ["get_scene", { extra: true }, false],
-  ["get_selection", {}, true],
-  ["get_selection", { extra: 1 }, false],
-  ["search_products", {}, true],
-  ["search_products", { category: "sofa", query: "modern", limit: 3 }, true],
-  ["search_products", { limit: 0 }, false],
-  ["search_products", { limit: 4 }, false],
-  ["search_products", { query: "   " }, false],
-  ["search_products", { query: "q".repeat(81) }, false],
-  ["search_products", { category: "not-a-category" }, false],
-  ["search_products", { unknown: 1 }, false],
-  [
+interface ContractParityCase {
+  readonly tool: CoreToolName;
+  readonly input: unknown;
+  /** Whether the browser's authoritative Zod contract accepts the input. */
+  readonly zod: boolean;
+  /** Whether the manifest JSON Schema admits the input to the handler. */
+  readonly jsonSchema: boolean;
+}
+
+/** Agreement is the common case; asymmetric cases spell both layers out. */
+function agree(
+  tool: CoreToolName,
+  input: unknown,
+  accepted: boolean,
+): ContractParityCase {
+  return { tool, input, zod: accepted, jsonSchema: accepted };
+}
+
+const CONTRACT_PARITY_CASES: readonly ContractParityCase[] = [
+  agree("get_scene", {}, true),
+  agree("get_scene", { extra: true }, false),
+  agree("get_selection", {}, true),
+  agree("get_selection", { extra: 1 }, false),
+  agree("search_products", {}, true),
+  agree("search_products", { category: "sofa", query: "modern", limit: 3 }, true),
+  agree("search_products", { limit: 0 }, false),
+  agree("search_products", { limit: 4 }, false),
+  agree("search_products", { query: "   " }, false),
+  agree("search_products", { query: "q".repeat(81) }, false),
+  agree("search_products", { category: "not-a-category" }, false),
+  agree("search_products", { unknown: 1 }, false),
+  agree(
     "replace_object",
     { productId: "table", expectedRevision: 1, expectedStateVersion: 1 },
     true,
-  ],
-  ["replace_object", { productId: "table", expectedRevision: 1 }, false],
-  [
+  ),
+  agree("replace_object", { productId: "table", expectedRevision: 1 }, false),
+  agree(
     "replace_object",
     {
       objectId: "   ",
@@ -130,18 +148,18 @@ const CONTRACT_PARITY_CASES: readonly (readonly [CoreToolName, unknown, boolean]
       expectedStateVersion: 1,
     },
     false,
-  ],
-  [
+  ),
+  agree(
     "replace_object",
     { productId: "table", expectedRevision: 0, expectedStateVersion: 1 },
     false,
-  ],
-  [
+  ),
+  agree(
     "replace_object",
     { productId: "table", expectedRevision: 1.5, expectedStateVersion: 1 },
     false,
-  ],
-  [
+  ),
+  agree(
     "move_object",
     {
       position: { x: 20, z: -20 },
@@ -150,13 +168,13 @@ const CONTRACT_PARITY_CASES: readonly (readonly [CoreToolName, unknown, boolean]
       expectedStateVersion: 1,
     },
     true,
-  ],
-  [
+  ),
+  agree(
     "move_object",
     { position: { x: 21, z: 0 }, expectedRevision: 1, expectedStateVersion: 1 },
     false,
-  ],
-  [
+  ),
+  agree(
     "move_object",
     {
       position: { x: 0, z: 0, y: 1 },
@@ -164,8 +182,8 @@ const CONTRACT_PARITY_CASES: readonly (readonly [CoreToolName, unknown, boolean]
       expectedStateVersion: 1,
     },
     false,
-  ],
-  [
+  ),
+  agree(
     "move_object",
     {
       position: { x: 0, z: 0 },
@@ -174,30 +192,30 @@ const CONTRACT_PARITY_CASES: readonly (readonly [CoreToolName, unknown, boolean]
       expectedStateVersion: 1,
     },
     false,
-  ],
-  ["move_object", { expectedRevision: 1, expectedStateVersion: 1 }, false],
-  ["add_scene_to_cart", { expectedRevision: 1, expectedStateVersion: 1 }, true],
-  [
+  ),
+  agree("move_object", { expectedRevision: 1, expectedStateVersion: 1 }, false),
+  agree("add_scene_to_cart", { expectedRevision: 1, expectedStateVersion: 1 }, true),
+  agree(
     "add_scene_to_cart",
     { expectedRevision: 1, expectedStateVersion: 1, objectIds: ["sofa", "rug"] },
     true,
-  ],
-  [
+  ),
+  agree(
     "add_scene_to_cart",
     { expectedRevision: 1, expectedStateVersion: 1, objectIds: ["rug", "rug"] },
     false,
-  ],
-  [
+  ),
+  agree(
     "add_scene_to_cart",
     { expectedRevision: 1, expectedStateVersion: 1, objectIds: [] },
     false,
-  ],
-  [
+  ),
+  agree(
     "add_scene_to_cart",
     { expectedRevision: 1, expectedStateVersion: 1, objectIds: ["   "] },
     false,
-  ],
-  [
+  ),
+  agree(
     "add_scene_to_cart",
     {
       expectedRevision: 1,
@@ -205,7 +223,20 @@ const CONTRACT_PARITY_CASES: readonly (readonly [CoreToolName, unknown, boolean]
       objectIds: Array.from({ length: 21 }, (_value, index) => `object-${index}`),
     },
     false,
-  ],
+  ),
+  {
+    // Zod trims each id before the uniqueness refine, so it sees a duplicate;
+    // JSON Schema `uniqueItems` compares the raw strings and admits the call.
+    // Zod is the authoritative validator, so the page still answers INVALID_INPUT.
+    tool: "add_scene_to_cart",
+    input: {
+      expectedRevision: 1,
+      expectedStateVersion: 1,
+      objectIds: ["rug", "rug "],
+    },
+    zod: false,
+    jsonSchema: true,
+  },
 ];
 
 describe("WebMCP Core 6 contracts", () => {
@@ -460,20 +491,20 @@ describe("WebMCP Core 6 contracts", () => {
     ]);
   });
 
-  test("agrees on representative inputs across both contract layers", () => {
-    for (const [tool, input, expected] of CONTRACT_PARITY_CASES) {
+  test("JSON Schema admits, Zod decides", () => {
+    for (const { tool, input, zod, jsonSchema } of CONTRACT_PARITY_CASES) {
       const entry = CORE_TOOL_MANIFEST.find(({ name }) => name === tool);
       if (!entry) throw new Error(`Missing manifest entry for ${tool}.`);
       const label = `${tool} ${JSON.stringify(input)}`;
 
-      expect([label, ZOD_INPUT_SCHEMAS[tool].safeParse(input).success]).toEqual([
-        label,
-        expected,
-      ]);
-      expect([label, acceptsJsonSchema(entry.inputSchema, input)]).toEqual([
-        label,
-        expected,
-      ]);
+      expect([label, "zod", ZOD_INPUT_SCHEMAS[tool].safeParse(input).success])
+        .toEqual([label, "zod", zod]);
+      expect([label, "jsonSchema", acceptsJsonSchema(entry.inputSchema, input)])
+        .toEqual([label, "jsonSchema", jsonSchema]);
+      // The manifest schema is the transport gate and may be a superset: it must
+      // never reject an input the authoritative Zod contract accepts.
+      expect([label, "admits every Zod-valid input", !zod || jsonSchema])
+        .toEqual([label, "admits every Zod-valid input", true]);
     }
   });
 });

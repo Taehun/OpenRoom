@@ -492,6 +492,7 @@ export function createCoreTools(context: ToolContext): readonly ModelContextTool
 
   return CORE_TOOL_MANIFEST.map((entry) => ({
     ...entry,
+    annotations: { ...entry.annotations },
     execute: executors[entry.name],
   }));
 }
