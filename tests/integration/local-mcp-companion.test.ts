@@ -9,6 +9,7 @@ import { Client } from "@modelcontextprotocol/client";
 import { StdioClientTransport } from "@modelcontextprotocol/client/stdio";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import { relayCallFailure } from "../../src/local-mcp/page-relay-client";
 import {
   CORE_TOOL_MANIFEST,
   getCoreToolManifestHash,
@@ -361,6 +362,21 @@ describe("local MCP companion", () => {
     expect(result.isError).toBe(true);
     expect(result.content).toEqual(failure.content);
     expect(result.structuredContent).toEqual(failure.structuredContent);
+  });
+
+  it("forwards a relay level failure that carries no revision fields", async () => {
+    // What the page returns for a name or a request id no Core 6 descriptor
+    // owns. It is shaped like a ToolFailure but omits `sceneRevision` and
+    // `stateVersion`, so the companion's result check must not demand them.
+    const failure = relayCallFailure("get_selection", "DUPLICATE_REQUEST", "Request already executed.");
+    page.respond = () => failure;
+
+    const result = await client.callTool({ name: "get_selection", arguments: {} });
+    expect(result.isError).toBe(true);
+    expect(result.content).toEqual(failure.content);
+    expect(result.structuredContent).toEqual(failure.structuredContent);
+    expect(result.structuredContent).not.toHaveProperty("sceneRevision");
+    expect(result.structuredContent).not.toHaveProperty("stateVersion");
   });
 
   it("turns one move_object call into exactly one request id and one page execution", async () => {

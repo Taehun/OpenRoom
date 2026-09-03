@@ -105,6 +105,9 @@ export function createOpenInteriorMcpServer(registry: SessionRegistry): McpServe
           }
           return result;
         } catch (error) {
+          // `RelayError.retryable` is advice for the caller, never a licence for
+          // this adapter to re-send: one MCP call is at most one page
+          // execution, so a refusal is reported once and the call is dropped.
           if (isRelayError(error)) return toolFailure(relayFailureText(error));
           return toolFailure("The OpenInterior companion could not complete the call.");
         }
