@@ -172,3 +172,38 @@ test("completes the deterministic spatial commerce UI journey", async ({
   await expect(dialog).toBeHidden();
   expect(consoleErrors).toEqual([]);
 });
+
+test("keeps the room across a soft navigation to the home page and back", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.goto("/demo");
+
+  const diagnostics = page.getByRole("status", { name: "Scene diagnostics" });
+  const roomCanvas = page.getByRole("main", { name: "Room canvas" });
+  const viewCart = page.getByRole("button", { name: "View cart" });
+  await expect(roomCanvas).toBeVisible();
+
+  await page.getByRole("button", { name: "Find alternatives" }).click();
+  await page
+    .getByRole("button", { name: "Place Oak Frame Table in room" })
+    .click();
+  await expect(roomCanvas.getByText("Oak Frame Table")).toBeVisible();
+  await expect(diagnostics).toContainText("Revision 2");
+  await expect(viewCart).toHaveText("View cart1");
+
+  // The header wordmark is a `next/link`, so this is a soft navigation: the
+  // workspace unmounts, and only a store outside the route subtree survives
+  // it. Playwright's Chromium has no WebMCP, so `/` renders the guide.
+  await page.getByRole("link", { name: "OpenRoom home" }).click();
+  await expect(page).toHaveURL("/");
+  await expect(
+    page.getByRole("region", { name: "WebMCP in this browser" }),
+  ).toBeVisible();
+
+  await page.getByRole("link", { name: "Open the demo" }).first().click();
+  await expect(page).toHaveURL("/demo");
+  await expect(roomCanvas.getByText("Oak Frame Table")).toBeVisible();
+  await expect(diagnostics).toContainText("Revision 2");
+  await expect(viewCart).toHaveText("View cart1");
+});
