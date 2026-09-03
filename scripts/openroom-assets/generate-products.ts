@@ -221,7 +221,10 @@ export async function runGenerateProducts(
         },
       );
       const decoded = await decode(generated);
-      const cutout = removeBackground(decoded.rgba, decoded.width, decoded.height);
+      const cutout = removeBackground(decoded.rgba, decoded.width, decoded.height, {
+        // A bookcase's shelf gaps are enclosed by its frame but are still wall.
+        enclosed: job.category === "bookshelf",
+      });
       const anchor = measureAnchor(cutout, decoded.width, decoded.height);
       if (!anchor) {
         throw new Error(

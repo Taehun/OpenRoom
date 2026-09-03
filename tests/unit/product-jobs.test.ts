@@ -777,3 +777,43 @@ describe("generate-views through the provider adapter", () => {
     });
   });
 });
+
+describe("removeBackground with enclosed regions", () => {
+  function frameWithHole(size: number, hole: number): Uint8Array {
+    // A dark square frame on white; the hole in the middle is white too.
+    const rgba = new Uint8Array(size * size * 4).fill(255);
+    const inset = 4;
+    for (let y = inset; y < size - inset; y += 1) {
+      for (let x = inset; x < size - inset; x += 1) {
+        const inHole =
+          x >= (size - hole) / 2 && x < (size + hole) / 2 && y >= (size - hole) / 2 && y < (size + hole) / 2;
+        if (inHole) continue;
+        const i = (y * size + x) * 4;
+        rgba[i] = 40; rgba[i + 1] = 30; rgba[i + 2] = 20; rgba[i + 3] = 255;
+      }
+    }
+    return rgba;
+  }
+  const centre = (size: number, out: Uint8Array) => out[((size / 2) * size + size / 2) * 4 + 3];
+
+  it("keeps an enclosed pale region by default", () => {
+    const size = 40;
+    const out = removeBackground(frameWithHole(size, 10), size, size);
+    expect(centre(size, out)).toBe(255);
+    expect(out[3]).toBe(0);
+  });
+
+  it("clears a large enclosed background region when asked", () => {
+    const size = 40;
+    const out = removeBackground(frameWithHole(size, 10), size, size, { enclosed: true, enclosedMinimumPixels: 50 });
+    expect(centre(size, out)).toBe(0);
+    // the frame itself is untouched
+    expect(out[((6 * size) + 6) * 4 + 3]).toBe(255);
+  });
+
+  it("leaves a small enclosed pale detail alone even when asked", () => {
+    const size = 40;
+    const out = removeBackground(frameWithHole(size, 4), size, size, { enclosed: true, enclosedMinimumPixels: 50 });
+    expect(centre(size, out)).toBe(255);
+  });
+});

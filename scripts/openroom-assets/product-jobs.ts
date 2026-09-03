@@ -196,10 +196,24 @@ function withinTolerance(
  * only, so no cleared pixel is ever given a white halo. The input is not
  * mutated.
  */
+export interface RemoveBackgroundOptions {
+  /**
+   * Also clear background-coloured regions that the border flood cannot reach:
+   * the gaps between the shelves of a bookcase are enclosed by its frame in 2D
+   * but are still the studio wall behind it. Only regions of at least
+   * `enclosedMinimumPixels` are cleared so small pale details survive.
+   */
+  enclosed?: boolean;
+  enclosedMinimumPixels?: number;
+}
+
+export const ENCLOSED_BACKGROUND_MINIMUM_PIXELS = 2000;
+
 export function removeBackground(
   rgba: Uint8Array,
   width: number,
   height: number,
+  options: RemoveBackgroundOptions = {},
 ): Uint8Array {
   const out = new Uint8Array(rgba);
   if (width <= 0 || height <= 0) return out;
@@ -240,6 +254,42 @@ export function removeBackground(
     if (x < width - 1) visit(index + 1);
     if (y > 0) visit(index - width);
     if (y < height - 1) visit(index + width);
+  }
+
+  if (options.enclosed) {
+    const minimum =
+      options.enclosedMinimumPixels ?? ENCLOSED_BACKGROUND_MINIMUM_PIXELS;
+    const seen = new Uint8Array(width * height);
+    for (let start = 0; start < seen.length; start += 1) {
+      if (seen[start] === 1 || cleared[start] === 1 || !isBackground(start)) {
+        continue;
+      }
+      // Collect one enclosed background-coloured component at a time.
+      const component: number[] = [];
+      const stack = [start];
+      seen[start] = 1;
+      while (stack.length > 0) {
+        const index = stack.pop()!;
+        component.push(index);
+        const x = index % width;
+        const y = (index - x) / width;
+        const neighbours = [
+          x > 0 ? index - 1 : -1,
+          x < width - 1 ? index + 1 : -1,
+          y > 0 ? index - width : -1,
+          y < height - 1 ? index + width : -1,
+        ];
+        for (const next of neighbours) {
+          if (next < 0 || seen[next] === 1 || cleared[next] === 1) continue;
+          if (!isBackground(next)) continue;
+          seen[next] = 1;
+          stack.push(next);
+        }
+      }
+      if (component.length >= minimum) {
+        for (const index of component) cleared[index] = 1;
+      }
+    }
   }
 
   const alpha = new Uint8Array(width * height);
