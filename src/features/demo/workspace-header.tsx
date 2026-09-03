@@ -9,6 +9,8 @@ interface WorkspaceHeaderProps {
   cartButtonRef: RefObject<HTMLButtonElement | null>;
   canUndo: boolean;
   dispatch: Dispatch<DemoAction>;
+  /** Set only by the adaptive home page, which also hosts the guide. */
+  guideHref?: string | undefined;
   provider: string;
   roomTotalMinor: number;
   scene: Scene;
@@ -22,6 +24,7 @@ export function WorkspaceHeader({
   cartButtonRef,
   canUndo,
   dispatch,
+  guideHref,
   provider,
   roomTotalMinor,
   scene,
@@ -54,6 +57,11 @@ export function WorkspaceHeader({
       </div>
 
       <div className={styles.headerActions}>
+        {guideHref ? (
+          <Link className={styles.quietButton} href={guideHref}>
+            <span>Guide</span>
+          </Link>
+        ) : null}
         <button
           className={styles.quietButton}
           disabled={!canUndo}

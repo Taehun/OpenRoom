@@ -162,6 +162,7 @@ test("exposes six photo controls and six object-rail controls", () => {
   expect(
     screen.getByRole("status", { name: "Native WebMCP status" }),
   ).toHaveTextContent("Unavailable");
+  expect(screen.queryByRole("link", { name: "Guide" })).toBeNull();
 });
 
 test("arranges through Human UI and one Undo restores the Scene", async () => {

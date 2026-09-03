@@ -735,6 +735,10 @@ test("redesigns the whole photo room through Core 6 and preserves human transfor
 
   await page.getByRole("link", { name: "Nook home" }).click();
   await expect(page).toHaveURL("/");
+  // `/` is the dashboard whenever WebMCP is present, so it remounts the
+  // workspace. The guide is the workspace-free view that proves teardown.
+  await page.getByRole("link", { name: "Guide" }).click();
+  await expect(page).toHaveURL("/?view=guide");
   await expect
     .poll(() =>
       page.evaluate(() => [...window.__photoActiveToolNames].sort()),
