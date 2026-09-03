@@ -51,8 +51,8 @@ Views come from the asset's symmetry class (`PHOTO_VIEW_SYMMETRY`):
 | `coffee_table` | `front-back` | `side` (one image serves a facing and its opposite) |
 | `floor_lamp`, `plant`, `rug` | `radial` | none — one image serves every facing |
 
-The demo catalog is 4 sofas + 4 chairs (3 views each) + 4 coffee tables (1 view
-each) = **28 jobs**.
+`pnpm assets:views --dry-run` prints the exact job list for the current catalog
+(the unit tests pin that count through `EXPECTED_VIEW_JOBS`).
 
 ## Commands
 
@@ -108,6 +108,7 @@ pnpm assets:products --dry-run                    # print the plan, make no requ
 pnpm assets:products                              # generate every missing cutout
 pnpm assets:products --product oak-side-table     # one product (repeatable)
 pnpm assets:products --product oak-side-table --force  # regenerate a generated entry
+pnpm assets:products --product oak-side-table --force --angle-reference hinoki-low-sofa  # match a photographed cutout's camera angle
 ```
 
 `--force` only regenerates cutouts this pipeline wrote before. A hand-registered
@@ -125,6 +126,10 @@ reflections.
 
 `{title}` and `{description}` come from the catalog entry, so the model never
 sees an id or a Scene enum.
+
+`--angle-reference <assetId>` sends a registered cutout to the model as an
+inline reference image and asks for the same camera height and quarter angle;
+use it when a generated cutout is audited as facing the wrong way.
 
 ### The product manifest
 
@@ -157,6 +162,24 @@ and `generatedAt` are provenance only and never reach the compositor.
 
 Once a product has its front-quarter cutout, `pnpm assets:views` picks it up
 and plans its alternate views on the next run.
+
+## Silhouettes
+
+The compositor scales every cutout by its silhouette, not by its frame: a
+product photographed with generous transparent margins would otherwise render
+smaller than a tightly cropped one of the same width.
+
+```bash
+pnpm assets:measure   # measure every registered cutout's alpha content box
+```
+
+The script reads each PNG/WebP under `public/demo/photo/`, finds the box that
+contains every pixel with alpha above 8 (as fractions of the image), and writes
+`src/features/photo/photo-silhouettes.generated.ts`. `PHOTO_ASSETS` merges the
+box in as `contentBox`, and `objectVisualWidth` divides the projected extent by
+the box's width so the visible silhouette spans the object's real width. Rerun
+it after any cutout is added or regenerated; the unit tests fail when a
+registered cutout has no box.
 
 ## Providers
 
