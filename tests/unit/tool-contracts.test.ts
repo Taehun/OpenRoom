@@ -1,18 +1,22 @@
 import { describe, expect, test } from "vitest";
 import { z } from "zod";
 import journeys from "../evals/webmcp-journeys.json";
+import { CORE_TOOL_MANIFEST } from "../../src/webmcp/core-tool-manifest";
 import {
   ADD_SCENE_TO_CART_JSON_SCHEMA,
   CORE_TOOL_NAMES,
   GET_SCENE_JSON_SCHEMA,
+  GET_SELECTION_JSON_SCHEMA,
   MOVE_OBJECT_JSON_SCHEMA,
   REPLACE_OBJECT_JSON_SCHEMA,
   SEARCH_PRODUCTS_JSON_SCHEMA,
   addSceneToCartInputSchema,
   getSceneInputSchema,
+  getSelectionInputSchema,
   moveObjectInputSchema,
   replaceObjectInputSchema,
   searchProductsInputSchema,
+  type CoreToolName,
 } from "../../src/webmcp/tool-contracts";
 import {
   invalidInputResult,
@@ -20,6 +24,189 @@ import {
   toolSuccess,
   type ToolResult,
 } from "../../src/webmcp/tool-result";
+
+type SchemaNode = { readonly [key: string]: unknown };
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function acceptsJsonSchema(schema: SchemaNode, value: unknown): boolean {
+  const enumValues = schema.enum;
+  if (Array.isArray(enumValues) && !enumValues.includes(value)) return false;
+
+  switch (schema.type) {
+    case "object": {
+      if (!isPlainObject(value)) return false;
+      const properties = isPlainObject(schema.properties) ? schema.properties : {};
+      const required = Array.isArray(schema.required) ? schema.required : [];
+      if (required.some((key) => !(String(key) in value))) return false;
+      if (
+        schema.additionalProperties === false &&
+        Object.keys(value).some((key) => !(key in properties))
+      ) {
+        return false;
+      }
+      return Object.entries(value).every(([key, entry]) => {
+        const property = properties[key];
+        return !isPlainObject(property) || acceptsJsonSchema(property, entry);
+      });
+    }
+    case "array": {
+      if (!Array.isArray(value)) return false;
+      if (typeof schema.minItems === "number" && value.length < schema.minItems) {
+        return false;
+      }
+      if (typeof schema.maxItems === "number" && value.length > schema.maxItems) {
+        return false;
+      }
+      if (
+        schema.uniqueItems === true &&
+        new Set(value.map((item) => JSON.stringify(item))).size !== value.length
+      ) {
+        return false;
+      }
+      const items = schema.items;
+      return !isPlainObject(items) ||
+        value.every((item) => acceptsJsonSchema(items, item));
+    }
+    case "string": {
+      if (typeof value !== "string") return false;
+      if (typeof schema.minLength === "number" && value.length < schema.minLength) {
+        return false;
+      }
+      if (typeof schema.maxLength === "number" && value.length > schema.maxLength) {
+        return false;
+      }
+      return typeof schema.pattern !== "string" ||
+        new RegExp(schema.pattern).test(value);
+    }
+    case "integer":
+    case "number": {
+      if (typeof value !== "number" || !Number.isFinite(value)) return false;
+      if (schema.type === "integer" && !Number.isInteger(value)) return false;
+      if (typeof schema.minimum === "number" && value < schema.minimum) return false;
+      return typeof schema.maximum !== "number" || value <= schema.maximum;
+    }
+    default:
+      return true;
+  }
+}
+
+const ZOD_INPUT_SCHEMAS: Record<CoreToolName, z.ZodType> = {
+  get_scene: getSceneInputSchema,
+  get_selection: getSelectionInputSchema,
+  search_products: searchProductsInputSchema,
+  replace_object: replaceObjectInputSchema,
+  move_object: moveObjectInputSchema,
+  add_scene_to_cart: addSceneToCartInputSchema,
+};
+
+const CONTRACT_PARITY_CASES: readonly (readonly [CoreToolName, unknown, boolean])[] = [
+  ["get_scene", {}, true],
+  ["get_scene", { extra: true }, false],
+  ["get_selection", {}, true],
+  ["get_selection", { extra: 1 }, false],
+  ["search_products", {}, true],
+  ["search_products", { category: "sofa", query: "modern", limit: 3 }, true],
+  ["search_products", { limit: 0 }, false],
+  ["search_products", { limit: 4 }, false],
+  ["search_products", { query: "   " }, false],
+  ["search_products", { query: "q".repeat(81) }, false],
+  ["search_products", { category: "not-a-category" }, false],
+  ["search_products", { unknown: 1 }, false],
+  [
+    "replace_object",
+    { productId: "table", expectedRevision: 1, expectedStateVersion: 1 },
+    true,
+  ],
+  ["replace_object", { productId: "table", expectedRevision: 1 }, false],
+  [
+    "replace_object",
+    {
+      objectId: "   ",
+      productId: "table",
+      expectedRevision: 1,
+      expectedStateVersion: 1,
+    },
+    false,
+  ],
+  [
+    "replace_object",
+    { productId: "table", expectedRevision: 0, expectedStateVersion: 1 },
+    false,
+  ],
+  [
+    "replace_object",
+    { productId: "table", expectedRevision: 1.5, expectedStateVersion: 1 },
+    false,
+  ],
+  [
+    "move_object",
+    {
+      position: { x: 20, z: -20 },
+      rotationYDegrees: 90,
+      expectedRevision: 1,
+      expectedStateVersion: 1,
+    },
+    true,
+  ],
+  [
+    "move_object",
+    { position: { x: 21, z: 0 }, expectedRevision: 1, expectedStateVersion: 1 },
+    false,
+  ],
+  [
+    "move_object",
+    {
+      position: { x: 0, z: 0, y: 1 },
+      expectedRevision: 1,
+      expectedStateVersion: 1,
+    },
+    false,
+  ],
+  [
+    "move_object",
+    {
+      position: { x: 0, z: 0 },
+      rotationYDegrees: 361,
+      expectedRevision: 1,
+      expectedStateVersion: 1,
+    },
+    false,
+  ],
+  ["move_object", { expectedRevision: 1, expectedStateVersion: 1 }, false],
+  ["add_scene_to_cart", { expectedRevision: 1, expectedStateVersion: 1 }, true],
+  [
+    "add_scene_to_cart",
+    { expectedRevision: 1, expectedStateVersion: 1, objectIds: ["sofa", "rug"] },
+    true,
+  ],
+  [
+    "add_scene_to_cart",
+    { expectedRevision: 1, expectedStateVersion: 1, objectIds: ["rug", "rug"] },
+    false,
+  ],
+  [
+    "add_scene_to_cart",
+    { expectedRevision: 1, expectedStateVersion: 1, objectIds: [] },
+    false,
+  ],
+  [
+    "add_scene_to_cart",
+    { expectedRevision: 1, expectedStateVersion: 1, objectIds: ["   "] },
+    false,
+  ],
+  [
+    "add_scene_to_cart",
+    {
+      expectedRevision: 1,
+      expectedStateVersion: 1,
+      objectIds: Array.from({ length: 21 }, (_value, index) => `object-${index}`),
+    },
+    false,
+  ],
+];
 
 describe("WebMCP Core 6 contracts", () => {
   test("publishes the stable Core tool names", () => {
@@ -260,5 +447,33 @@ describe("WebMCP Core 6 contracts", () => {
     expect(getSceneInputSchema.parse({})).toEqual({});
     expect(getSceneInputSchema.safeParse({ unexpected: 1 }).success).toBe(false);
     expect(z.object({}).strict().safeParse({ unexpected: 1 }).success).toBe(false);
+  });
+
+  test("reuses the published JSON Schemas in the shared manifest", () => {
+    expect(CORE_TOOL_MANIFEST.map(({ inputSchema }) => inputSchema)).toEqual([
+      GET_SCENE_JSON_SCHEMA,
+      GET_SELECTION_JSON_SCHEMA,
+      SEARCH_PRODUCTS_JSON_SCHEMA,
+      REPLACE_OBJECT_JSON_SCHEMA,
+      MOVE_OBJECT_JSON_SCHEMA,
+      ADD_SCENE_TO_CART_JSON_SCHEMA,
+    ]);
+  });
+
+  test("agrees on representative inputs across both contract layers", () => {
+    for (const [tool, input, expected] of CONTRACT_PARITY_CASES) {
+      const entry = CORE_TOOL_MANIFEST.find(({ name }) => name === tool);
+      if (!entry) throw new Error(`Missing manifest entry for ${tool}.`);
+      const label = `${tool} ${JSON.stringify(input)}`;
+
+      expect([label, ZOD_INPUT_SCHEMAS[tool].safeParse(input).success]).toEqual([
+        label,
+        expected,
+      ]);
+      expect([label, acceptsJsonSchema(entry.inputSchema, input)]).toEqual([
+        label,
+        expected,
+      ]);
+    }
   });
 });

@@ -2,6 +2,7 @@ import { act, cleanup, render, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, test, vi } from "vitest";
 
 import { createSceneStore } from "../../src/features/scene/scene-store";
+import { CORE_TOOL_MANIFEST } from "../../src/webmcp/core-tool-manifest";
 import { CORE_TOOL_NAMES } from "../../src/webmcp/tool-contracts";
 import type { ToolContext } from "../../src/webmcp/tool-context";
 import { DEMO_COMMERCE } from "../helpers/commerce-fixtures";
@@ -26,6 +27,7 @@ interface RegistrationFailure {
 class FakeModelContext implements ModelContext {
   readonly activeNames = new Set<string>();
   readonly registrations: Registration[] = [];
+  readonly tools: ModelContextTool[] = [];
 
   constructor(private readonly failure?: RegistrationFailure) {}
 
@@ -41,6 +43,7 @@ class FakeModelContext implements ModelContext {
 
     this.activeNames.add(tool.name);
     this.registrations.push({ name: tool.name, signal });
+    this.tools.push(tool);
     const removeName = () => this.activeNames.delete(tool.name);
     signal.addEventListener("abort", removeName, { once: true });
     if (signal.aborted) removeName();
@@ -123,6 +126,26 @@ describe("WebMCP registration lifecycle", () => {
     expect(modelContext.registrations.every(({ signal }) => signal.aborted)).toBe(
       true,
     );
+  });
+
+  test("registers descriptors built from the shared Core 6 manifest", async () => {
+    const modelContext = new FakeModelContext();
+    const registration = registerWebMcpTools(modelContext, createToolContext());
+
+    await registration.ready;
+    expect(
+      modelContext.tools.map(({ name, description, inputSchema, annotations }) => ({
+        name,
+        description,
+        inputSchema,
+        annotations,
+      })),
+    ).toEqual(CORE_TOOL_MANIFEST);
+    expect(
+      modelContext.tools.every(({ execute }) => typeof execute === "function"),
+    ).toBe(true);
+
+    registration.unregister();
   });
 
   test("aborts every tool when a registration fails", async () => {
