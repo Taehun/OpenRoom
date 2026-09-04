@@ -101,7 +101,7 @@ describe("the one-screen guide", () => {
       screen.getByRole("heading", { level: 1, name: "OpenRoom" }),
     ).toBeVisible();
     expect(
-      screen.getByText("AI Room Planner & Furniture Shopping"),
+      screen.getByText("AI room planner and furniture shopping"),
     ).toBeVisible();
 
     const banner = screen.getByRole("region", {
@@ -110,9 +110,9 @@ describe("the one-screen guide", () => {
     expect(within(banner).getByRole("status")).toHaveTextContent(
       "Needs a flag in Chromium 151",
     );
-    expect(
-      within(banner).getByText("Chromium 151 · secure context"),
-    ).toBeVisible();
+    // The facts line names the browser and nothing else: every page but the
+    // insecure one is a secure context, and that one says so in its title.
+    expect(within(banner).getByText("Chromium 151")).toBeVisible();
     expect(
       within(banner).getByText("chrome://flags/#enable-webmcp-testing"),
     ).toBeVisible();
@@ -124,15 +124,28 @@ describe("the one-screen guide", () => {
     ).toBeVisible();
 
     const connect = screen.getByRole("region", { name: "Connect an AI app" });
+    // Every card ends at the same demo, so one link sits under the grid.
     expect(
       within(connect).getAllByRole("link", { name: "Open the demo" }),
-    ).toHaveLength(3);
+    ).toHaveLength(1);
+    // Claude Desktop has no `mcp add`, so it gets the config block instead.
+    for (const card of ["Claude Code", "Claude Desktop", "Codex CLI"])
+      expect(within(connect).getByRole("article", { name: card })).toBeVisible();
     expect(within(connect).getByText(commandText(CONNECT_COMMANDS.claude))).toBeVisible();
     expect(within(connect).getByText(commandText(CONNECT_COMMANDS.codex))).toBeVisible();
-    // Each CLI card tails the log the registered command appends to.
+    expect(
+      within(connect).getByText(commandText(CONNECT_COMMANDS.claudeDesktop)),
+    ).toBeVisible();
+    // Each companion card tails the log its registered command appends to.
     expect(
       within(connect).getAllByText(commandText(CONNECT_COMMANDS.log)),
-    ).toHaveLength(2);
+    ).toHaveLength(3);
+    // The in-app browser card installs nothing; it hands over this address.
+    expect(
+      within(connect).getByRole("button", {
+        name: "Copy the OpenRoom address",
+      }),
+    ).toBeVisible();
     // The client starts the companion, so the guide never asks the reader to
     // run a second one: that fails with EADDRINUSE or pairs nothing.
     expect(within(connect).queryByText("pnpm mcp:openroom")).toBeNull();
@@ -155,44 +168,57 @@ describe("the one-screen guide", () => {
   });
 
   it.each([
-    [
-      "update-required",
-      { brand: "Chromium", version: 140 },
-      "Update Chrome to 146 or newer",
-      "You are on Chromium 140.",
-    ],
-    [
-      "unsupported-browser",
-      { engine: "other" as const, brand: "Safari", version: 18 },
-      "Not available in Safari",
-      "Use Google Chrome 146 or newer.",
-    ],
-    [
-      "insecure-context",
-      {},
-      "Needs HTTPS or localhost",
-      "Open this page over HTTPS or on http://localhost.",
-    ],
-  ])("titles the %s banner", (kind, browser, title, body) => {
-    renderGuide({
-      kind: kind as CompatibilityStatus["kind"],
-      browser,
-    });
+    {
+      kind: "update-required" as const,
+      browser: { brand: "Chromium", version: 140 },
+      title: "Update Chrome to 146 or newer",
+      // The facts line under the banner already names Chromium 140.
+      body: null,
+      checkAgain: true,
+    },
+    {
+      kind: "unsupported-browser" as const,
+      browser: { engine: "other" as const, brand: "Safari", version: 18 },
+      title: "Not available in Safari",
+      body: "Use Google Chrome 146 or newer.",
+      // Checking again in Safari can never change the answer, so the banner
+      // offers nothing to press.
+      checkAgain: false,
+    },
+    {
+      kind: "insecure-context" as const,
+      browser: {},
+      title: "Needs HTTPS or localhost",
+      body: "Open this page over HTTPS or on http://localhost.",
+      checkAgain: true,
+    },
+  ])(
+    "titles the $kind banner",
+    ({ body, browser, checkAgain, kind, title }) => {
+      renderGuide({ kind, browser });
 
-    const banner = screen.getByRole("region", {
-      name: "WebMCP in this browser",
-    });
-    expect(within(banner).getByRole("status")).toHaveTextContent(title);
-    expect(within(banner).getByText(body)).toBeVisible();
-    // Only one action, and it is not the flag-required pair.
-    expect(
-      within(banner).getByRole("button", { name: "Check again" }),
-    ).toBeVisible();
-    expect(within(banner).getAllByRole("button")).toHaveLength(1);
-    expect(
-      within(banner).queryByRole("link", { name: "Open the demo" }),
-    ).toBeNull();
-  });
+      const banner = screen.getByRole("region", {
+        name: "WebMCP in this browser",
+      });
+      expect(within(banner).getByRole("status")).toHaveTextContent(title);
+      if (body === null)
+        expect(banner.querySelector(".md-banner-body")).toBeNull();
+      else expect(within(banner).getByText(body)).toBeVisible();
+
+      if (checkAgain) {
+        // Only one action, and it is not the flag-required pair.
+        expect(
+          within(banner).getByRole("button", { name: "Check again" }),
+        ).toBeVisible();
+        expect(within(banner).getAllByRole("button")).toHaveLength(1);
+      } else {
+        expect(within(banner).queryByRole("button")).toBeNull();
+      }
+      expect(
+        within(banner).queryByRole("link", { name: "Open the demo" }),
+      ).toBeNull();
+    },
+  );
 
   it("titles the ready banner and offers the dashboard", () => {
     renderGuide({ kind: "ready" });
@@ -237,9 +263,7 @@ describe("the one-screen guide", () => {
     );
     expect(screen.getByRole("button", { name: "Copied" })).toBeVisible();
 
-    const claudeCard = screen.getByRole("article", {
-      name: "Claude Code & Claude Desktop",
-    });
+    const claudeCard = screen.getByRole("article", { name: "Claude Code" });
     const copies = within(claudeCard).getAllByRole("button", { name: /^Copy Claude/ });
     expect(copies).toHaveLength(2);
     // The client launches the companion: the first step registers it behind
@@ -248,6 +272,20 @@ describe("the one-screen guide", () => {
     expect(writeText).toHaveBeenLastCalledWith(CONNECT_COMMANDS.claude);
     await user.click(copies[1]!);
     expect(writeText).toHaveBeenLastCalledWith(CONNECT_COMMANDS.log);
+
+    const desktopCard = screen.getByRole("article", { name: "Claude Desktop" });
+    await user.click(
+      within(desktopCard).getByRole("button", {
+        name: "Copy the Claude Desktop configuration",
+      }),
+    );
+    expect(writeText).toHaveBeenLastCalledWith(CONNECT_COMMANDS.claudeDesktop);
+
+    // The in-app browser card copies the address the reader is already on.
+    await user.click(
+      screen.getByRole("button", { name: "Copy the OpenRoom address" }),
+    );
+    expect(writeText).toHaveBeenLastCalledWith(window.location.origin);
   });
 
   it("lists the six agent tools from the core manifest", () => {
@@ -403,9 +441,10 @@ test("points a browser without WebMCP at the local companion dashboard", async (
   }))
     expect(dashboard).toHaveAttribute("href", "/?view=dashboard");
   expect(
-    within(connect).getByRole("article", {
-      name: "Claude Code & Claude Desktop",
-    }),
+    within(connect).getByRole("article", { name: "Claude Code" }),
+  ).toBeVisible();
+  expect(
+    within(connect).getByRole("article", { name: "Claude Desktop" }),
   ).toBeVisible();
   expect(screen.queryByRole("main", { name: "Room canvas" })).toBeNull();
 });

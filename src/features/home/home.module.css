@@ -2,7 +2,7 @@
  * Guide layout only. Every colour, type step, and radius is a Material token
  * from `app/material-tokens.css`; the buttons, cards, banner, code spans, and
  * top app bar are the global `.md-*` classes. What lives here is placement:
- * the 1040px column, the two-column hero, the three-up connect row, and the
+ * the 1040px column, the two-column hero, the 2×2 connect grid, and the
  * spacing that keeps everything above the disclosures inside one 1440×900
  * viewport.
  */
@@ -102,20 +102,37 @@
   margin-top: 14px;
 }
 
+/* The figure is the frame plus its caption; only the frame clips. */
 .heroRoom {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+}
+
+.heroRoomFrame {
   position: relative;
   aspect-ratio: 16 / 10;
   /* Caps the tallest row so the connect cards close above the 900px fold. */
   max-height: 248px;
-  margin: 0;
   overflow: hidden;
   border-radius: var(--md-sys-shape-corner-large);
   background: var(--md-sys-color-surface-dim);
 }
 
-.heroRoom img {
+.heroRoomFrame img {
   object-fit: cover;
   object-position: center;
+}
+
+/* The photo is one redesign of the demo room, not the room the demo opens
+   with; the caption says so where the frame cannot clip it. */
+.heroCaption {
+  margin: 0;
+  color: var(--md-sys-color-on-surface-variant);
+  font-size: var(--md-sys-typescale-body-small-size);
+  font-weight: var(--md-sys-typescale-body-small-weight);
+  letter-spacing: var(--md-sys-typescale-body-small-tracking);
+  line-height: var(--md-sys-typescale-body-small-line-height);
 }
 
 /* ----------------------------------------------------------------- banner */
@@ -157,7 +174,9 @@
 
 .connectGrid {
   display: grid;
-  align-items: stretch;
+  /* Each card is as tall as its own steps: a two-line card next to a config
+     block should not stretch to the config block's height. */
+  align-items: start;
   gap: 16px;
   grid-template-columns: minmax(0, 1fr);
 }
@@ -222,9 +241,9 @@
 /*
  * A command wraps at its spaces first, so tokens (`--dir`, `<repo>`,
  * `mcp:openroom`) stay whole wherever they fit; `overflow-wrap: anywhere` is
- * the fallback for the one token too long for a narrow card — the quoted
- * `2>>"$HOME/openroom-mcp.log"` redirect — so nothing scrolls or clips at
- * 390 px. The text is unchanged, so the copy buttons still write the exact
+ * the fallback for the one token too long for the box — the quoted
+ * `2>>"$HOME/openroom-mcp.log"` redirect — so nothing scrolls or overhangs at
+ * any width. The text is unchanged, so the copy buttons still write the exact
  * command. `.md-code` keeps its default wrapping for the inline spans
  * elsewhere in the guide.
  */
@@ -239,8 +258,17 @@
   line-height: 1.5;
 }
 
+/*
+ * An inline-block token moves to the next line whole and is bounded by the
+ * code box, so a token wider than the box breaks inside itself instead of
+ * overhanging the card — which `white-space: nowrap` alone let it do between
+ * 900 and 1120 px, where the cards are narrowest.
+ */
 .commandToken {
-  white-space: nowrap;
+  display: inline-block;
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .stepCopy {
@@ -249,9 +277,9 @@
 }
 
 /* Pulls the text button's 16px of padding back so its label aligns with the
-   card's text edge. */
-.connectLink {
-  margin-top: auto;
+   section's text edge. */
+.connectFooterLink {
+  margin-top: 8px;
   margin-left: -16px;
 }
 
@@ -317,7 +345,7 @@
 @media (max-width: 899px) {
   /* Stacked under the copy, the photo spans the column instead of stopping at
      the two-column height cap. */
-  .heroRoom {
+  .heroRoomFrame {
     max-height: none;
   }
 }
@@ -328,8 +356,10 @@
     grid-template-columns: minmax(0, 1fr) minmax(0, 0.82fr);
   }
 
+  /* Four cards, 2×2: a third column would squeeze every code box under
+     360px and force the longest command to break inside a token. */
   .connectGrid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 

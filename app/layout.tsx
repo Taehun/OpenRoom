@@ -20,7 +20,7 @@ const mono = Roboto_Mono({
 
 export const metadata: Metadata = {
   title: "OpenRoom",
-  description: "AI Room Planner & Furniture Shopping",
+  description: "AI room planner and furniture shopping",
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {

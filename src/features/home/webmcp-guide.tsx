@@ -1,6 +1,12 @@
 import Image from "next/image";
 import Link from "next/link";
-import { Fragment, useEffect, useId, useState } from "react";
+import {
+  Fragment,
+  useEffect,
+  useId,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import {
   WEBMCP_FLAG_URL,
   WEBMCP_MIN_CHROMIUM,
@@ -18,31 +24,50 @@ const CONNECT_SECTION_ID = "connect-an-ai-app";
 const CONNECT_HEADING_ID = "connect-an-ai-app-heading";
 
 /**
- * The commands a reader copies to reach the local companion. `<repo>` is
- * literal text the reader replaces with their checkout path, and the copy
- * buttons write these strings verbatim.
+ * What a reader copies to reach the local companion: two `mcp add` commands,
+ * the Claude Desktop config block that has no command to run, and the log to
+ * tail. `<repo>` is literal text the reader replaces with their checkout path,
+ * and the copy buttons write these strings verbatim.
  *
  * The client starts the companion itself, so there is no separate command to
  * run first: a second companion in a terminal either fails with `EADDRINUSE`
  * or prints a code for a relay no client is attached to. The client also owns
- * the companion's stderr, which is where the pair code lands, so the
- * registered command wraps it in `sh -c` and appends stderr to a log the
- * reader can `tail`. See `docs/local-mcp.md`.
+ * the companion's stderr, which is where the pair code lands, so every entry
+ * wraps it in `sh -c` and appends stderr to a log the reader can `tail`. See
+ * `docs/local-mcp.md`.
  */
 export const CONNECT_COMMANDS = {
   claude:
     'claude mcp add --transport stdio openroom -- sh -c \'exec pnpm --silent --dir <repo> mcp:openroom 2>>"$HOME/openroom-mcp.log"\'',
+  claudeDesktop: `{
+  "mcpServers": {
+    "openroom": {
+      "command": "sh",
+      "args": ["-c", "exec pnpm --silent --dir <repo> mcp:openroom 2>>\\"$HOME/openroom-mcp.log\\""]
+    }
+  }
+}`,
   codex:
     'codex mcp add openroom -- sh -c \'exec pnpm --silent --dir <repo> mcp:openroom 2>>"$HOME/openroom-mcp.log"\'',
   log: "tail -f ~/openroom-mcp.log",
 } as const;
 
-const REPO_PLACEHOLDER_NOTE = "Replace <repo> with your OpenRoom checkout path.";
+/** Every companion card needs the repository on disk before anything runs. */
+const CHECKOUT_NOTE = `Needs a local checkout: git clone ${REPOSITORY_URL}, then pnpm install. Replace <repo> below with that folder.`;
 
 const PAIR_STEP =
-  "Start a chat; your app launches the companion, which writes a six-digit code to the log. Type it into the demo.";
+  "Start a chat. Your app launches OpenRoom's companion, which writes a six-digit code to the log. In the demo, press Connect an AI app, enter the code, and press Connect.";
 
-type ConnectStep = { command: string } | { note: string };
+/**
+ * A step is a command to run, a config block to paste, a plain instruction, or
+ * this page's own address — which only the browser knows, so it is a marker
+ * here and resolved at render time.
+ */
+type ConnectStep =
+  | { command: string }
+  | { config: string }
+  | { note: string }
+  | { address: true };
 
 interface ConnectCardContent {
   title: string;
@@ -52,13 +77,17 @@ interface ConnectCardContent {
 
 const CONNECT_CARDS: ReadonlyArray<ConnectCardContent> = [
   {
-    title: "ChatGPT & Codex app",
-    body: "Open OpenRoom in the ChatGPT desktop app's browser. Nothing else to install.",
-    steps: [],
+    title: "ChatGPT or Codex app",
+    body: "Open OpenRoom inside the app's built-in browser. Nothing to install.",
+    steps: [
+      { note: "In the app, open its browser and paste this address:" },
+      { address: true },
+      { note: "Start a chat. The app finds OpenRoom's tools on its own." },
+    ],
   },
   {
-    title: "Claude Code & Claude Desktop",
-    body: REPO_PLACEHOLDER_NOTE,
+    title: "Claude Code",
+    body: CHECKOUT_NOTE,
     steps: [
       { command: CONNECT_COMMANDS.claude },
       { command: CONNECT_COMMANDS.log },
@@ -66,8 +95,18 @@ const CONNECT_CARDS: ReadonlyArray<ConnectCardContent> = [
     ],
   },
   {
+    // Claude Desktop has no `mcp add`; the same server is registered by hand.
+    title: "Claude Desktop",
+    body: `Add this to claude_desktop_config.json (Settings > Developer > Edit Config). ${CHECKOUT_NOTE}`,
+    steps: [
+      { config: CONNECT_COMMANDS.claudeDesktop },
+      { command: CONNECT_COMMANDS.log },
+      { note: PAIR_STEP },
+    ],
+  },
+  {
     title: "Codex CLI",
-    body: REPO_PLACEHOLDER_NOTE,
+    body: CHECKOUT_NOTE,
     steps: [
       { command: CONNECT_COMMANDS.codex },
       { command: CONNECT_COMMANDS.log },
@@ -117,12 +156,15 @@ function bannerContent(status: CompatibilityStatus | null): BannerContent {
     case "flag-required":
       return {
         title: `Needs a flag in ${describeBrowser(status.browser)}`,
-        body: "Enable WebMCP for testing, relaunch, then check again.",
+        body:
+          "Paste this address into the address bar, set “WebMCP for testing” to Enabled, relaunch, then check again.",
       };
     case "update-required":
+      // The facts line under the banner already names the browser and its
+      // version, so a body would say it twice.
       return {
         title: `Update Chrome to ${WEBMCP_MIN_CHROMIUM} or newer`,
-        body: `You are on ${describeBrowser(status.browser)}.`,
+        body: null,
       };
     case "unsupported-browser":
       return {
@@ -137,11 +179,12 @@ function bannerContent(status: CompatibilityStatus | null): BannerContent {
   }
 }
 
-/** One body-small line of facts, never a table. */
+/**
+ * One body-small line of facts, never a table. The context is not named: every
+ * page but the insecure one is secure, and that one says so in its title.
+ */
 function bannerFacts(status: CompatibilityStatus): string {
-  const context =
-    status.kind === "insecure-context" ? "insecure context" : "secure context";
-  return `${describeBrowser(status.browser)} · ${context}`;
+  return describeBrowser(status.browser);
 }
 
 /** Outlined 24px glyphs in the same stroke language as the workspace icons. */
@@ -176,6 +219,8 @@ interface CopyButtonProps {
   accessibleLabel?: string | undefined;
   className: string;
   describedBy?: string | undefined;
+  /** Held down while the text to copy is still unknown. */
+  disabled?: boolean | undefined;
   label: string;
   text: string;
 }
@@ -184,6 +229,7 @@ function CopyButton({
   accessibleLabel,
   className,
   describedBy,
+  disabled,
   label,
   text,
 }: CopyButtonProps) {
@@ -201,6 +247,7 @@ function CopyButton({
       aria-describedby={describedBy}
       aria-label={accessibleLabel}
       className={className}
+      disabled={disabled}
       onClick={() => {
         // Clipboard access is absent on insecure origins and can be denied.
         try {
@@ -252,7 +299,9 @@ function StatusBanner({
       {status === null ? null : (
         <p className={styles.bannerFacts}>{bannerFacts(status)}</p>
       )}
-      {status === null ? null : (
+      {/* An unsupported browser gets no actions: "Check again" cannot ever
+          succeed there, and the body already names the browser to install. */}
+      {status === null || status.kind === "unsupported-browser" ? null : (
         <div className="md-banner-actions">
           {status.kind === "ready" ? (
             // eslint-disable-next-line @next/next/no-html-link-for-pages -- same-route query switch must reload: a soft navigation leaves this guide on screen without the Chromium Navigation API.
@@ -283,9 +332,24 @@ function StatusBanner({
   );
 }
 
+const STEP_COPY_CLASS = `md-button md-button--text md-button--dense ${styles.stepCopy}`;
+
+/** The origin never changes while the document is alive. */
+const subscribeToOrigin = () => () => undefined;
+const getOriginSnapshot = () => window.location.origin;
+const getServerOriginSnapshot = () => null;
+
 function ConnectCard({ card }: { card: ConnectCardContent }) {
   const baseId = useId();
   const titleId = `${baseId}-title`;
+  // Only the browser knows where this page is served from, and the address a
+  // reader must paste is the one they are already on. The server render says
+  // so in words rather than guessing a host, and the hydrated page fills it in.
+  const origin = useSyncExternalStore(
+    subscribeToOrigin,
+    getOriginSnapshot,
+    getServerOriginSnapshot,
+  );
 
   return (
     <article
@@ -300,45 +364,81 @@ function ConnectCard({ card }: { card: ConnectCardContent }) {
       )}
       {card.steps.length === 0 ? null : (
         <ol className={styles.steps}>
-          {card.steps.map((step, index) =>
-            "command" in step ? (
-              // The row is a span so the `li` keeps its `list-item` display
-              // and its ordinal marker.
-              <li key={step.command}>
-                <span className={styles.commandRow}>
-                  <code className="md-code" id={`${baseId}-${index}`}>
-                    {/* One span per token so a line never breaks inside
-                        `--silent` or `openroom-mcp.log`; the text is unchanged
-                        and the Copy button still writes the exact command. */}
-                    {step.command.split(" ").map((token, tokenIndex) => (
-                      <Fragment key={tokenIndex}>
-                        {tokenIndex > 0 ? " " : null}
-                        <span className={styles.commandToken}>{token}</span>
-                      </Fragment>
-                    ))}
-                  </code>
-                  <CopyButton
-                    accessibleLabel={`Copy ${card.title} command ${index + 1}`}
-                    className={`md-button md-button--text md-button--dense ${styles.stepCopy}`}
-                    describedBy={`${baseId}-${index}`}
-                    label="Copy"
-                    text={step.command}
-                  />
-                </span>
-              </li>
-            ) : (
-              <li key={step.note}>{step.note}</li>
-            ),
-          )}
+          {card.steps.map((step, index) => {
+            const stepId = `${baseId}-${index}`;
+
+            // The row is a span so the `li` keeps its `list-item` display and
+            // its ordinal marker.
+            if ("command" in step)
+              return (
+                <li key={stepId}>
+                  <span className={styles.commandRow}>
+                    <code className="md-code" id={stepId}>
+                      {/* One span per token, so a line breaks between tokens
+                          before it breaks inside `--silent` or
+                          `openroom-mcp.log`; the text is unchanged and the
+                          Copy button still writes the exact command. */}
+                      {step.command.split(" ").map((token, tokenIndex) => (
+                        <Fragment key={tokenIndex}>
+                          {tokenIndex > 0 ? " " : null}
+                          <span className={styles.commandToken}>{token}</span>
+                        </Fragment>
+                      ))}
+                    </code>
+                    <CopyButton
+                      accessibleLabel={`Copy ${card.title} command ${index + 1}`}
+                      className={STEP_COPY_CLASS}
+                      describedBy={stepId}
+                      label="Copy"
+                      text={step.command}
+                    />
+                  </span>
+                </li>
+              );
+
+            // JSON carries its own line breaks and the code box keeps them
+            // (`white-space: pre-wrap`), so a config needs no token split.
+            if ("config" in step)
+              return (
+                <li key={stepId}>
+                  <span className={styles.commandRow}>
+                    <code className="md-code" id={stepId}>
+                      {step.config}
+                    </code>
+                    <CopyButton
+                      accessibleLabel={`Copy the ${card.title} configuration`}
+                      className={STEP_COPY_CLASS}
+                      describedBy={stepId}
+                      label="Copy"
+                      text={step.config}
+                    />
+                  </span>
+                </li>
+              );
+
+            if ("address" in step)
+              return (
+                <li key={stepId}>
+                  <span className={styles.commandRow}>
+                    <code className="md-code" id={stepId}>
+                      {origin ?? "this page's address"}
+                    </code>
+                    <CopyButton
+                      accessibleLabel="Copy the OpenRoom address"
+                      className={STEP_COPY_CLASS}
+                      describedBy={stepId}
+                      disabled={origin === null}
+                      label="Copy"
+                      text={origin ?? ""}
+                    />
+                  </span>
+                </li>
+              );
+
+            return <li key={stepId}>{step.note}</li>;
+          })}
         </ol>
       )}
-      {/* eslint-disable-next-line @next/next/no-html-link-for-pages -- same-route query switch must reload: a soft navigation leaves this guide on screen without the Chromium Navigation API. */}
-      <a
-        className={`md-button md-button--text ${styles.connectLink}`}
-        href="/?view=dashboard"
-      >
-        Open the demo
-      </a>
     </article>
   );
 }
@@ -396,7 +496,7 @@ export function WebMcpGuide({ onCheckAgain, status }: WebMcpGuideProps) {
               OpenRoom
             </h1>
             <p className={styles.heroTagline}>
-              AI Room Planner &amp; Furniture Shopping
+              AI room planner and furniture shopping
             </p>
             <p className={styles.heroLede}>
               {"Furnish a real room photo with catalog products — by hand, or through the AI app you already use."}
@@ -410,13 +510,20 @@ export function WebMcpGuide({ onCheckAgain, status }: WebMcpGuideProps) {
           </div>
 
           <figure className={styles.heroRoom}>
-            <Image
-              alt="Approximate living room visualization with a cream sofa, oak coffee table, woven rug, floor lamp, chair, and potted plant."
-              fill
-              priority
-              sizes="(min-width: 900px) 46vw, 100vw"
-              src="/demo/openroom-room.png"
-            />
+            {/* The frame clips the photo; the caption sits outside it, so the
+                overflow that crops the image never crops the words. */}
+            <div className={styles.heroRoomFrame}>
+              <Image
+                alt="A living room furnished with a cream sofa, oak coffee table, woven rug, floor lamp, chair and potted plant."
+                fill
+                priority
+                sizes="(min-width: 900px) 46vw, 100vw"
+                src="/demo/openroom-room.png"
+              />
+            </div>
+            <figcaption className={styles.heroCaption}>
+              {"The demo room after one redesign. The demo opens with the room's original furniture, ready to swap."}
+            </figcaption>
           </figure>
         </section>
 
@@ -435,6 +542,15 @@ export function WebMcpGuide({ onCheckAgain, status }: WebMcpGuideProps) {
               <ConnectCard card={card} key={card.title} />
             ))}
           </div>
+          {/* One link under the grid, not one per card: every card ends at the
+              same demo. */}
+          {/* eslint-disable-next-line @next/next/no-html-link-for-pages -- same-route query switch must reload: a soft navigation leaves this guide on screen without the Chromium Navigation API. */}
+          <a
+            className={`md-button md-button--text ${styles.connectFooterLink}`}
+            href="/?view=dashboard"
+          >
+            Open the demo
+          </a>
         </section>
 
         <div className={styles.moreInfo}>
