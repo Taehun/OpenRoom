@@ -174,7 +174,13 @@ export function PhotoObjectLayer({
         ) : null}
       </button>
 
-      {selected && silhouetteStyle ? (
+      {/*
+        Always rendered, never conditioned on the selection: the span is the one
+        place the room draws a ring, and the stylesheet colours it moss for the
+        selection, inverse-surface for keyboard focus. Rendering it only when
+        selected would leave a focused-but-unselected cutout with no ring at all.
+      */}
+      {silhouetteStyle ? (
         <span
           aria-hidden="true"
           className={styles.photoSilhouetteOutline}

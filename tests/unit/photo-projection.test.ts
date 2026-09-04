@@ -11,6 +11,7 @@ import {
   projectRoomPoint,
   projectRugPlacement,
   stableLayerOrder,
+  supportedTopOffset,
   unprojectStagePoint,
   verticalScaleAt,
   silhouetteExtentM,
@@ -177,6 +178,105 @@ describe("photo projection", () => {
       0.42 * verticalScaleAt(0, room),
       12,
     );
+  });
+
+  // Important QA regression: the calibrated lift drew a lamp standing on a table's
+  // lower shelf. A cutout is scaled by its width and keeps its picture's aspect, so
+  // the supporter's drawn top is where the photograph puts it, not where the
+  // calibration says the object ends.
+  describe("standing on a supporter's drawn top", () => {
+    const table = boxAt(1.2, 0, {
+      type: "coffee_table",
+      dimensionsM: { width: 1.2, height: 0.42, depth: 0.6 },
+      position: [0, 0.21, 0],
+      rotation: [0, 0, 0],
+    });
+    // A 3:2 picture whose furniture fills the middle 70% of its height.
+    const tablePresentation = {
+      view: "front-quarter" as const,
+      symmetry: "front-back" as const,
+      contentBox: { left: 0, right: 1, top: 0.2, bottom: 0.9 },
+      intrinsicWidth: 1536,
+      intrinsicHeight: 1024,
+    };
+    const stage = { width: 1024, height: 576 };
+    const lampAt = (z: number) => ({ position: [0, 1.22, z] as SceneObject["position"] });
+
+    it("anchors the object to the top the supporter's picture draws", () => {
+      // 1.2·cos35° + 0.6·sin35° = 1.32713 m spans 15.9256% of a 6 m room at mid
+      // depth, so the 3:2 picture is 18.8747% of the 16:9 stage's height and its
+      // silhouette 70% of that, 13.2123%. The calibration gives the table
+      // 0.42 · 0.12 · 16/9 = 8.96% of it; the remaining 4.2523% is its top surface
+      // seen from above, and the lamp rides half of that back from the front edge.
+      const centre = supportedTopOffset(
+        lampAt(0),
+        table,
+        tablePresentation,
+        room,
+        stage,
+      );
+      const back = supportedTopOffset(
+        lampAt(-0.3),
+        table,
+        tablePresentation,
+        room,
+        stage,
+      );
+      const front = supportedTopOffset(
+        lampAt(0.3),
+        table,
+        tablePresentation,
+        room,
+        stage,
+      );
+
+      expect(centre).toBeCloseTo(0.1108615, 6);
+      expect(back).toBeCloseTo(0.0896, 6);
+      expect(front).toBeCloseTo(0.132123, 6);
+      expect(centre).toBeCloseTo(((back ?? 0) + (front ?? 0)) / 2, 12);
+      // The calibrated lift is the same number in the wrong unit: a fraction of the
+      // stage width where a fraction of its height is needed.
+      expect(centre).toBeGreaterThan(
+        objectElevationOffset(
+          boxAt(0.35, 0, {
+            type: "floor_lamp",
+            dimensionsM: { width: 0.35, height: 1.6, depth: 0.35 },
+            position: [0, 1.22, 0],
+          }),
+          room,
+        ),
+      );
+    });
+
+    it("declines a supporter with no measured picture, so the caller can fall back", () => {
+      expect(
+        supportedTopOffset(lampAt(0), table, {}, room, stage),
+      ).toBeNull();
+      expect(
+        supportedTopOffset(
+          lampAt(0),
+          table,
+          { ...tablePresentation, intrinsicWidth: 0 },
+          room,
+          stage,
+        ),
+      ).toBeNull();
+    });
+
+    it("falls back to the stylesheet's 16:9 box before the stage is measured", () => {
+      expect(
+        supportedTopOffset(lampAt(0), table, tablePresentation, room),
+      ).toBeCloseTo(
+        supportedTopOffset(lampAt(0), table, tablePresentation, room, stage)!,
+        12,
+      );
+      expect(
+        supportedTopOffset(lampAt(0), table, tablePresentation, room, {
+          width: 0,
+          height: 0,
+        }),
+      ).toBeCloseTo(0.1108615, 6);
+    });
   });
 
   it("keeps a rug lying at its 0.01 resting height on the floor", () => {

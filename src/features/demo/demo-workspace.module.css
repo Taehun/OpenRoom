@@ -333,6 +333,15 @@
   background-size: cover;
 }
 
+/*
+ * The stage is a fallback focus target, not a tab stop: a deselection with no rail
+ * button to return to parks focus here rather than leaving it on a cutout the
+ * inspector no longer calls selected. It draws no ring of its own.
+ */
+.photoStage:focus-visible {
+  outline: none;
+}
+
 .photoObjectFrame {
   position: absolute;
 }
@@ -374,32 +383,58 @@
   transform: scaleX(-1);
 }
 
+/*
+ * One ring vocabulary for the room: moss says selected, inverse-surface says the
+ * keyboard is here, and a white halo backs whichever ring is drawn so it survives
+ * an arbitrary photograph. `--moss` *is* `--md-sys-color-primary`, so a focus ring
+ * in primary was indistinguishable from the selection — the two states now differ
+ * in hue, and a selected, focused cutout keeps moss and gains the halo.
+ *
+ * With a measured silhouette the ring hugs the furniture rather than the image's
+ * transparent margins: the button's own outline yields to a span sized to the alpha
+ * content box, and that span carries both states.
+ */
 .photoObjectSelected {
   outline: 3px solid var(--moss);
   outline-offset: 4px;
 }
 
-/*
- * With a measured silhouette the selection hugs the furniture, not the image's
- * transparent margins: the button's own outline yields to a span sized to the
- * alpha content box, and the keyboard focus ring moves onto that span too.
- */
 .photoObjectSilhouetted.photoObjectSelected,
-.photoObjectSilhouetted.photoObjectSelected:focus-visible {
+.photoObjectSilhouetted:focus-visible {
   outline: none;
 }
 
 .photoSilhouetteOutline {
   position: absolute;
   border-radius: 2px;
-  outline: 3px solid var(--moss);
+  outline: 3px solid transparent;
   outline-offset: 4px;
   pointer-events: none;
-  transition: outline-color 140ms ease;
+  transition: outline-color 140ms ease, box-shadow 140ms ease;
 }
 
-.photoObjectSilhouetted:focus-visible ~ .photoSilhouetteOutline {
-  outline-color: var(--md-sys-color-primary);
+.photoObjectSelected ~ .photoSilhouetteOutline {
+  outline-color: var(--moss);
+}
+
+.photoObject:focus-visible ~ .photoSilhouetteOutline {
+  outline-color: var(--md-sys-color-inverse-surface);
+  box-shadow: 0 0 0 4px var(--paper);
+}
+
+.photoObjectSelected:focus-visible ~ .photoSilhouetteOutline {
+  outline-color: var(--moss);
+  box-shadow: 0 0 0 4px var(--paper);
+}
+
+.photoObject:focus-visible:not(.photoObjectSilhouetted) {
+  outline: 3px solid var(--md-sys-color-inverse-surface);
+  outline-offset: 4px;
+  box-shadow: 0 0 0 4px var(--paper);
+}
+
+.photoObjectSelected:focus-visible:not(.photoObjectSilhouetted) {
+  box-shadow: 0 0 0 4px var(--paper);
 }
 
 .photoRugLayer {
@@ -467,6 +502,26 @@
   opacity: 1;
 }
 
+/*
+ * The rug speaks the same vocabulary as a cutout: a moss quad when it is selected,
+ * an inverse-surface quad when only the keyboard is on it, and a white halo under
+ * whichever quad is drawn so it reads over the rug's own pattern.
+ */
+.photoRugButton:focus-visible ~ .photoRugSelection:not(.photoRugSelectionVisible) {
+  stroke: var(--md-sys-color-inverse-surface);
+  fill: transparent;
+}
+
+.photoRugFocusHalo {
+  fill: none;
+  stroke: var(--paper);
+  opacity: 0;
+}
+
+.photoRugButton:focus-visible ~ .photoRugSelection .photoRugFocusHalo {
+  opacity: 1;
+}
+
 .photoRugButton:focus-visible {
   outline: none;
 }
@@ -481,18 +536,6 @@
   border-radius: 50%;
   background: var(--openroom-contact-shadow);
   pointer-events: none;
-}
-
-/*
- * The only override of the global focus ring: these controls sit on the room
- * photograph, where 2px of primary can land on a similar colour. A thicker
- * ring at a wider offset stays legible over an arbitrary image.
- */
-.photoObject:focus-visible,
-.photoObjectSelected:focus-visible,
-.rotationHandle:focus-visible {
-  outline: 3px solid var(--md-sys-color-primary);
-  outline-offset: 4px;
 }
 
 .floorAnchor {
