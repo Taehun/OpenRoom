@@ -15,6 +15,7 @@ import {
   PLACEHOLDER_STORE_DOMAIN,
   SHOPIFY_COMMERCE,
   fixtureGid,
+  fixtureProductLinks,
 } from "../helpers/commerce-fixtures";
 
 const PERMALINK = `https://${PLACEHOLDER_STORE_DOMAIN}/cart/${FIXTURE_VARIANT_IDS["oak-frame-table"]}:1,${FIXTURE_VARIANT_IDS["woven-jute-rug"]}:1`;
@@ -68,6 +69,7 @@ function mappedDraft(): CartApprovalDraft {
       ],
       skipped: [],
       checkoutPermalink: PERMALINK,
+      productLinks: fixtureProductLinks("oak-frame-table", "woven-jute-rug"),
     },
   };
 }
@@ -90,6 +92,7 @@ function emptyDraft(commerceBlock = false): CartApprovalDraft {
             lines: [],
             skipped: [],
             checkoutPermalink: null,
+            productLinks: [],
           },
         }
       : {}),
@@ -134,6 +137,7 @@ function agentDraft(): CartApprovalDraft {
       ],
       skipped: [{ productId: "rice-paper-floor-lamp", reason: "unmapped" }],
       checkoutPermalink: TABLE_PERMALINK,
+      productLinks: fixtureProductLinks("oak-frame-table", "rice-paper-floor-lamp"),
     },
   };
 }

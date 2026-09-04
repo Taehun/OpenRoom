@@ -4,6 +4,7 @@ import type {
   CommerceContext,
   CommerceDraft,
   CommerceLine,
+  ProductLink,
   ShopifyVariantMap,
   SkippedLine,
 } from "./commerce-types";
@@ -65,6 +66,21 @@ export function buildCartPermalink(
   return `https://${storeDomain}/cart/${path}`;
 }
 
+export function buildProductLinks(
+  storeDomain: string,
+  items: readonly CartLineInput[],
+): ProductLink[] {
+  const seen = new Set<string>();
+  const links: ProductLink[] = [];
+  for (const { productId, quantity } of items) {
+    if (!Number.isInteger(quantity) || quantity <= 0) continue;
+    if (seen.has(productId)) continue;
+    seen.add(productId);
+    links.push({ productId, url: `https://${storeDomain}/products/${productId}` });
+  }
+  return links;
+}
+
 export function buildCommerceDraft(
   commerce: CommerceContext,
   items: readonly CartLineInput[],
@@ -83,6 +99,7 @@ export function buildCommerceDraft(
     })),
     skipped,
     checkoutPermalink: buildCartPermalink(commerce.config.storeDomain, lines),
+    productLinks: buildProductLinks(commerce.config.storeDomain, items),
   };
 }
 

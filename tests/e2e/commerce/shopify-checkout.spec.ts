@@ -258,6 +258,12 @@ test("returns Shopify lines and the store MCP endpoint from add_scene_to_cart", 
     ],
     skipped: [],
     checkoutPermalink: TABLE_PERMALINK,
+    productLinks: [
+      {
+        productId: "oak-frame-table",
+        url: `https://${STORE}/products/oak-frame-table`,
+      },
+    ],
   });
 
   const dialog = page.getByRole("dialog", { name: "Review your room" });

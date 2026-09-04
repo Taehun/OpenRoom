@@ -31,6 +31,7 @@ import {
   FIXTURE_VARIANT_IDS,
   SHOPIFY_COMMERCE,
   fixtureGid,
+  fixtureProductLinks,
 } from "../helpers/commerce-fixtures";
 
 function createContext(
@@ -707,6 +708,7 @@ describe("add_scene_to_cart commerce block", () => {
       ],
       skipped: [],
       checkoutPermalink: `https://openroom-placeholder.myshopify.com/cart/${FIXTURE_VARIANT_IDS["oak-frame-table"]}:1`,
+      productLinks: fixtureProductLinks("oak-frame-table"),
     });
     expect(drafts).toHaveLength(1);
     expect(drafts[0]!.commerce).toEqual(draft.commerce);

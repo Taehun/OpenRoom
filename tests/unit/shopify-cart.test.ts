@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildCartPermalink,
   buildCommerceDraft,
+  buildProductLinks,
   enrichCartDraft,
   resolveShopifyLines,
 } from "../../src/features/commerce/shopify-cart";
@@ -134,6 +135,36 @@ describe("buildCartPermalink", () => {
   });
 });
 
+describe("buildProductLinks", () => {
+  it("links every requested product by handle, mapped or not", () => {
+    expect(
+      buildProductLinks(PLACEHOLDER_STORE_DOMAIN, [
+        { productId: "oak-frame-table", quantity: 1 },
+        { productId: "plant", quantity: 1 },
+      ]),
+    ).toEqual([
+      {
+        productId: "oak-frame-table",
+        url: `https://${PLACEHOLDER_STORE_DOMAIN}/products/oak-frame-table`,
+      },
+      {
+        productId: "plant",
+        url: `https://${PLACEHOLDER_STORE_DOMAIN}/products/plant`,
+      },
+    ]);
+  });
+
+  it("lists each product once and drops non-positive quantities", () => {
+    expect(
+      buildProductLinks(PLACEHOLDER_STORE_DOMAIN, [
+        { productId: "rug", quantity: 1 },
+        { productId: "rug", quantity: 2 },
+        { productId: "coffee-table", quantity: 0 },
+      ]).map(({ productId }) => productId),
+    ).toEqual(["rug"]);
+  });
+});
+
 describe("buildCommerceDraft", () => {
   it("returns null in demo mode", () => {
     expect(buildCommerceDraft(DEMO_COMMERCE, [{ productId: "coffee-table", quantity: 1 }])).toBeNull();
@@ -155,6 +186,16 @@ describe("buildCommerceDraft", () => {
       ],
       skipped: [{ productId: "plant", reason: "unmapped" }],
       checkoutPermalink: `https://${PLACEHOLDER_STORE_DOMAIN}/cart/${FIXTURE_VARIANT_IDS["coffee-table"]}:1`,
+      productLinks: [
+        {
+          productId: "coffee-table",
+          url: `https://${PLACEHOLDER_STORE_DOMAIN}/products/coffee-table`,
+        },
+        {
+          productId: "plant",
+          url: `https://${PLACEHOLDER_STORE_DOMAIN}/products/plant`,
+        },
+      ],
     });
   });
 
@@ -188,6 +229,20 @@ describe("enrichCartDraft", () => {
       ],
       skipped: [{ productId: "rice-paper-floor-lamp", reason: "unmapped" }],
       checkoutPermalink: `https://${PLACEHOLDER_STORE_DOMAIN}/cart/${FIXTURE_VARIANT_IDS["oak-frame-table"]}:1,${FIXTURE_VARIANT_IDS["woven-jute-rug"]}:1`,
+      productLinks: [
+        {
+          productId: "oak-frame-table",
+          url: `https://${PLACEHOLDER_STORE_DOMAIN}/products/oak-frame-table`,
+        },
+        {
+          productId: "woven-jute-rug",
+          url: `https://${PLACEHOLDER_STORE_DOMAIN}/products/woven-jute-rug`,
+        },
+        {
+          productId: "rice-paper-floor-lamp",
+          url: `https://${PLACEHOLDER_STORE_DOMAIN}/products/rice-paper-floor-lamp`,
+        },
+      ],
     });
   });
 });

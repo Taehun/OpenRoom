@@ -22,6 +22,15 @@ export function fixtureGid(productId: keyof typeof FIXTURE_VARIANT_IDS): string 
   return `gid://shopify/ProductVariant/${FIXTURE_VARIANT_IDS[productId]}`;
 }
 
+export function fixtureProductLinks(
+  ...productIds: readonly string[]
+): { productId: string; url: string }[] {
+  return productIds.map((productId) => ({
+    productId,
+    url: `https://${PLACEHOLDER_STORE_DOMAIN}/products/${productId}`,
+  }));
+}
+
 export const FIXTURE_VARIANTS: ShopifyVariantMap = {
   "coffee-table": fixtureGid("coffee-table"),
   rug: fixtureGid("rug"),

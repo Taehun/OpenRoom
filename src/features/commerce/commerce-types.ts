@@ -44,6 +44,11 @@ export interface SkippedLine {
   reason: "unmapped" | "invalid";
 }
 
+export interface ProductLink {
+  productId: string;
+  url: string;
+}
+
 export interface CommerceDraft {
   provider: "shopify";
   storeDomain: string;
@@ -52,6 +57,13 @@ export interface CommerceDraft {
   lines: readonly CommerceLine[];
   skipped: readonly SkippedLine[];
   checkoutPermalink: string | null;
+  /**
+   * One link per requested product, mapped or not. The seed kit writes the
+   * OpenRoom product id as the Shopify handle, so these stay correct on any
+   * store seeded with it — which is what makes switching stores useful rather
+   * than decorative.
+   */
+  productLinks: readonly ProductLink[];
 }
 
 export interface CommerceContext {
