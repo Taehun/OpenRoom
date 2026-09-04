@@ -1,6 +1,11 @@
-import type { Dispatch } from "react";
+import { type Dispatch, type RefObject, useEffect, useRef } from "react";
 import { PHOTO_ASSETS } from "../photo/photo-assets";
 import { facingOf, rotationYOf } from "../photo/photo-facing";
+import {
+  PHOTO_VIEW_SYMMETRY,
+  getPhotoAssetSet,
+  selectPhotoView,
+} from "../photo/photo-views";
 import type { Scene, SceneObject } from "../scene/scene-schema";
 import { supportOf } from "../scene/support";
 import { DEMO_PRODUCTS } from "./demo-data";
@@ -33,7 +38,9 @@ export function describeFacing(rotationY: number): string {
   const yaw = rotationYOf(facingOf(rotationY));
   const degrees = Math.round((yaw * 180) / Math.PI);
   const magnitude = Math.abs(degrees);
-  if (magnitude <= 5) return "Toward the camera";
+  // Under 3° is rounding noise; a deliberate 5° nudge has to read as a turn,
+  // otherwise the first press of Rotate looks like it did nothing.
+  if (magnitude < 3) return "Toward the camera";
   if (magnitude >= 175) return "Away from the camera";
   return `Turned ${magnitude}° to the ${degrees > 0 ? "left" : "right"}`;
 }
@@ -64,11 +71,25 @@ const CATEGORY_HEADINGS: Readonly<Record<SceneObject["type"], string>> = {
   unknown: "Products for your room",
 };
 
+/**
+ * One image serves every facing, so the piece has no readable front and the
+ * Faces row would only ever say "Toward the camera". Mirrors `photo-views`'
+ * own rule: the type decides first, the asset set is the second opinion.
+ */
+function isRadialPiece(
+  object: SceneObject,
+  set: ReturnType<typeof getPhotoAssetSet>,
+): boolean {
+  return PHOTO_VIEW_SYMMETRY[object.type] === "radial" || set?.symmetry === "radial";
+}
+
 function InspectorPanel({
   dispatch,
+  headingRef,
   scene,
 }: {
   dispatch: Dispatch<DemoAction>;
+  headingRef: RefObject<HTMLHeadingElement | null>;
   scene: Scene;
 }) {
   const selectedObject = scene.objects.find(
@@ -88,12 +109,18 @@ function InspectorPanel({
   // Spec §5: a lamp standing on a table reads as such rather than as a lamp with a
   // surprising Y; unsupported objects keep the panel exactly as it was.
   const supporter = supportOf(scene, selectedObject);
+  // The stage shows the nearest photographed view, not a render, so the panel
+  // says so in words next to the facing it qualifies.
+  const set = getPhotoAssetSet(selectedObject);
+  const view = set ? selectPhotoView(selectedObject, set) : null;
 
   return (
     <section className={styles.inspectorPanel} aria-labelledby="inspector-title">
       <div className={styles.panelHeading}>
         <span className={styles.panelEyebrow}>Selected</span>
-        <h2 id="inspector-title">{objectDisplayName(selectedObject)}</h2>
+        <h2 id="inspector-title" ref={headingRef} tabIndex={-1}>
+          {objectDisplayName(selectedObject)}
+        </h2>
         {selectedObject.product ? (
           <p>{formatPrice(selectedObject.product.price.amountMinor)}</p>
         ) : null}
@@ -104,10 +131,20 @@ function InspectorPanel({
           <dt>Size</dt>
           <dd>{formatDimensions(selectedObject)}</dd>
         </div>
-        <div>
-          <dt>Faces</dt>
-          <dd>{describeFacing(selectedObject.rotation[1])}</dd>
-        </div>
+        {isRadialPiece(selectedObject, set) ? null : (
+          <div>
+            <dt>Faces</dt>
+            <dd>
+              {describeFacing(selectedObject.rotation[1])}
+              {view && !view.exact ? (
+                <>
+                  {" "}
+                  <small>· nearest photo shown</small>
+                </>
+              ) : null}
+            </dd>
+          </div>
+        )}
         {supporter ? (
           <div>
             <dt>Standing on</dt>
@@ -119,6 +156,11 @@ function InspectorPanel({
           <dd>{describeStyle(selectedObject)}</dd>
         </div>
       </dl>
+
+      <p className={styles.editHint}>
+        Drag to move, or nudge with the arrow keys. Rotate turns it; hold Shift
+        for bigger steps.
+      </p>
 
       <div className={`md-card md-card--outlined ${styles.lockRow}`}>
         <span className={styles.lockMark} aria-hidden="true">
@@ -143,9 +185,11 @@ function InspectorPanel({
 
 function ProductsPanel({
   dispatch,
+  headingRef,
   scene,
 }: {
   dispatch: Dispatch<DemoAction>;
+  headingRef: RefObject<HTMLHeadingElement | null>;
   scene: Scene;
 }) {
   const selectedObject = scene.objects.find(
@@ -166,7 +210,9 @@ function ProductsPanel({
       <div className={styles.panelHeadingWithAction}>
         <div>
           <span className={styles.panelEyebrow}>Alternatives</span>
-          <h2 id="products-title">{categoryHeading}</h2>
+          <h2 id="products-title" ref={headingRef} tabIndex={-1}>
+            {categoryHeading}
+          </h2>
         </div>
         <button
           className={styles.textButton}
@@ -289,13 +335,41 @@ function ActivityPanel({
 }
 
 export function ContextPanel({ dispatch, scene, state }: ContextPanelProps) {
+  const inspectorHeadingRef = useRef<HTMLHeadingElement | null>(null);
+  const productsHeadingRef = useRef<HTMLHeadingElement | null>(null);
+  const mounted = useRef(false);
+
+  /*
+   * "Find alternatives" and "Back" unmount themselves, which drops focus to
+   * <body>; the panel that replaces them takes it so the keyboard stays where
+   * the eye went. `document.activeElement` is the whole test: a cutout click
+   * or an object-rail click leaves focus on the control that was pressed, and
+   * the first render is skipped so the page never steals focus on load.
+   */
+  useEffect(() => {
+    const heading =
+      state.mode === "products" ? productsHeadingRef : inspectorHeadingRef;
+    if (mounted.current && document.activeElement === document.body) {
+      heading.current?.focus({ preventScroll: true });
+    }
+    mounted.current = true;
+  }, [state.mode]);
+
   return (
     <aside className={styles.contextPanel} aria-label="Room context">
       {state.mode === "inspector" ? (
-        <InspectorPanel dispatch={dispatch} scene={scene} />
+        <InspectorPanel
+          dispatch={dispatch}
+          headingRef={inspectorHeadingRef}
+          scene={scene}
+        />
       ) : null}
       {state.mode === "products" ? (
-        <ProductsPanel dispatch={dispatch} scene={scene} />
+        <ProductsPanel
+          dispatch={dispatch}
+          headingRef={productsHeadingRef}
+          scene={scene}
+        />
       ) : null}
       {state.mode === "activity" ? (
         <ActivityPanel dispatch={dispatch} scene={scene} />

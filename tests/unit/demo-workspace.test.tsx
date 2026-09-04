@@ -10,7 +10,10 @@ import {
 import userEvent from "@testing-library/user-event";
 import { afterEach, expect, test, vi } from "vitest";
 import { createDemoScene } from "../../src/demo/demo-scene";
-import { ContextPanel } from "../../src/features/demo/context-panel";
+import {
+  ContextPanel,
+  describeFacing,
+} from "../../src/features/demo/context-panel";
 import { DemoWorkspace } from "../../src/features/demo/demo-workspace";
 import type { ModelContextTool } from "../../src/webmcp/tool-handlers";
 import {
@@ -849,4 +852,95 @@ test("shows an On row only while the selected object is supported", () => {
   expect(screen.getByText("Standing on").nextElementSibling).toHaveTextContent(
     "Coffee table",
   );
+});
+
+const INSPECTOR_STATE = {
+  mode: "inspector" as const,
+  isCartOpen: false,
+  cartDraft: null,
+  toast: null,
+  announcement: null,
+};
+
+// A 5° nudge is a deliberate press of Rotate; only rounding noise still reads
+// as "Toward the camera".
+test("reads the first rotate press as a turn, not as facing the camera", () => {
+  const degrees = (value: number) => (value * Math.PI) / 180;
+
+  expect(describeFacing(0)).toBe("Toward the camera");
+  expect(describeFacing(degrees(2))).toBe("Toward the camera");
+  expect(describeFacing(degrees(5))).toBe("Turned 5° to the left");
+  expect(describeFacing(degrees(-5))).toBe("Turned 5° to the right");
+  expect(describeFacing(degrees(180))).toBe("Away from the camera");
+});
+
+// One photo serves a lamp from every side, so a Faces row could only ever say
+// "Toward the camera" — it says nothing instead.
+test("hides the Faces row for a piece with no photographed front", () => {
+  const scene = createDemoScene();
+  scene.selectedObjectId = "lamp_01";
+
+  const { unmount } = render(
+    <ContextPanel dispatch={() => {}} scene={scene} state={INSPECTOR_STATE} />,
+  );
+  expect(screen.queryByText("Faces")).toBeNull();
+  unmount();
+
+  const sofaScene = createDemoScene();
+  sofaScene.selectedObjectId = "sofa_01";
+  render(
+    <ContextPanel
+      dispatch={() => {}}
+      scene={sofaScene}
+      state={INSPECTOR_STATE}
+    />,
+  );
+  expect(screen.getByText("Faces")).toBeVisible();
+});
+
+test("tells people how to edit the selected piece", () => {
+  render(<DemoWorkspace />);
+
+  expect(
+    screen.getByText(
+      "Drag to move, or nudge with the arrow keys. Rotate turns it; hold Shift for bigger steps.",
+    ),
+  ).toBeVisible();
+});
+
+test("Find alternatives moves focus to the products heading", async () => {
+  const user = userEvent.setup();
+  render(<DemoWorkspace />);
+
+  await user.click(screen.getByRole("button", { name: "Find alternatives" }));
+
+  expect(
+    screen.getByRole("heading", { name: "Coffee tables for your room" }),
+  ).toHaveFocus();
+});
+
+test("Back moves focus to the inspector title", async () => {
+  const user = userEvent.setup();
+  render(<DemoWorkspace />);
+
+  await user.click(screen.getByRole("button", { name: "Find alternatives" }));
+  await user.click(screen.getByRole("button", { name: "Back" }));
+
+  expect(screen.getByRole("heading", { name: "Coffee table" })).toHaveFocus();
+});
+
+// The heading only catches focus a pressed control dropped: a click on the
+// photo keeps it on the cutout, and the first render never steals it.
+test("leaves focus alone when the selection changes from the photo", async () => {
+  const user = userEvent.setup();
+  render(<DemoWorkspace />);
+
+  expect(document.body).toHaveFocus();
+
+  const stage = screen.getByRole("region", { name: "Editable room photo" });
+  const sofa = within(stage).getByRole("button", { name: "Sofa" });
+  await user.click(screen.getByRole("button", { name: "Find alternatives" }));
+  await user.click(sofa);
+
+  expect(sofa).toHaveFocus();
 });
