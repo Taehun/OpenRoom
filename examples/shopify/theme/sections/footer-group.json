@@ -104,14 +104,15 @@
           ]
         },
         "menu_shop": {
-          "type": "menu",
+          "type": "text",
+          "name": "Shop",
           "settings": {
-            "menu": "main-menu",
-            "heading": "Shop",
-            "menu_spacing": 8,
-            "heading_preset": "h6",
-            "link_preset": "paragraph",
-            "text_color": "#43483F"
+            "text": "<h3>Shop</h3><p><a href=\"/collections/sofa\">Sofas</a></p><p><a href=\"/collections/chair\">Chairs</a></p><p><a href=\"/collections/coffee-table\">Coffee tables</a></p><p><a href=\"/collections/side-table\">Side tables</a></p><p><a href=\"/collections/bookshelf\">Bookshelves</a></p><p><a href=\"/collections/floor-lamp\">Lighting</a></p><p><a href=\"/collections/rug\">Rugs</a></p><p><a href=\"/collections/plant\">Plants</a></p>",
+            "type_preset": "rte",
+            "width": "fit-content",
+            "max_width": "normal",
+            "alignment": "left",
+            "wrap": "pretty"
           }
         },
         "menu_help": {
