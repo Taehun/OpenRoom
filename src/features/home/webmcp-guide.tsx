@@ -117,12 +117,15 @@ function bannerContent(status: CompatibilityStatus | null): BannerContent {
     case "flag-required":
       return {
         title: `Needs a flag in ${describeBrowser(status.browser)}`,
-        body: "Enable WebMCP for testing, relaunch, then check again.",
+        body:
+          "Paste this address into the address bar, set “WebMCP for testing” to Enabled, relaunch, then check again.",
       };
     case "update-required":
+      // The facts line under the banner already names the browser and its
+      // version, so a body would say it twice.
       return {
         title: `Update Chrome to ${WEBMCP_MIN_CHROMIUM} or newer`,
-        body: `You are on ${describeBrowser(status.browser)}.`,
+        body: null,
       };
     case "unsupported-browser":
       return {
@@ -137,11 +140,12 @@ function bannerContent(status: CompatibilityStatus | null): BannerContent {
   }
 }
 
-/** One body-small line of facts, never a table. */
+/**
+ * One body-small line of facts, never a table. The context is not named: every
+ * page but the insecure one is secure, and that one says so in its title.
+ */
 function bannerFacts(status: CompatibilityStatus): string {
-  const context =
-    status.kind === "insecure-context" ? "insecure context" : "secure context";
-  return `${describeBrowser(status.browser)} · ${context}`;
+  return describeBrowser(status.browser);
 }
 
 /** Outlined 24px glyphs in the same stroke language as the workspace icons. */
@@ -252,7 +256,9 @@ function StatusBanner({
       {status === null ? null : (
         <p className={styles.bannerFacts}>{bannerFacts(status)}</p>
       )}
-      {status === null ? null : (
+      {/* An unsupported browser gets no actions: "Check again" cannot ever
+          succeed there, and the body already names the browser to install. */}
+      {status === null || status.kind === "unsupported-browser" ? null : (
         <div className="md-banner-actions">
           {status.kind === "ready" ? (
             // eslint-disable-next-line @next/next/no-html-link-for-pages -- same-route query switch must reload: a soft navigation leaves this guide on screen without the Chromium Navigation API.
@@ -396,7 +402,7 @@ export function WebMcpGuide({ onCheckAgain, status }: WebMcpGuideProps) {
               OpenRoom
             </h1>
             <p className={styles.heroTagline}>
-              AI Room Planner &amp; Furniture Shopping
+              AI room planner and furniture shopping
             </p>
             <p className={styles.heroLede}>
               {"Furnish a real room photo with catalog products — by hand, or through the AI app you already use."}
@@ -410,13 +416,20 @@ export function WebMcpGuide({ onCheckAgain, status }: WebMcpGuideProps) {
           </div>
 
           <figure className={styles.heroRoom}>
-            <Image
-              alt="Approximate living room visualization with a cream sofa, oak coffee table, woven rug, floor lamp, chair, and potted plant."
-              fill
-              priority
-              sizes="(min-width: 900px) 46vw, 100vw"
-              src="/demo/openroom-room.png"
-            />
+            {/* The frame clips the photo; the caption sits outside it, so the
+                overflow that crops the image never crops the words. */}
+            <div className={styles.heroRoomFrame}>
+              <Image
+                alt="A living room furnished with a cream sofa, oak coffee table, woven rug, floor lamp, chair and potted plant."
+                fill
+                priority
+                sizes="(min-width: 900px) 46vw, 100vw"
+                src="/demo/openroom-room.png"
+              />
+            </div>
+            <figcaption className={styles.heroCaption}>
+              {"The demo room after one redesign. The demo opens with the room's original furniture, ready to swap."}
+            </figcaption>
           </figure>
         </section>
 

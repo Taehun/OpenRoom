@@ -102,20 +102,37 @@
   margin-top: 14px;
 }
 
+/* The figure is the frame plus its caption; only the frame clips. */
 .heroRoom {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+}
+
+.heroRoomFrame {
   position: relative;
   aspect-ratio: 16 / 10;
   /* Caps the tallest row so the connect cards close above the 900px fold. */
   max-height: 248px;
-  margin: 0;
   overflow: hidden;
   border-radius: var(--md-sys-shape-corner-large);
   background: var(--md-sys-color-surface-dim);
 }
 
-.heroRoom img {
+.heroRoomFrame img {
   object-fit: cover;
   object-position: center;
+}
+
+/* The photo is one redesign of the demo room, not the room the demo opens
+   with; the caption says so where the frame cannot clip it. */
+.heroCaption {
+  margin: 0;
+  color: var(--md-sys-color-on-surface-variant);
+  font-size: var(--md-sys-typescale-body-small-size);
+  font-weight: var(--md-sys-typescale-body-small-weight);
+  letter-spacing: var(--md-sys-typescale-body-small-tracking);
+  line-height: var(--md-sys-typescale-body-small-line-height);
 }
 
 /* ----------------------------------------------------------------- banner */
@@ -317,7 +334,7 @@
 @media (max-width: 899px) {
   /* Stacked under the copy, the photo spans the column instead of stopping at
      the two-column height cap. */
-  .heroRoom {
+  .heroRoomFrame {
     max-height: none;
   }
 }
