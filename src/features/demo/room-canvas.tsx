@@ -119,24 +119,11 @@ export function RoomCanvas({
                 : styles.toolButton
             }
             onClick={() => setToolMode("select")}
-            title="Select"
+            title="Select — drag to move, arrow keys to nudge (Shift for bigger steps)"
             type="button"
           >
             <OpenRoomIcon name="select" />
             <span>Select</span>
-          </button>
-          <button
-            aria-label="Move tool"
-            aria-pressed={toolMode === "move"}
-            className={
-              toolMode === "move" ? styles.toolButtonActive : styles.toolButton
-            }
-            onClick={() => setToolMode("move")}
-            title="Move the selected piece (arrow keys; hold Shift for bigger steps)"
-            type="button"
-          >
-            <OpenRoomIcon name="move" />
-            <span>Move</span>
           </button>
           <button
             aria-label="Rotate tool"
@@ -208,8 +195,8 @@ export function RoomCanvas({
             <RoomPhotoStage />
           </div>
           <figcaption className={styles.visuallyHidden}>
-            Edit catalog cutouts directly over the room photo with pointer or
-            keyboard controls.
+            Drag a piece to move it, or use the arrow keys; the Rotate tool
+            turns it.
           </figcaption>
 
 
@@ -266,19 +253,25 @@ export function RoomCanvas({
               </button>
             </div>
           </div>
-          {copyStatus ? (
-            <span
-              aria-label="Prompt copy status"
-              className={
-                copyStatus.kind === "success"
+          {/*
+            The live region is permanent: a status element mounted at the moment
+            it fills is not announced, so "Prompt copied" would never be spoken.
+            Idle, it is the visually-hidden rule and holds an empty string.
+          */}
+          <span
+            aria-label="Prompt copy status"
+            aria-live="polite"
+            className={
+              copyStatus
+                ? copyStatus.kind === "success"
                   ? styles.copyStatusSuccess
                   : styles.copyStatusError
-              }
-              role="status"
-            >
-              {copyStatus.message}
-            </span>
-          ) : null}
+                : styles.copyStatusIdle
+            }
+            role="status"
+          >
+            {copyStatus?.message ?? ""}
+          </span>
         </section>
       </main>
     </div>

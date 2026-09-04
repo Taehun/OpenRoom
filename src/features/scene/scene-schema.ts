@@ -129,7 +129,7 @@ export type SceneProduct = z.infer<typeof SceneProductSchema>;
 export type SceneObject = z.infer<typeof SceneObjectSchema>;
 export type Opening = z.infer<typeof OpeningSchema>;
 export type Scene = z.infer<typeof SceneSchema>;
-export type ToolMode = "select" | "move" | "rotate";
+export type ToolMode = "select" | "rotate";
 export type CommandActor = "human" | "agent";
 
 export type SceneCommand =

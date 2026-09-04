@@ -741,7 +741,8 @@ describe("RoomPhotoStage", () => {
 
   test("moves a focused object by one keyboard command with normal and Shift steps", () => {
     const store = fixtureStore();
-    store.getState().setToolMode("move");
+    // Select is the default tool: the arrows nudge without picking anything.
+    expect(store.getState().toolMode).toBe("select");
     const commit = vi.spyOn(store.getState(), "commitTransform");
     const initial = structuredClone(objectFromStore(store, "table_01"));
     renderStage(store);
@@ -760,6 +761,31 @@ describe("RoomPhotoStage", () => {
     expect(objectFromStore(store, "table_01").position[2]).toBeCloseTo(
       initial.position[2] - 0.24,
     );
+  });
+
+  // A keyboard nudge moved pixels and said nothing; the room now narrates it.
+  test("announces each keyboard nudge and turn in a polite live region", () => {
+    const store = fixtureStore();
+    const { stage } = renderStage(store);
+    const table = screen.getByRole("button", { name: "Coffee table" });
+    const note = within(stage).getByRole("status");
+    expect(note).toHaveAttribute("aria-live", "polite");
+    expect(note).toHaveTextContent("");
+
+    fireEvent.keyDown(table, { key: "ArrowRight" });
+    expect(note).toHaveTextContent("Coffee table moved right");
+    fireEvent.keyDown(table, { key: "ArrowUp" });
+    expect(note).toHaveTextContent("Coffee table moved back");
+    fireEvent.keyDown(table, { key: "ArrowDown" });
+    expect(note).toHaveTextContent("Coffee table moved forward");
+    fireEvent.keyDown(table, { key: "ArrowLeft" });
+    expect(note).toHaveTextContent("Coffee table moved left");
+
+    act(() => store.getState().setToolMode("rotate"));
+    fireEvent.keyDown(table, { key: "ArrowRight", shiftKey: true });
+    expect(note).toHaveTextContent("Coffee table turned 15° to the right");
+    fireEvent.keyDown(table, { key: "ArrowLeft" });
+    expect(note).toHaveTextContent("Coffee table turned 5° to the left");
   });
 
   test("rotates focused vertical objects and rugs by keyboard", () => {
@@ -1315,20 +1341,64 @@ describe("keyboard focus", () => {
     expect(document.activeElement).toBe(field);
   });
 
-  test("reaches the cutout when the move tool is picked, so arrows move it", () => {
+  test("reaches the cutout when a tool is picked, so arrows reach the piece", () => {
     const { store } = renderStage();
     expect(store.getState().scene.selectedObjectId).toBe("table_01");
-    const before = objectFromStore(store, "table_01").position[0];
+    const before = objectFromStore(store, "table_01").rotation[1];
 
-    act(() => store.getState().setToolMode("move"));
+    act(() => store.getState().setToolMode("rotate"));
 
     const table = screen.getByRole("button", { name: "Coffee table" });
     expect(document.activeElement).toBe(table);
 
     fireEvent.keyDown(document.activeElement!, { key: "ArrowRight" });
 
-    expect(objectFromStore(store, "table_01").position[0]).toBeCloseTo(
-      before + 0.08,
+    expect(objectFromStore(store, "table_01").rotation[1]).toBeCloseTo(
+      before + (5 * Math.PI) / 180,
     );
+  });
+
+  // Important QA regression: clicking the already-active tool, or the rail item
+  // for the already-selected piece, was a silent no-op that left focus (and so
+  // the arrow keys) on the button that was clicked.
+  test("clicking Rotate twice keeps arrows working", () => {
+    const store = fixtureStore();
+    vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockReturnValue(
+      STAGE_RECT,
+    );
+    render(
+      <SceneStoreProvider store={store}>
+        <button
+          data-rail-object-id="table_01"
+          onClick={() => store.getState().selectObject("table_01")}
+          type="button"
+        >
+          Coffee table rail
+        </button>
+        <RoomPhotoStage />
+      </SceneStoreProvider>,
+    );
+    const rotateTool = () => act(() => store.getState().setToolMode("rotate"));
+    const table = screen.getByRole("button", { name: "Coffee table" });
+    const rail = screen.getByRole("button", { name: "Coffee table rail" });
+
+    rotateTool();
+    expect(document.activeElement).toBe(table);
+
+    // The keyboard user walks back to the rail, then re-picks the same tool.
+    act(() => rail.focus());
+    rotateTool();
+    expect(document.activeElement).toBe(table);
+
+    const before = objectFromStore(store, "table_01").rotation[1];
+    fireEvent.keyDown(document.activeElement!, { key: "ArrowRight" });
+    expect(objectFromStore(store, "table_01").rotation[1]).toBeCloseTo(
+      before + (5 * Math.PI) / 180,
+    );
+
+    // And re-clicking the rail item for the piece that is already selected.
+    act(() => rail.focus());
+    fireEvent.click(rail);
+    expect(document.activeElement).toBe(table);
   });
 });

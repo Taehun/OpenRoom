@@ -200,6 +200,31 @@ describe("createSceneStore", () => {
     expect(store.getState().stateVersion).toBe(1);
   });
 
+  // Re-picking the active tool or the already-selected rail item used to be a
+  // silent no-op, which left the arrow keys stranded on the rail button.
+  test("counts every selection and tool pick as a focus request", () => {
+    const store = createSceneStore();
+    expect(store.getState().focusRequest).toBe(0);
+
+    store.getState().selectObject("chair_01");
+    expect(store.getState().focusRequest).toBe(1);
+
+    store.getState().selectObject("chair_01");
+    expect(store.getState().focusRequest).toBe(2);
+    expect(store.getState().stateVersion).toBe(2);
+
+    store.getState().setToolMode("rotate");
+    expect(store.getState().focusRequest).toBe(3);
+
+    store.getState().setToolMode("rotate");
+    expect(store.getState().focusRequest).toBe(4);
+    expect(store.getState().toolMode).toBe("rotate");
+
+    // An id that is not in the Scene is not a request for anything.
+    store.getState().selectObject("missing_01");
+    expect(store.getState().focusRequest).toBe(4);
+  });
+
   test("increments stateVersion only for actual selection changes", () => {
     const store = createSceneStore();
 

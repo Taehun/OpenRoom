@@ -30,6 +30,13 @@ export interface SceneStoreState {
   history: Scene[];
   toolMode: ToolMode;
   isTransforming: boolean;
+  /**
+   * Bumped by every selection and every tool pick, whether or not the value
+   * changed. Re-picking the active tool, or the rail item already selected, is
+   * still a request to put the keyboard back on that piece: the room watches
+   * this counter so the arrow keys are never left behind on the rail.
+   */
+  focusRequest: number;
   resetVersion: number;
   stateVersion: number;
   selectObject(objectId: string | null): void;
@@ -101,6 +108,7 @@ export function createSceneStore(
       history: [],
       toolMode: "select",
       isTransforming: false,
+      focusRequest: 0,
       resetVersion: 0,
       stateVersion: 1,
 
@@ -112,16 +120,24 @@ export function createSceneStore(
           ) {
             return state;
           }
-          if (state.scene.selectedObjectId === objectId) return state;
+          // Re-selecting the same object is not a Scene change, so neither the
+          // revision nor stateVersion moves; only the focus request does.
+          if (state.scene.selectedObjectId === objectId) {
+            return { focusRequest: state.focusRequest + 1 };
+          }
 
           const scene = cloneScene(state.scene);
           scene.selectedObjectId = objectId;
-          return { scene, stateVersion: state.stateVersion + 1 };
+          return {
+            scene,
+            focusRequest: state.focusRequest + 1,
+            stateVersion: state.stateVersion + 1,
+          };
         });
       },
 
       setToolMode(toolMode) {
-        set({ toolMode });
+        set((state) => ({ toolMode, focusRequest: state.focusRequest + 1 }));
       },
 
       setTransforming(isTransforming) {

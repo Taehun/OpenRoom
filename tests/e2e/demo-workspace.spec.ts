@@ -111,11 +111,15 @@ test("completes the deterministic spatial commerce UI journey", async ({
   ).toBeVisible();
   await objectRail.getByRole("button", { name: "Chair" }).click();
   await expect(page.getByRole("heading", { name: "Chair" })).toBeVisible();
-  await page.getByRole("button", { name: "Move tool" }).click();
-  await expect(page.getByRole("button", { name: "Move tool" })).toHaveAttribute(
-    "aria-pressed",
-    "true",
-  );
+  await expect(page.getByRole("button", { name: "Move tool" })).toHaveCount(0);
+  await page.getByRole("button", { name: "Rotate tool" }).click();
+  await expect(
+    page.getByRole("button", { name: "Rotate tool" }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await page.getByRole("button", { name: "Select tool" }).click();
+  await expect(
+    page.getByRole("button", { name: "Select tool" }),
+  ).toHaveAttribute("aria-pressed", "true");
   await stage.getByRole("button", { name: "Coffee table" }).click();
   await page.getByRole("button", { name: "Find alternatives" }).click();
   await page.getByRole("button", { name: "Place Oak Frame Table in room" }).click();

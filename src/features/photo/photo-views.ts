@@ -252,7 +252,10 @@ interface ViewCandidate {
  * radial image from being mirrored. `viewFidelity` stays set-only because Task
  * 4 scores bare facings against a set, with no object in hand.
  */
-function isRadial(type: SceneObjectType, set: PhotoAssetSet | null): boolean {
+export function isRadial(
+  type: SceneObjectType,
+  set: PhotoAssetSet | null,
+): boolean {
   return PHOTO_VIEW_SYMMETRY[type] === "radial" || set?.symmetry === "radial";
 }
 
