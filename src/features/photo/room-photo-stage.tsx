@@ -51,6 +51,12 @@ interface TransformPreview {
   startPointerAngle: number;
   startPosition: Vec3;
   startRotationY: number;
+  /**
+   * The twin the cutout was already drawn with when the gesture began. The
+   * preview keeps it, so a piece dragged past the room's centre line does not
+   * flip left/right under the pointer; the choice is re-made on release.
+   */
+  incumbentView: IncumbentView | undefined;
   position: Vec3;
   rotationY: number;
   changed: boolean;
@@ -166,10 +172,6 @@ export function RoomPhotoStage() {
     tool: toolMode,
   });
   const [srNote, setSrNote] = useState("");
-  // The mirrored/native twin each object was last drawn with outside a gesture.
-  // A drag re-uses it instead of re-deciding, so a cutout does not flip
-  // left/right the instant the pointer crosses the room's centre line.
-  const committedViewsRef = useRef(new Map<string, IncumbentView>());
   const transformPreviewRef = useRef<TransformPreview | null>(null);
   const previewListenersRef = useRef(new Set<() => void>());
   const subscribeToTransformPreview = useCallback((listener: () => void) => {
@@ -282,9 +284,17 @@ export function RoomPhotoStage() {
       scene.room,
     );
 
+    const set = getPhotoAssetSet(object);
+    // Rugs are drawn by floor homography, never by a chosen twin.
+    const incumbentView =
+      set && object.type !== "rug"
+        ? { mirrored: selectPhotoView(object, set).mirrored }
+        : undefined;
+
     capturePointer(event.currentTarget, event.pointerId);
     transformPreviewRef.current = {
       kind,
+      incumbentView,
       pointerId: event.pointerId,
       objectId: object.id,
       startPointer,
@@ -528,22 +538,13 @@ export function RoomPhotoStage() {
       // vertical cutouts are chosen by front vector.
       if (object.type === "rug") continue;
       const set = getPhotoAssetSet(object);
-      const previewing = transformPreview?.objectId === object.id;
-      const selected = set
-        ? selectPhotoView(
-            object,
-            set,
-            previewing ? committedViewsRef.current.get(object.id) : undefined,
-          )
-        : null;
-      // Only a committed placement teaches the twin: a preview reads it.
-      if (!previewing) {
-        if (selected) {
-          committedViewsRef.current.set(object.id, {
-            mirrored: selected.mirrored,
-          });
-        } else committedViewsRef.current.delete(object.id);
-      }
+      // Mid-gesture the twin recorded at pointer-down wins the tie-break, so the
+      // cutout is steady under the pointer; released, the room decides again.
+      const incumbent =
+        transformPreview?.objectId === object.id
+          ? transformPreview.incumbentView
+          : undefined;
+      const selected = set ? selectPhotoView(object, set, incumbent) : null;
       views.set(object.id, selected);
       presentations.set(object.id, {
         view: selected?.view.view,
