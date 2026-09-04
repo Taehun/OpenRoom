@@ -169,11 +169,12 @@ The Shopify variables above belong in the Pages **build environment**, because
 Next.js inlines `NEXT_PUBLIC_*` values while building. No Cloudflare runtime
 binding is required for the static deployment.
 
-GitHub Actions runs type checking, linting, Vitest, both Playwright smoke
-suites, and both builds, then deploys `out` to Pages when the Cloudflare
-secrets are set. Pages is the only deployment target: the Worker that once
-served the site has been deleted, and any metadata route added later must
-carry `export const dynamic = "force-static"` or the export fails.
+GitHub Actions only checks: type checking, linting, Vitest, both Playwright
+smoke suites, and both builds. Deployment belongs to Cloudflare Pages' own Git
+integration, so no workflow holds a Cloudflare token. Pages is the only
+deployment target — the Worker that once served the site has been deleted —
+and any metadata route added later must carry
+`export const dynamic = "force-static"` or the export fails.
 
 ## Project layout
 
