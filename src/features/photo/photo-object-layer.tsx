@@ -133,6 +133,9 @@ export function PhotoObjectLayer({
   return (
     <div
       className={styles.photoObjectFrame}
+      // The room shows the piece, not a caption about it: the disclosure that a
+      // facing is only approximated lives in the inspector and in the cutout's
+      // alt text. The flag stays here for the tests and the stylesheet.
       data-photo-approximate={view ? String(!view.exact) : undefined}
       data-photo-mirrored={view ? String(view.mirrored) : undefined}
       data-photo-view={view?.view.view}
@@ -193,15 +196,6 @@ export function PhotoObjectLayer({
           data-testid={`photo-silhouette-${object.id}`}
           style={silhouetteStyle}
         />
-      ) : null}
-
-      {view && !view.exact ? (
-        <span
-          className={styles.photoApproximateBadge}
-          data-testid={`photo-approximate-${object.id}`}
-        >
-          Approximate view
-        </span>
       ) : null}
 
       {selected ? (

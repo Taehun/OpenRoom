@@ -37,6 +37,7 @@ import {
   getPhotoAssetSet,
   isRadial,
   selectPhotoView,
+  type IncumbentView,
   type SelectedPhotoView,
 } from "./photo-views";
 import type { NormalizedPoint } from "./photo-calibration";
@@ -165,6 +166,10 @@ export function RoomPhotoStage() {
     tool: toolMode,
   });
   const [srNote, setSrNote] = useState("");
+  // The mirrored/native twin each object was last drawn with outside a gesture.
+  // A drag re-uses it instead of re-deciding, so a cutout does not flip
+  // left/right the instant the pointer crosses the room's centre line.
+  const committedViewsRef = useRef(new Map<string, IncumbentView>());
   const transformPreviewRef = useRef<TransformPreview | null>(null);
   const previewListenersRef = useRef(new Set<() => void>());
   const subscribeToTransformPreview = useCallback((listener: () => void) => {
@@ -523,7 +528,22 @@ export function RoomPhotoStage() {
       // vertical cutouts are chosen by front vector.
       if (object.type === "rug") continue;
       const set = getPhotoAssetSet(object);
-      const selected = set ? selectPhotoView(object, set) : null;
+      const previewing = transformPreview?.objectId === object.id;
+      const selected = set
+        ? selectPhotoView(
+            object,
+            set,
+            previewing ? committedViewsRef.current.get(object.id) : undefined,
+          )
+        : null;
+      // Only a committed placement teaches the twin: a preview reads it.
+      if (!previewing) {
+        if (selected) {
+          committedViewsRef.current.set(object.id, {
+            mirrored: selected.mirrored,
+          });
+        } else committedViewsRef.current.delete(object.id);
+      }
       views.set(object.id, selected);
       presentations.set(object.id, {
         view: selected?.view.view,

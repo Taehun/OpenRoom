@@ -299,12 +299,26 @@ function candidateAngleDegrees(
 
 type TieRank = [number, number, number, number];
 
-function tieRank(candidate: ViewCandidate, preferPositiveX: boolean): TieRank {
-  const facesRoomCentre = preferPositiveX
-    ? candidate.frontVector.x > 0
-    : candidate.frontVector.x <= 0;
+/** The twin an object is already drawn with, so a preview does not re-decide. */
+export interface IncumbentView {
+  mirrored: boolean;
+}
+
+function tieRank(
+  candidate: ViewCandidate,
+  preferPositiveX: boolean,
+  incumbent: IncumbentView | undefined,
+): TieRank {
+  // Mid-gesture the twin already on screen wins: deciding by which half of the
+  // room the object is in flipped a dragged cutout left/right the instant the
+  // pointer crossed the centre line. On release the room-centre rule decides.
+  const preferred = incumbent
+    ? candidate.mirrored === incumbent.mirrored
+    : preferPositiveX
+      ? candidate.frontVector.x > 0
+      : candidate.frontVector.x <= 0;
   return [
-    facesRoomCentre ? 0 : 1,
+    preferred ? 0 : 1,
     candidate.view.origin === "photographed" ? 0 : 1,
     candidate.mirrored ? 1 : 0,
     candidate.order,
@@ -323,6 +337,7 @@ function compareTieRanks(first: TieRank, second: TieRank): number {
 export function selectPhotoView(
   object: Pick<SceneObject, "position" | "rotation" | "type">,
   set: PhotoAssetSet,
+  incumbent?: IncumbentView,
 ): SelectedPhotoView {
   const first = set.views[0];
   if (!first) throw new Error(`photo-views: asset set ${set.id} has no views`);
@@ -361,8 +376,8 @@ export function selectPhotoView(
     .filter((entry) => entry.angleDegrees <= closest + tieWindow)
     .sort((left, right) =>
       compareTieRanks(
-        tieRank(left.candidate, preferPositiveX),
-        tieRank(right.candidate, preferPositiveX),
+        tieRank(left.candidate, preferPositiveX, incumbent),
+        tieRank(right.candidate, preferPositiveX, incumbent),
       ),
     )[0]!;
 
@@ -372,7 +387,12 @@ export function selectPhotoView(
     frontVector: best.candidate.frontVector,
     anchorX: best.candidate.anchorX,
     angleDegrees: best.angleDegrees,
-    exact: best.angleDegrees <= COVERAGE_DEGREES,
+    // A straight-on facing is shown exactly by either twin, so the angle to the
+    // one the tie-break happened to pick is not a measure of fidelity: the
+    // mirrored front-quarter sits 50° from a 15° yaw and still shows it truly.
+    exact:
+      best.angleDegrees <= COVERAGE_DEGREES ||
+      straightOnDegrees <= STRAIGHT_ON_DEGREES,
   };
 }
 

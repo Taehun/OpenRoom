@@ -1282,7 +1282,65 @@ describe("RoomPhotoStage", () => {
     expect(frame.dataset.photoApproximate).toBe("true");
     expect(frame.dataset.photoMirrored).toBe("true");
     expect(frame.style.transform).not.toContain("rotate(");
-    expect(screen.getByText(/approximate/i)).toBeInTheDocument();
+    // The pill is gone from the room: the flag stays on the frame and on the
+    // drawn picture, and the words belong to the inspector.
+    expect(screen.queryByText("Approximate view")).toBeNull();
+    expect(
+      within(frame).getByRole("button").querySelector("img"),
+    ).toHaveAttribute("data-photo-approximate", "true");
+  });
+
+  // Important QA regression: dragging a piece past the room's centre line
+  // re-ran the room-centre tie-break, so the cutout flipped left/right under
+  // the pointer. The twin is re-decided on release instead.
+  test("keeps a dragged cutout's twin until the pointer is released", () => {
+    const store = fixtureStore();
+    const start = objectFromStore(store, "sofa_01");
+    act(() => {
+      store
+        .getState()
+        .commitTransform("sofa_01", [-0.4, start.position[1], start.position[2]], 0);
+    });
+    renderStage(store);
+    const sofa = screen.getByRole("button", { name: "Sofa" });
+    const mirrored = () =>
+      screen.getByTestId("photo-object-frame-sofa_01").dataset.photoMirrored;
+    expect(mirrored()).toBe("false");
+
+    fireEvent.pointerDown(sofa, { pointerId: 61, clientX: 500, clientY: 400 });
+    fireEvent.pointerMove(sofa, { pointerId: 61, clientX: 620, clientY: 400 });
+    expect(mirrored()).toBe("false");
+    fireEvent.pointerMove(sofa, { pointerId: 61, clientX: 760, clientY: 400 });
+    expect(mirrored()).toBe("false");
+
+    fireEvent.pointerUp(sofa, { pointerId: 61, clientX: 760, clientY: 400 });
+
+    expect(objectFromStore(store, "sofa_01").position[0]).toBeGreaterThan(0);
+    expect(mirrored()).toBe("true");
+  });
+
+  // Important QA regression: the pill appeared on a 15° turn (the mirrored twin
+  // the tie-break picked sits 50° away) but not on a 30° one.
+  test("does not call a front-quarter turn approximate on either side", () => {
+    const store = fixtureStore();
+    store.getState().selectObject("chair_01");
+    store.getState().setToolMode("rotate");
+    renderStage(store);
+    const chair = screen.getByRole("button", { name: "Chair" });
+    const frame = screen.getByTestId("photo-object-frame-chair_01");
+
+    act(() => store.getState().commitTransform("chair_01", [1.4, 0.425, 0.6], 0));
+    expect(frame.dataset.photoMirrored).toBe("true");
+    expect(frame.dataset.photoApproximate).toBe("false");
+
+    fireEvent.keyDown(chair, { key: "ArrowRight", shiftKey: true });
+    expect(objectFromStore(store, "chair_01").rotation[1]).toBeCloseTo(
+      (15 * Math.PI) / 180,
+    );
+    expect(frame.dataset.photoApproximate).toBe("false");
+
+    fireEvent.keyDown(chair, { key: "ArrowRight", shiftKey: true });
+    expect(frame.dataset.photoApproximate).toBe("false");
   });
 });
 

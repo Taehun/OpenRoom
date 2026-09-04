@@ -153,6 +153,45 @@ describe("selectPhotoView", () => {
     ).toBe(true);
   });
 
+  // Important QA regression: a 15° turn on the right-hand side of the room won
+  // its tie-break for the mirrored twin, which sits 50° away, and the room
+  // called a piece that is drawn perfectly well "approximate".
+  it("calls a straight-on facing exact whichever twin the tie-break picks", () => {
+    const fifteen = (15 * Math.PI) / 180;
+    // Left of centre the straight-on rule turns the piece inward, so the twin
+    // it picks is the far one — 50° away, yet a truthful picture of a 15° turn.
+    const nudged = selectPhotoView(objectAt(-1.8, fifteen), sofaSet());
+    expect(nudged.mirrored).toBe(false);
+    expect(nudged.angleDegrees).toBeGreaterThan(45);
+    expect(nudged.exact).toBe(true);
+
+    // One more step leaves the straight-on window, where the nearest view wins
+    // outright; the pill used to appear at 15° and vanish again at 30°.
+    const turned = selectPhotoView(objectAt(-1.8, fifteen * 2), sofaSet());
+    expect(turned.angleDegrees).toBeLessThan(45);
+    expect(turned.exact).toBe(true);
+
+    // A quarter turn is past every registered view and stays approximate.
+    expect(selectPhotoView(objectAt(1.8, Math.PI / 2), sofaSet()).exact).toBe(
+      false,
+    );
+  });
+
+  // Important QA regression: dragging a piece past x = 0 re-ran the room-centre
+  // tie-break and flipped the cutout left/right in the middle of the gesture.
+  it("keeps the twin a dragged object already shows until it is released", () => {
+    const incumbent = { mirrored: false };
+    for (const x of [-0.4, -0.1, 0, 0.1, 0.4]) {
+      expect(selectPhotoView(objectAt(x, 0), sofaSet(), incumbent).mirrored)
+        .toBe(false);
+    }
+    // Released, the room-centre rule decides again.
+    expect(selectPhotoView(objectAt(0.4, 0), sofaSet()).mirrored).toBe(true);
+    expect(
+      selectPhotoView(objectAt(-0.4, 0), sofaSet(), { mirrored: true }).mirrored,
+    ).toBe(true);
+  });
+
   it("marks a 90° turn approximate without a side view and exact with one", () => {
     expect(selectPhotoView(objectAt(0, Math.PI / 2), sofaSet()).exact).toBe(
       false,
