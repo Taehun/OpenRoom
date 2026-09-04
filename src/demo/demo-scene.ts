@@ -31,16 +31,27 @@ interface SeedPlacement {
  * the window. The sofa stays at x <= 0 so the compositor keeps its native
  * front-quarter cutout; the chair at +45 degrees faces the table and picks the
  * mirrored cutout exactly.
+ *
+ * The arrangement is judged on the composited photo, not on the plan: the lamp stands
+ * at the sofa's front-left corner where its whole stem and foot read against bare
+ * floor (a lamp beside the sofa's arm at the same depth looks embedded in it, and one
+ * behind the chair loses its base — `expectLampVisibleBeyondChair` in
+ * tests/e2e/photo-compositor.spec.ts holds that line), and the table keeps a 0.3 m
+ * walkway from the sofa's front edge so the two do not merge into one silhouette. Its
+ * front edge stays behind z = 0.85, the depth the compositor's tie test parks a lamp
+ * at, so that lamp lands on the floor instead of on the table. The
+ * plant holds the back-right corner: the room is 2.72 m deep and the sofa owns the
+ * back band, so the only floor left for it is behind the chair, where its foliage
+ * clears the chair's back while the pot does not.
  */
 const CALIBRATED_SEED: Readonly<Record<string, SeedPlacement>> = {
   sofa_01: { x: -0.2, z: -0.55, rotationDeg: 0 },
-  table_01: { x: -0.2, z: 0.4, rotationDeg: 0 },
+  table_01: { x: -0.45, z: 0.5, rotationDeg: 0 },
   rug_01: { x: -0.2, z: 0.38, rotationDeg: 0 },
-  lamp_01: { x: -1.42, z: -0.5, rotationDeg: 0 },
-  chair_01: { x: 1.0, z: 0.69, rotationDeg: 45 },
-  plant_01: { x: 1.3, z: -0.32, rotationDeg: 0 },
+  lamp_01: { x: -1.42, z: 0.15, rotationDeg: 0 },
+  chair_01: { x: 0.85, z: 0.66, rotationDeg: 45 },
+  plant_01: { x: 1.32, z: -0.3, rotationDeg: 0 },
 };
-
 export interface DemoSceneOptions {
   /**
    * Room width in metres. Defaults to the calibrated photo width; any other width
