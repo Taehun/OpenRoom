@@ -9,6 +9,7 @@ import {
 import type { CartApprovalDraft } from "../../src/webmcp/tool-context";
 import {
   DEMO_COMMERCE,
+  FIXTURE_AGENT_PROFILE_URL,
   FIXTURE_VARIANTS,
   FIXTURE_VARIANT_IDS,
   PLACEHOLDER_STORE_DOMAIN,
@@ -51,7 +52,8 @@ function mappedDraft(): CartApprovalDraft {
     commerce: {
       provider: "shopify",
       storeDomain: PLACEHOLDER_STORE_DOMAIN,
-      mcpEndpoint: `https://${PLACEHOLDER_STORE_DOMAIN}/api/mcp`,
+      mcpEndpoint: `https://${PLACEHOLDER_STORE_DOMAIN}/api/ucp/mcp`,
+      agentProfileUrl: FIXTURE_AGENT_PROFILE_URL,
       lines: [
         {
           productId: "oak-frame-table",
@@ -83,7 +85,8 @@ function emptyDraft(commerceBlock = false): CartApprovalDraft {
           commerce: {
             provider: "shopify" as const,
             storeDomain: PLACEHOLDER_STORE_DOMAIN,
-            mcpEndpoint: `https://${PLACEHOLDER_STORE_DOMAIN}/api/mcp`,
+            mcpEndpoint: `https://${PLACEHOLDER_STORE_DOMAIN}/api/ucp/mcp`,
+            agentProfileUrl: FIXTURE_AGENT_PROFILE_URL,
             lines: [],
             skipped: [],
             checkoutPermalink: null,
@@ -120,7 +123,8 @@ function agentDraft(): CartApprovalDraft {
     commerce: {
       provider: "shopify",
       storeDomain: PLACEHOLDER_STORE_DOMAIN,
-      mcpEndpoint: `https://${PLACEHOLDER_STORE_DOMAIN}/api/mcp`,
+      mcpEndpoint: `https://${PLACEHOLDER_STORE_DOMAIN}/api/ucp/mcp`,
+      agentProfileUrl: FIXTURE_AGENT_PROFILE_URL,
       lines: [
         {
           productId: "oak-frame-table",

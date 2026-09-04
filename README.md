@@ -22,8 +22,8 @@ backend, no runtime image generation, and no Shopify access token.
 - One validated Scene store shared by the human editor, native WebMCP, and the
   local MCP companion.
 - Local cart approval before any checkout action.
-- Token-free Shopify checkout through cart permalinks and the store's
-  Storefront MCP endpoint.
+- Token-free Shopify checkout through cart permalinks and the store's UCP MCP
+  endpoint.
 - Static production deployment on Cloudflare Pages from the `main` branch.
 
 ## Quick start
@@ -86,8 +86,9 @@ That is the complete runtime integration. When a customer approves the room:
 
 - **Continue to Shopify** opens a cart permalink in a new tab.
 - Products without a variant mapping are clearly listed and skipped.
-- `add_scene_to_cart` also returns `https://<store>/api/mcp` and the mapped cart
-  lines for agents that use Shopify's Storefront MCP.
+- `add_scene_to_cart` also returns `https://<store>/api/ucp/mcp`, the published
+  UCP agent profile that endpoint requires, and the mapped cart lines, for
+  agents that would rather build the cart themselves.
 - OpenRoom itself sends no request to Shopify and stores no credentials.
 
 To import the demo catalog into a Shopify development store, use the checked-in

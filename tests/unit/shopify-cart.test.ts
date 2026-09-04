@@ -9,6 +9,7 @@ import {
 import type { CartApprovalDraft } from "../../src/webmcp/tool-context";
 import {
   DEMO_COMMERCE,
+  FIXTURE_AGENT_PROFILE_URL,
   FIXTURE_VARIANTS,
   FIXTURE_VARIANT_IDS,
   PLACEHOLDER_STORE_DOMAIN,
@@ -147,7 +148,8 @@ describe("buildCommerceDraft", () => {
     ).toEqual({
       provider: "shopify",
       storeDomain: PLACEHOLDER_STORE_DOMAIN,
-      mcpEndpoint: `https://${PLACEHOLDER_STORE_DOMAIN}/api/mcp`,
+      mcpEndpoint: `https://${PLACEHOLDER_STORE_DOMAIN}/api/ucp/mcp`,
+      agentProfileUrl: FIXTURE_AGENT_PROFILE_URL,
       lines: [
         { productId: "coffee-table", merchandiseId: fixtureGid("coffee-table"), quantity: 1 },
       ],
@@ -178,7 +180,8 @@ describe("enrichCartDraft", () => {
     expect(enriched.commerce).toEqual({
       provider: "shopify",
       storeDomain: PLACEHOLDER_STORE_DOMAIN,
-      mcpEndpoint: `https://${PLACEHOLDER_STORE_DOMAIN}/api/mcp`,
+      mcpEndpoint: `https://${PLACEHOLDER_STORE_DOMAIN}/api/ucp/mcp`,
+      agentProfileUrl: FIXTURE_AGENT_PROFILE_URL,
       lines: [
         { productId: "oak-frame-table", merchandiseId: fixtureGid("oak-frame-table"), quantity: 1 },
         { productId: "woven-jute-rug", merchandiseId: fixtureGid("woven-jute-rug"), quantity: 1 },

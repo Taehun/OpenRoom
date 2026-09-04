@@ -2,6 +2,13 @@ import type { CommerceContext, ShopifyVariantMap } from "../../src/features/comm
 
 export const PLACEHOLDER_STORE_DOMAIN = "openroom-placeholder.myshopify.com";
 
+// The site origin the Shopify-mode dev server is built with, and the agent
+// profile URL that follows from it. Shopify fetches that URL itself, so the
+// fixture uses an https origin rather than the loopback host the server runs on.
+export const FIXTURE_SITE_ORIGIN = "https://openroom-placeholder.pages.dev";
+
+export const FIXTURE_AGENT_PROFILE_URL = `${FIXTURE_SITE_ORIGIN}/ucp/agent-profile.json`;
+
 // Real Shopify variant ids are 13-14 digits; the fixtures use realistic-length
 // ids so the permalink and the override string are exercised at full width.
 export const FIXTURE_VARIANT_IDS = {
@@ -45,7 +52,8 @@ export const SHOPIFY_COMMERCE: CommerceContext = {
   config: {
     provider: "shopify",
     storeDomain: PLACEHOLDER_STORE_DOMAIN,
-    mcpEndpoint: `https://${PLACEHOLDER_STORE_DOMAIN}/api/mcp`,
+    mcpEndpoint: `https://${PLACEHOLDER_STORE_DOMAIN}/api/ucp/mcp`,
+    agentProfileUrl: FIXTURE_AGENT_PROFILE_URL,
   },
   variants: FIXTURE_VARIANTS,
 };

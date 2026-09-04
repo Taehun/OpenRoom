@@ -1,8 +1,10 @@
 import { describe, expect, test, vi } from "vitest";
 
+import { createDemoScene } from "../../src/demo/demo-scene";
 import { DEMO_PRODUCTS } from "../../src/features/demo/demo-data";
 import {
   footprintInsideRoom,
+  footprintsOverlap,
   objectFootprint,
 } from "../../src/features/placement/footprint-geometry";
 import { facingOf, roundFacing } from "../../src/features/photo/photo-facing";
@@ -25,6 +27,7 @@ import type {
 import type { CommerceContext } from "../../src/features/commerce/commerce-types";
 import {
   DEMO_COMMERCE,
+  FIXTURE_AGENT_PROFILE_URL,
   FIXTURE_VARIANT_IDS,
   SHOPIFY_COMMERCE,
   fixtureGid,
@@ -148,7 +151,7 @@ describe("WebMCP Core 6 handlers", () => {
     expect(store.getState().scene.revision).toBe(2);
   });
 
-  test("returns the sixth replacement in the strict Core 6 shape", async () => {
+  test("returns the sixth collision-free replacement in the strict Core 6 shape", async () => {
     const store = createSceneStore();
     const tools = createCoreTools(createContext(store).context);
     const objectIds = store.getState().scene.objects.map(({ id }) => id);
@@ -157,7 +160,10 @@ describe("WebMCP Core 6 handlers", () => {
     for (let index = 0; index < objectIds.length; index += 1) {
       const objectId = objectIds[index]!;
       const object = store.getState().scene.objects.find(({ id }) => id === objectId)!;
-      const product = DEMO_PRODUCTS.find(({ category }) => category === object.type)!;
+      const product =
+        object.type === "plant"
+          ? DEMO_PRODUCTS.find(({ id }) => id === "stoneware-snake-plant")!
+          : DEMO_PRODUCTS.find(({ category }) => category === object.type)!;
       finalResult = await execute(tools, "replace_object", {
         objectId,
         productId: product.id,
@@ -654,7 +660,8 @@ describe("add_scene_to_cart commerce block", () => {
     expect(draft.commerce).toEqual({
       provider: "shopify",
       storeDomain: "openroom-placeholder.myshopify.com",
-      mcpEndpoint: "https://openroom-placeholder.myshopify.com/api/mcp",
+      mcpEndpoint: "https://openroom-placeholder.myshopify.com/api/ucp/mcp",
+      agentProfileUrl: FIXTURE_AGENT_PROFILE_URL,
       lines: [
         {
           productId: "oak-frame-table",
@@ -988,7 +995,10 @@ describe("supportedBy on tool output", () => {
   });
 
   test("clamps a move so the whole footprint stays on the floor", async () => {
-    const store = createSceneStore();
+    const seed = createDemoScene();
+    seed.objects = seed.objects.filter(({ id }) => id === "sofa_01");
+    seed.selectedObjectId = "sofa_01";
+    const store = createSceneStore(seed);
     const tools = createCoreTools(createContext(store).context);
 
     const moved = await execute(tools, "move_object", {
@@ -1008,5 +1018,39 @@ describe("supportedBy on tool output", () => {
     expect(
       footprintInsideRoom(objectFootprint(sofa), data.scene.room, 0.1),
     ).toBe(true);
+  });
+
+  test("returns the nearest collision-free position for an overlapping move", async () => {
+    const seed = createDemoScene();
+    seed.objects = seed.objects.filter(({ id }) =>
+      id === "sofa_01" || id === "chair_01"
+    );
+    seed.selectedObjectId = "chair_01";
+    const store = createSceneStore(seed);
+    const tools = createCoreTools(createContext(store).context);
+    const sofa = store.getState().scene.objects.find(({ id }) => id === "sofa_01")!;
+
+    const moved = await execute(tools, "move_object", {
+      objectId: "chair_01",
+      position: { x: sofa.position[0], z: sofa.position[2] },
+      expectedRevision: store.getState().scene.revision,
+      expectedStateVersion: store.getState().stateVersion,
+    });
+
+    expect(moved.structuredContent.ok).toBe(true);
+    const data = successData(moved) as {
+      scene: ToolScene;
+      adjustedToFit: boolean;
+      appliedPosition: [number, number, number];
+    };
+    const chair = data.scene.objects.find(({ id }) => id === "chair_01")!;
+    expect(data.adjustedToFit).toBe(true);
+    expect(data.appliedPosition).toEqual(chair.position);
+    expect(
+      footprintInsideRoom(objectFootprint(chair), data.scene.room, 0.1),
+    ).toBe(true);
+    expect(
+      footprintsOverlap(objectFootprint(chair), objectFootprint(sofa)),
+    ).toBe(false);
   });
 });

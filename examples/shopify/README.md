@@ -1,7 +1,7 @@
 # Shopify furniture store seed kit
 
 OpenRoom's `shopify` mode is token-free: it builds a cart permalink and points
-agents at the store's Storefront MCP endpoint, and it never holds a credential.
+agents at the store's UCP MCP endpoint, and it never holds a credential.
 What it does need is a store that actually carries the 43 demo products, so the
 variant ids in `NEXT_PUBLIC_SHOPIFY_VARIANTS` resolve to something real.
 
@@ -157,8 +157,25 @@ In `shopify` mode the approval sheet still opens locally for every
 Shopify** opens `https://<store>/cart/<variantNumericId>:<qty>,…` in a new tab;
 products with no mapping are listed as `Not mapped to a Shopify variant` and
 left out. The tool's `draft.commerce` block carries the same lines plus
-`mcpEndpoint` (`https://<store>/api/mcp`) for an agent that would rather drive
-the store's Storefront MCP server.
+`mcpEndpoint` (`https://<store>/api/ucp/mcp`) for an agent that would rather
+build the cart itself.
+
+Shopify stopped serving the old `/api/mcp` cart tools on 31 August 2026; that
+endpoint now lists only `search_shop_policies_and_faqs`, and `get_cart` answers
+with a deprecation notice. The replacement at `/api/ucp/mcp` carries
+`search_catalog`, `get_product`, `create_cart`, `update_cart`, `get_cart`, and
+the checkout tools. Every call to it has to name a publicly fetchable UCP agent
+profile in `params.arguments.meta["ucp-agent"].profile`. OpenRoom publishes one
+at `public/ucp/agent-profile.json`, and reports its absolute URL as
+`draft.commerce.agentProfileUrl` when `NEXT_PUBLIC_SITE_ORIGIN` is set to the
+origin the build is served from. Without that variable the field is `null` and
+the agent has to bring its own profile.
+
+A password-protected development store still answers the cart and checkout
+tools, so the whole handoff can be exercised before the store is public. Only
+`search_catalog` comes back empty, because an unlisted storefront has no
+catalog to search — which costs OpenRoom nothing, since it hands the agent
+variant ids rather than a search query.
 
 `pnpm run test:e2e:commerce` exercises that journey against a stubbed store
 domain. It never touches a real store, so it stays useful before and after you

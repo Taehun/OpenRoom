@@ -75,6 +75,7 @@ export function buildCommerceDraft(
     provider: "shopify",
     storeDomain: commerce.config.storeDomain,
     mcpEndpoint: commerce.config.mcpEndpoint,
+    agentProfileUrl: commerce.config.agentProfileUrl,
     lines: lines.map(({ productId, merchandiseId, quantity }) => ({
       productId,
       merchandiseId,

@@ -29,13 +29,14 @@
   },
   {
     "id": "cart-approval-shopify-lines",
-    "prompt": "Add the product-backed scene objects to the cart, then create the Shopify cart through the store's MCP server",
+    "prompt": "Add the product-backed scene objects to the cart, then create the Shopify cart through the store's UCP MCP server",
     "expectedTools": ["add_scene_to_cart"],
     "assertions": [
       "In shopify mode the draft carries commerce.lines with merchandiseId and quantity plus commerce.mcpEndpoint",
-      "Draft items carry demoVariantId (the demo catalog id); only commerce.lines[].merchandiseId is sent to update_cart",
+      "commerce.mcpEndpoint is the store's /api/ucp/mcp endpoint, and commerce.agentProfileUrl names the UCP agent profile every call to it must carry",
+      "Draft items carry demoVariantId (the demo catalog id); only commerce.lines[].merchandiseId is sent to create_cart",
       "Unmapped products appear in commerce.skipped and are not sent anywhere",
-      "OpenRoom makes no external request; the agent calls update_cart and get_cart on the store MCP itself"
+      "OpenRoom makes no external request; the agent calls create_cart and get_cart on the store MCP itself"
     ]
   },
   {
