@@ -16,10 +16,11 @@
 > never moves anything. Re-wiring it means adding a caller back, not restoring
 > deleted solver code.
 >
-> **2026-09-04 — Shopify seed kit.** `examples/shopify-furniture-store/` seeds a
-> development store with all 43 catalog products (`pnpm shop:export`,
-> `pnpm shop:seed`, `pnpm shop:variants`); developer tooling only, nothing under
-> `src/` or `app/` changed.
+> **2026-09-04 — Shopify seed kit.** `examples/shopify/` seeds a development
+> store with all 43 catalog products (`pnpm shop:export`, `pnpm shop:seed`,
+> `pnpm shop:variants`); developer tooling only, nothing under `src/` or `app/`
+> changed. Since 1 January 2026 the Admin token comes from a Dev Dashboard app
+> via a client credentials grant and expires after 24 hours.
 
 Snapshot: 2026-09-03 KST. This is the **final natural-placement verification
 record**. It replaces the interim handoff that was written before Task 7.

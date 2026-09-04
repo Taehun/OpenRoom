@@ -92,7 +92,7 @@ That is the complete runtime integration. When a customer approves the room:
 
 To import the demo catalog into a Shopify development store, use the checked-in
 CSV or the optional Admin API seed tools described in
-[`examples/shopify-furniture-store/README.md`](examples/shopify-furniture-store/README.md).
+[`examples/shopify/README.md`](examples/shopify/README.md).
 
 ## WebMCP and agent access
 
@@ -188,8 +188,7 @@ src/local-mcp/               Browser side of the local MCP relay
 scripts/openroom-mcp/        Local MCP companion
 scripts/openroom-assets/     Offline asset pipelines
 tests/                       Unit, integration, evaluation, and browser tests
-examples/shopify-furniture-store/
-                             Optional Shopify catalog import and seed tools
+examples/shopify/            Optional Shopify catalog import and seed tools
 ```
 
 ## Contributing

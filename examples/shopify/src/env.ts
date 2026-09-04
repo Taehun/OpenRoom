@@ -14,7 +14,7 @@ import { fileURLToPath } from "node:url";
  * unit-tested through a module runner where `import.meta.url` is not a `file:`
  * URL, and only the scripts — always run by `tsx` — need a real path.
  *
- * `<repo>/examples/shopify-furniture-store/src/env.ts` → `<repo>`.
+ * `<repo>/examples/shopify/src/env.ts` → `<repo>`.
  */
 export function repoRoot(): string {
   return fileURLToPath(new URL("../../../", import.meta.url));

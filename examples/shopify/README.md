@@ -17,36 +17,81 @@ bundle inlines it, and no CI job runs it. The Admin API token lives in your
 
 ## Prerequisites
 
-- A **Shopify Partner development store**. Create one at
-  <https://partners.shopify.com> → Stores → Add store → Development store.
-- A **custom app** in that store: Settings → Apps and sales channels → Develop
-  apps → Create an app. Under **Configuration → Admin API integration** grant
-  exactly these scopes:
+Shopify retired admin-created custom apps on 1 January 2026. There is no
+`Settings → Apps and sales channels → Develop apps` path any more and no
+permanent `shpat_…` token: an app is created in the **Dev Dashboard**, and its
+Admin API token is fetched with a client credentials grant and **expires after
+24 hours**. The seeder does not care which kind of token it holds — it only
+sends the value as `X-Shopify-Access-Token` — but a re-seed a day later needs a
+fresh one.
 
-  ```text
-  read_products, write_products, write_publications
-  ```
-
-  Then **Install app** and reveal the **Admin API access token** (`shpat_…`).
-  It is shown once.
-- The **Online Store** sales channel enabled in that store. The seeder looks for
-  a publication named `Online Store` and stops if there is none.
 - Node 24.13.1 and pnpm 10.27.0 (the versions in `package.json` and
   `.node-version`), with `pnpm install --frozen-lockfile` already run.
 
-Copy this folder's `.env.example` into `.env.local` **at the repository root**
-(that file is git-ignored) and fill in the two required values:
+### 1. A development store
+
+<https://dev.shopify.com/dashboard> → **Stores** → **Create store** → **Dev**.
+Leave *Generate test data* unchecked so the 43 seeded products are the only
+ones in the store. Afterwards copy the real `….myshopify.com` domain — Shopify
+appends a suffix, so a store named `openroom` becomes something like
+`openroom-vahokae7.myshopify.com`.
+
+The **Online Store** sales channel must be present; the seeder looks for a
+publication named `Online Store` and stops if there is none. A store created
+this way has it by default.
+
+### 2. A Dev Dashboard app
+
+In the same dashboard, **Apps** → **Create app** → **Start from Dev Dashboard**.
+
+1. **Versions** tab → *Create version*. The App URL is never called by this kit,
+   so the placeholder is fine; leave *Embed app in Shopify admin* unchecked. In
+   **API access → Scopes** enter exactly:
+
+   ```text
+   read_products,write_products,write_publications
+   ```
+
+   Then select **Release**. Without a released version the scopes are not
+   granted, and the token below comes back with an empty `scope`.
+2. **Home** → **Install app** → pick the development store → **Install**. The
+   browser lands on the app URL with `hmac` and `host` query parameters; that
+   redirect *is* the completed install, and the page itself does not matter.
+3. **App settings** → copy the **Client ID** and **Client secret**.
+
+### 3. An access token
+
+Put the store domain and the two credentials in `.env.local` **at the
+repository root** (git-ignored), then exchange them:
 
 ```bash
-cat examples/shopify-furniture-store/.env.example >> .env.local
+cat examples/shopify/.env.example >> .env.local
+# fill in SHOPIFY_STORE_DOMAIN, SHOPIFY_CLIENT_ID, SHOPIFY_CLIENT_SECRET
+
+curl -s -X POST "https://<store>.myshopify.com/admin/oauth/access_token" \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d grant_type=client_credentials \
+  -d client_id=<Client ID> -d client_secret=<Client secret>
 ```
+
+The response carries `access_token`, the granted `scope`, and
+`expires_in: 86399`. Copy the token into `SHOPIFY_ADMIN_ACCESS_TOKEN`. Shopify
+folds `read_products` into `write_products`, so `scope` reading
+`write_products,write_publications` is correct — an **empty** `scope` means the
+app version was never released.
 
 | Variable | Required | Meaning |
 | --- | --- | --- |
 | `SHOPIFY_STORE_DOMAIN` | yes | `your-store.myshopify.com`, no scheme. |
-| `SHOPIFY_ADMIN_ACCESS_TOKEN` | yes | The custom app's Admin API token. Never commit it. |
+| `SHOPIFY_ADMIN_ACCESS_TOKEN` | yes | The `access_token` from the grant above. Expires in 24 hours; never commit it. |
+| `SHOPIFY_CLIENT_ID` | no | Read by nothing here — kept in `.env.local` so the token can be re-minted. |
+| `SHOPIFY_CLIENT_SECRET` | no | Same. Never commit it. |
 | `SHOPIFY_API_VERSION` | no | Admin GraphQL version; defaults to `2026-01`. |
 | `OPENROOM_IMAGE_BASE` | no | Host the cutouts are fetched from; defaults to `https://openroom-webmcp.pages.dev`. |
+
+An older store may still have a working admin-created custom app with a
+`shpat_…` token. Those keep working and need none of the above — drop the token
+straight into `SHOPIFY_ADMIN_ACCESS_TOKEN`.
 
 ## Quick start
 
@@ -77,18 +122,19 @@ NEXT_PUBLIC_SHOPIFY_VARIANTS=ash-lounge-chair=gid://shopify/ProductVariant/…,�
 
 ## Import via CSV instead
 
-If you would rather not create an Admin API token, `products.csv` is a plain
-Shopify import file (it is checked in, so no command is needed to obtain it).
+If you would rather skip the Dev Dashboard app entirely, `products.csv` is a
+plain Shopify import file (it is checked in, so no command is needed to obtain
+it). This path needs no credential at all.
 
 1. In the store admin go to **Products → Import**.
-2. Upload `examples/shopify-furniture-store/products.csv` and confirm.
+2. Upload `examples/shopify/products.csv` and confirm.
 3. Shopify fetches each `Image Src` from the public URL, so the store needs
    outbound access to `https://openroom-webmcp.pages.dev`.
 4. The rows are already `Published=TRUE` and `Status=active`, so they land on
    the Online Store. Smart collections are **not** part of a CSV import; create
    them by hand or run `pnpm shop:seed` afterwards.
-5. Run `pnpm shop:variants --write` to build the map — it only reads, so a
-   read-only token is enough for this path.
+5. Run `pnpm shop:variants --write` to build the map. It only reads, so an app
+   with just `read_products` is enough for this path.
 
 ## Switch OpenRoom to Shopify mode
 
@@ -162,9 +208,10 @@ against the live catalog, so a catalog change that is not re-exported fails
 
 | Symptom | Cause and fix |
 | --- | --- |
-| `HTTP 401` or `HTTP 403 — check the app's scopes and token` | The token is wrong, revoked, or the app lacks `read_products`, `write_products`, `write_publications`. Re-check Configuration → Admin API integration, reinstall the app, and copy the token again. |
+| `HTTP 401` or `HTTP 403 — check the app's scopes and token` | Most often the 24-hour token simply expired — re-run the client credentials request and update `SHOPIFY_ADMIN_ACCESS_TOKEN`. Otherwise the app is not installed on this store, or its released version lacks `write_products` / `write_publications`. |
+| The grant returns a token with an empty `scope` | The Dev Dashboard app has no released version carrying the scopes. Versions tab → enter the scopes → **Release**, then mint the token again. |
 | The cart permalink 404s | The product is not published to the Online Store, or is not `ACTIVE`. Re-run `pnpm shop:seed`, which publishes every product, and confirm the store has the Online Store sales channel. |
-| `no "Online Store" publication` | That sales channel is not installed in the store. Add it in Settings → Apps and sales channels. |
+| `no "Online Store" publication` | That sales channel is not installed in the store. Add it in the store admin under Settings → Apps and sales channels. |
 | `Shopify Admin API throttled after 5 retries` | The store's API budget is exhausted. The client already waits `Retry-After` and retries five times; wait a minute and re-run — the seed is idempotent. |
 | Products have no image | Shopify could not fetch `Image Src`. Check the URL in `products.json` opens in a browser, and set `OPENROOM_IMAGE_BASE` to a host your store can reach. |
 | `missing SHOPIFY_STORE_DOMAIN, …` (exit code 2) | The keys are not in the environment or in `.env.local` at the repository root. |
@@ -172,9 +219,12 @@ against the live catalog, so a catalog change that is not re-exported fails
 
 ## Safety
 
-- The Admin API token is read from the environment or from `.env.local` at the
-  repository root, which `.gitignore` excludes. No script ever prints a value —
-  only key names appear in error messages.
+- The Admin API token, and the client credentials it is minted from, are read
+  from the environment or from `.env.local` at the repository root, which
+  `.gitignore` excludes. No script ever prints a value — only key names appear
+  in error messages. A token from the client credentials grant expires on its
+  own after 24 hours, which limits the damage of a leaked one; the client
+  secret does not, so treat it as the real credential.
 - OpenRoom itself never holds the token. The app's Shopify mode is three
   `NEXT_PUBLIC_*` values, all of them public by construction, and it makes no
   request to the store from its own code.

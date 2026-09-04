@@ -10,24 +10,24 @@ import {
   priceFromMinor,
   toShopifyCsv,
   type ShopProduct,
-} from "../../examples/shopify-furniture-store/src/catalog";
+} from "../../examples/shopify/src/catalog";
 import {
   adminEndpoint,
   createAdminClient,
   type AdminClient,
-} from "../../examples/shopify-furniture-store/src/admin-client";
+} from "../../examples/shopify/src/admin-client";
 import {
   collectionHandle,
   planCollections,
   planProductSet,
   seedStore,
-} from "../../examples/shopify-furniture-store/src/seed";
+} from "../../examples/shopify/src/seed";
 import {
   buildVariantsEnvLine,
   fetchStoreVariants,
   upsertEnvLine,
-} from "../../examples/shopify-furniture-store/src/variants";
-import { parseEnvFile, requireEnv } from "../../examples/shopify-furniture-store/src/env";
+} from "../../examples/shopify/src/variants";
+import { parseEnvFile, requireEnv } from "../../examples/shopify/src/env";
 import { DEMO_PRODUCTS } from "../../src/features/demo/demo-data";
 import { PHOTO_ASSETS } from "../../src/features/photo/photo-assets";
 import { parseVariantOverrides } from "../../src/features/commerce/shopify-variants";
@@ -35,7 +35,7 @@ import { parseVariantOverrides } from "../../src/features/commerce/shopify-varia
 const CATALOG = buildShopCatalog(DEMO_PRODUCTS, PHOTO_ASSETS, DEFAULT_IMAGE_BASE);
 
 /** Vitest runs from the repository root, so the kit is a fixed relative path. */
-const EXAMPLE_DIR = join(process.cwd(), "examples", "shopify-furniture-store");
+const EXAMPLE_DIR = join(process.cwd(), "examples", "shopify");
 
 function readExample(name: string): string {
   return readFileSync(join(EXAMPLE_DIR, name), "utf8");
@@ -596,9 +596,14 @@ describe("script environment", () => {
     expect(required.values.SHOPIFY_STORE_DOMAIN).toBe("demo.myshopify.com");
   });
 
-  it("keeps the shipped .env.example free of a real token", () => {
+  it("keeps the shipped .env.example free of a real credential", () => {
     const example = readExample(".env.example");
-    expect(example).toContain("SHOPIFY_ADMIN_ACCESS_TOKEN=shpat_...");
+    const parsed = parseEnvFile(example);
+    // The token now comes from a 24-hour client credentials grant, so the
+    // example ships every key empty rather than with a shpat_ placeholder.
+    expect(parsed.SHOPIFY_ADMIN_ACCESS_TOKEN).toBe("");
+    expect(parsed.SHOPIFY_CLIENT_ID).toBe("");
+    expect(parsed.SHOPIFY_CLIENT_SECRET).toBe("");
     expect(example).toContain("SHOPIFY_API_VERSION=2026-01");
     expect(example).toContain(`OPENROOM_IMAGE_BASE=${DEFAULT_IMAGE_BASE}`);
     expect(/shpat_[A-Za-z0-9]{8,}/.test(example)).toBe(false);

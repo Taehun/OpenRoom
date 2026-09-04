@@ -24,7 +24,7 @@ const { missing, values } = requireEnv(env, REQUIRED);
 
 if (missing.length > 0 && !dryRun) {
   console.error(
-    `[seed] missing ${missing.join(", ")} — copy examples/shopify-furniture-store/.env.example into .env.local at the repo root and fill it in`,
+    `[seed] missing ${missing.join(", ")} — copy examples/shopify/.env.example into .env.local at the repo root and fill it in`,
   );
   process.exit(2);
 }
