@@ -246,12 +246,12 @@ test("opens an empty cart for a room that holds no catalog product yet", async (
   expect(within(sheet).queryAllByRole("listitem")).toHaveLength(0);
   expect(
     within(sheet).getByText(
-      "Nothing to order yet. Add products with Find alternatives or ask your AI app.",
+      "Nothing to order yet. Swap a piece with Find alternatives, or ask your AI app.",
     ),
   ).toBeVisible();
   expect(
-    within(sheet).getByRole("button", { name: "Approve demo cart" }),
-  ).toBeDisabled();
+    within(sheet).queryByRole("button", { name: /Approve demo cart/ }),
+  ).toBeNull();
 });
 
 test("dismisses the approval announcement after four seconds", () => {
@@ -326,7 +326,7 @@ test("keeps keyboard focus inside the cart approval sheet", async () => {
 
   const sheet = screen.getByRole("dialog", { name: "Review your room" });
   const close = within(sheet).getByRole("button", {
-    name: "Close cart review",
+    name: "Close cart",
   });
   const continueToShopify = within(sheet).getByRole("button", {
     name: "Approve demo cart · $169",
@@ -356,7 +356,7 @@ test("hides the workspace from assistive technology and restores the cart trigge
   ).not.toBeInTheDocument();
 
   await user.click(
-    screen.getByRole("button", { name: "Close cart review" }),
+    screen.getByRole("button", { name: "Close cart" }),
   );
   expect(viewCart).toHaveFocus();
 });

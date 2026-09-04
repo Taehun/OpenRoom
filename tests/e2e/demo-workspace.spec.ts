@@ -148,12 +148,12 @@ test("completes the deterministic spatial commerce UI journey", async ({
   await expect(dialog.getByRole("listitem")).toHaveCount(0);
   await expect(
     dialog.getByText(
-      "Nothing to order yet. Add products with Find alternatives or ask your AI app.",
+      "Nothing to order yet. Swap a piece with Find alternatives, or ask your AI app.",
     ),
   ).toBeVisible();
   await expect(
-    dialog.getByRole("button", { name: "Approve demo cart", exact: true }),
-  ).toBeDisabled();
+    dialog.getByRole("button", { name: /Approve demo cart/ }),
+  ).toHaveCount(0);
   await page.keyboard.press("Escape");
   await expect(dialog).toBeHidden();
 

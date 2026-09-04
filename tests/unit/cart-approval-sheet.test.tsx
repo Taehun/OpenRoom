@@ -156,7 +156,7 @@ describe("CartApprovalSheet in demo mode", () => {
     expect(screen.queryByText("Not mapped to a Shopify variant")).toBeNull();
   });
 
-  it("keeps the demo total copy", () => {
+  it("names the demo total the way the header does", () => {
     render(
       <CartApprovalSheet
         commerce={DEMO_COMMERCE}
@@ -164,11 +164,11 @@ describe("CartApprovalSheet in demo mode", () => {
         draft={mappedDraft()}
       />,
     );
-    expect(screen.getByText("Estimated total")).toBeVisible();
+    expect(screen.getByText("Room total")).toBeVisible();
     expect(screen.getByText("Taxes and delivery calculated later")).toBeVisible();
   });
 
-  it("says the room is empty and disables approval when it holds no products", () => {
+  it("says the room is empty and offers only Keep editing", () => {
     const dispatch = vi.fn();
     render(
       <CartApprovalSheet
@@ -179,14 +179,18 @@ describe("CartApprovalSheet in demo mode", () => {
     );
     expect(
       screen.getByText(
-        "Nothing to order yet. Add products with Find alternatives or ask your AI app.",
+        "Nothing to order yet. Swap a piece with Find alternatives, or ask your AI app.",
       ),
     ).toBeVisible();
     expect(screen.queryAllByRole("listitem")).toHaveLength(0);
-    const approve = screen.getByRole("button", { name: "Approve demo cart" });
-    expect(approve).toBeDisabled();
-    fireEvent.click(approve);
-    expect(dispatch).not.toHaveBeenCalled();
+    // Nothing to approve, so the sheet offers no approval at all — and no $0
+    // total or checkout disclosure to explain away.
+    expect(
+      screen.queryByRole("button", { name: /Approve demo cart/ }),
+    ).toBeNull();
+    expect(screen.queryByText("Room total")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Keep editing" }));
+    expect(dispatch).toHaveBeenCalledWith({ type: "close-cart" });
   });
 });
 
@@ -276,7 +280,7 @@ describe("CartApprovalSheet in shopify mode", () => {
     expect(
       screen.getByText("Shopify shows the store's prices at checkout."),
     ).toBeVisible();
-    expect(screen.queryByText("Estimated total")).toBeNull();
+    expect(screen.queryByText("Room total")).toBeNull();
   });
 
   it("announces checkout even when the popup's opener setter throws", () => {
@@ -326,12 +330,12 @@ describe("CartApprovalSheet in shopify mode", () => {
     );
     expect(
       screen.getByText(
-        "Nothing to order yet. Add products with Find alternatives or ask your AI app.",
+        "Nothing to order yet. Swap a piece with Find alternatives, or ask your AI app.",
       ),
     ).toBeVisible();
     expect(
-      screen.getByRole("button", { name: "Continue to Shopify" }),
-    ).toBeDisabled();
+      screen.queryByRole("button", { name: /Continue to Shopify/ }),
+    ).toBeNull();
     expect(
       screen.queryByText(
         "No item in this cart is mapped to a Shopify variant yet.",

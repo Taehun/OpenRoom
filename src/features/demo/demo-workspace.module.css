@@ -1237,7 +1237,6 @@
   gap: 2px;
 }
 
-.cartItemCopy strong,
 .cartThumbnail img {
   display: block;
   width: 100%;
@@ -1247,20 +1246,23 @@
   object-fit: contain;
 }
 
+/* The title and the price are one row on the Material body scale; the title
+   used to inherit the thumbnail's image rule and came out padded and bold. */
+.cartItemCopy strong,
 .cartItems li > strong {
-  font-size: 0.72rem;
+  font-size: 0.875rem;
+  font-weight: 500;
 }
 
 .cartItemCopy small {
   color: var(--muted-text);
-  font-size: 0.61rem;
+  font-size: 0.75rem;
 }
 
 .cartEmpty {
   margin: 0;
   padding: 22px 0;
   border-top: 1px solid var(--warm-divider);
-  border-bottom: 1px solid var(--warm-divider);
   color: var(--muted-text);
   font-size: 0.72rem;
   line-height: 1.5;
@@ -1357,9 +1359,14 @@
   font-weight: 700;
 }
 
+.commerceButton:disabled {
+  opacity: 0.38;
+  cursor: not-allowed;
+}
+
 /* No Material class here: the sheet keeps its two-column price button, so it
    darkens toward the ink neutral rather than lightening with a state layer. */
-.commerceButton:hover {
+.commerceButton:hover:not(:disabled) {
   background: color-mix(
     in srgb,
     var(--md-sys-color-tertiary) 85%,
