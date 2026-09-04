@@ -246,14 +246,6 @@ export function RoomCanvas({
           <div className={styles.promptGuidance}>
             <p>{PRIMARY_PROMPT}</p>
             <div className={styles.composerChips}>
-              <div className={styles.promptSuggestions}>
-                <span className="md-chip md-chip--dense">
-                  Modern organic, soft neutral textures
-                </span>
-                <span className="md-chip md-chip--dense">
-                  Mid-century, warm walnut and brass
-                </span>
-              </div>
               <div className={styles.agentStatusRow}>
                 <div
                   aria-label="In-browser AI status"

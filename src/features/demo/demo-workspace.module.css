@@ -678,10 +678,10 @@
 }
 
 /*
- * Three stacked rows: the prompt, the style chips, and the status row. The
- * photo stage is centred in whatever height this section leaves, so a row
- * saved here is two pixels of clearance won back for the photo; that budget is
- * why every control in it is an `.md-*--dense` variant.
+ * Two stacked rows: the prompt and the status row. The photo stage is centred
+ * in whatever height this section leaves, so a row saved here is two pixels of
+ * clearance won back for the photo; that budget is why every control in it is
+ * an `.md-*--dense` variant.
  */
 .promptGuidance {
   display: grid;
@@ -706,7 +706,6 @@
   line-height: var(--md-sys-typescale-body-small-line-height);
 }
 
-.promptSuggestions,
 .agentStatusRow {
   display: flex;
   flex-wrap: wrap;
@@ -1429,14 +1428,12 @@
     grid-template-columns: minmax(0, 1fr) 320px;
   }
 
-  /* Under 1280px the style chips and the status chips share one wrapping
-     row, so the composer stays two rows tall instead of four. */
+  /* Under 1280px the status chips share one wrapping row. */
   .composerChips {
     display: flex;
     flex-wrap: wrap;
   }
 
-  .promptSuggestions,
   .agentStatusRow {
     display: contents;
   }
