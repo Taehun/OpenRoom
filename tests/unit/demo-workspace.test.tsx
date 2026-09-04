@@ -98,7 +98,7 @@ test("connects the Core 6 journey to the shared Scene and approval UI", async ()
     );
   });
   expect(
-    screen.getByRole("status", { name: "Scene diagnostics" }),
+    screen.getByTestId("scene-diagnostics"),
   ).toHaveTextContent(
     "Revision 2 · table_01 · travertine-plinth-table",
   );
@@ -147,7 +147,7 @@ test("moves from object inspection to product preview", async () => {
   expect(screen.getByText("Revision 2")).toBeVisible();
   expect(screen.getAllByText("$169")).not.toHaveLength(0);
   expect(
-    screen.getByRole("status", { name: "Scene diagnostics" }),
+    screen.getByTestId("scene-diagnostics"),
   ).toHaveTextContent("Revision 2 · table_01 · oak-frame-table");
 });
 
@@ -224,7 +224,7 @@ test("uses Scene selection without incrementing revision", async () => {
   expect(screen.getByRole("heading", { name: "Chair" })).toBeVisible();
   expect(screen.getByText("Revision 1")).toBeVisible();
   expect(
-    screen.getByRole("status", { name: "Scene diagnostics" }),
+    screen.getByTestId("scene-diagnostics"),
   ).toHaveTextContent("Revision 1 · chair_01 · placeholder");
 });
 
@@ -286,6 +286,154 @@ test("dismisses the approval announcement after four seconds", () => {
   } finally {
     vi.useRealTimers();
   }
+});
+
+// The announcement used to be a bare string, so a second identical approval
+// left the live region untouched and its four seconds ran from the first one.
+test("two approvals produce two live-region updates", () => {
+  vi.useFakeTimers();
+  try {
+    render(<DemoWorkspace />);
+    fireEvent.click(screen.getByRole("button", { name: "Find alternatives" }));
+    fireEvent.click(
+      screen.getByRole("button", { name: "Place Oak Frame Table in room" }),
+    );
+
+    const toast = () => screen.getByTestId("announcement-toast");
+    const approve = () => {
+      fireEvent.click(screen.getByRole("button", { name: /^View cart/ }));
+      fireEvent.click(
+        within(
+          screen.getByRole("dialog", { name: "Review your room" }),
+        ).getByRole("button", { name: "Approve demo cart · $169" }),
+      );
+    };
+    const announcement = "Demo approved — nothing was ordered.";
+
+    approve();
+    expect(toast()).toHaveTextContent(announcement);
+
+    act(() => {
+      vi.advanceTimersByTime(2000);
+    });
+    // Opening the sheet takes the toast down so it cannot cover "Keep editing".
+    fireEvent.click(screen.getByRole("button", { name: /^View cart/ }));
+    expect(toast()).toBeEmptyDOMElement();
+    fireEvent.click(
+      within(screen.getByRole("dialog", { name: "Review your room" })).getByRole(
+        "button",
+        { name: "Approve demo cart · $169" },
+      ),
+    );
+
+    // The second announcement runs its own four seconds, not the tail of the
+    // first one's.
+    expect(toast()).toHaveTextContent(announcement);
+    act(() => {
+      vi.advanceTimersByTime(3999);
+    });
+    expect(toast()).toHaveTextContent(announcement);
+    act(() => {
+      vi.advanceTimersByTime(1);
+    });
+    expect(toast()).toBeEmptyDOMElement();
+  } finally {
+    vi.useRealTimers();
+  }
+});
+
+// An edit, an undo, a reset and a cleared selection change the room silently;
+// they are said to the screen reader without covering it.
+test("announces silent edits without putting a toast over the room", async () => {
+  const user = userEvent.setup();
+  render(<DemoWorkspace />);
+
+  await user.click(screen.getByRole("button", { name: "Find alternatives" }));
+  await user.click(
+    screen.getByRole("button", { name: "Place Oak Frame Table in room" }),
+  );
+  await user.click(screen.getByRole("button", { name: "Undo" }));
+
+  expect(screen.getByTestId("announcement-quiet")).toHaveTextContent(
+    "Undo: last change reverted",
+  );
+  expect(screen.getByTestId("announcement-toast")).toBeEmptyDOMElement();
+
+  await user.click(screen.getByRole("button", { name: "Reset demo" }));
+  expect(screen.getByTestId("announcement-quiet")).toHaveTextContent(
+    "Room reset to the original furniture",
+  );
+
+  fireEvent.keyDown(window, { key: "Escape" });
+  expect(screen.getByTestId("announcement-quiet")).toHaveTextContent(
+    "Selection cleared",
+  );
+  expect(screen.getByRole("heading", { name: "Nothing selected" })).toBeVisible();
+});
+
+// The last undo used to disable the button under the pointer, which drops the
+// keyboard on <body> at the moment there is nothing left to undo.
+test("keeps Undo focusable when there is nothing left to undo", async () => {
+  const user = userEvent.setup();
+  render(<DemoWorkspace />);
+
+  const undo = screen.getByRole("button", { name: "Undo" });
+  expect(undo).toHaveAttribute("aria-disabled", "true");
+  expect(undo).toBeEnabled();
+
+  await user.click(screen.getByRole("button", { name: "Find alternatives" }));
+  await user.click(
+    screen.getByRole("button", { name: "Place Oak Frame Table in room" }),
+  );
+  expect(undo).toHaveAttribute("aria-disabled", "false");
+
+  await user.click(undo);
+  expect(undo).toHaveAttribute("aria-disabled", "true");
+  expect(undo).toHaveFocus();
+  expect(screen.getByTestId("scene-diagnostics")).toHaveTextContent(
+    "Revision 1 · table_01 · placeholder",
+  );
+
+  // A second press on the spent button does nothing at all.
+  await user.click(undo);
+  expect(screen.getByTestId("scene-diagnostics")).toHaveTextContent(
+    "Revision 1 · table_01 · placeholder",
+  );
+  expect(undo).toHaveFocus();
+});
+
+// Escape and ⌘Z belong to the room, but only while the room has the keyboard.
+test("Escape in the pairing dialog keeps the selection", async () => {
+  const user = userEvent.setup();
+  render(<DemoWorkspace />);
+
+  await user.click(openPairingDialog());
+  expect(
+    screen.getByRole("dialog", { name: "Connect an AI app" }),
+  ).toBeVisible();
+
+  fireEvent.keyDown(window, { key: "Escape" });
+
+  expect(screen.getByRole("heading", { name: "Coffee table" })).toBeVisible();
+  expect(screen.queryByRole("heading", { name: "Nothing selected" })).toBeNull();
+});
+
+test("Cmd+Z in the pairing code field does not undo the room", async () => {
+  const user = userEvent.setup();
+  render(<DemoWorkspace />);
+
+  await user.click(screen.getByRole("button", { name: "Find alternatives" }));
+  await user.click(
+    screen.getByRole("button", { name: "Place Oak Frame Table in room" }),
+  );
+  await user.click(openPairingDialog());
+
+  const code = screen.getByRole("textbox", { name: "Pairing code" });
+  fireEvent.keyDown(code, { key: "z", metaKey: true });
+
+  expect(screen.getByTestId("scene-diagnostics")).toHaveTextContent(
+    "Revision 2 · table_01 · oak-frame-table",
+  );
 });
 
 test("counts the room's products in the badge and approves them without an external cart request", async () => {
@@ -548,7 +696,7 @@ test("Reset demo restores the canonical inspector state", async () => {
   expect(screen.getByText("Revision 1")).toBeVisible();
   expect(screen.getByText("$0")).toBeVisible();
   expect(
-    screen.getByRole("status", { name: "Scene diagnostics" }),
+    screen.getByTestId("scene-diagnostics"),
   ).toHaveTextContent("Revision 1 · table_01 · placeholder");
   expect(
     within(screen.getByRole("main", { name: "Room canvas" })).queryByText(

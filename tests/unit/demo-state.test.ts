@@ -48,13 +48,51 @@ describe("demoReducer", () => {
     expect(preview).not.toHaveProperty("history");
   });
 
-  test("reset restores the canonical UI state", () => {
+  test("reset restores the canonical UI state and says so", () => {
     const products = demoReducer(createInitialDemoState(), {
       type: "show-products",
     });
-    expect(demoReducer(products, { type: "reset" })).toEqual(
-      createInitialDemoState(),
-    );
+    const reset = demoReducer(products, { type: "reset" });
+    expect(reset).toEqual({
+      ...createInitialDemoState(),
+      announcement: {
+        text: "Room reset to the original furniture",
+        nonce: expect.any(Number),
+        tone: "quiet",
+      },
+    });
+  });
+
+  // Nothing on screen reports an undo, a reset, or a cleared selection, so each
+  // is said quietly — to the screen reader only, never over the room.
+  test("announces silent edits quietly and approvals as a toast", () => {
+    expect(
+      demoReducer(createInitialDemoState(), { type: "undo" }).announcement,
+    ).toMatchObject({ text: "Undo: last change reverted", tone: "quiet" });
+
+    expect(
+      demoReducer(createInitialDemoState(), {
+        type: "select-object",
+        objectId: null,
+      }).announcement,
+    ).toMatchObject({ text: "Selection cleared", tone: "quiet" });
+
+    expect(
+      demoReducer(createInitialDemoState(), {
+        type: "select-object",
+        objectId: "sofa_01",
+      }).announcement,
+    ).toBeNull();
+  });
+
+  // The sheet is the next thing to read: a leftover toast sits over its
+  // "Keep editing" action.
+  test("clears any standing announcement when the cart opens", () => {
+    const approved = demoReducer(createInitialDemoState(), {
+      type: "confirm-demo-cart",
+    });
+    expect(approved.announcement).not.toBeNull();
+    expect(demoReducer(approved, { type: "open-cart" }).announcement).toBeNull();
   });
 
   test("keeps cart confirmation local and explicit", () => {
@@ -64,9 +102,14 @@ describe("demoReducer", () => {
     const confirmed = demoReducer(opened, { type: "confirm-demo-cart" });
 
     expect(confirmed.isCartOpen).toBe(false);
-    expect(confirmed.announcement).toBe(
-      "Demo approved — nothing was ordered.",
-    );
+    expect(confirmed.announcement).toMatchObject({
+      text: "Demo approved — nothing was ordered.",
+      tone: "toast",
+    });
+    // A second approval is a new announcement object, so the live region reads
+    // it again instead of bailing out on an unchanged string.
+    const again = demoReducer(confirmed, { type: "confirm-demo-cart" });
+    expect(again.announcement).not.toBe(confirmed.announcement);
   });
 
   test("clears the announcement once and returns the same state when there is none", () => {
@@ -108,12 +151,16 @@ describe("demoReducer", () => {
     });
     expect(closed.isCartOpen).toBe(false);
     expect(closed.cartDraft).toBeNull();
-    expect(closed.announcement).toBe(
-      "Opened Shopify checkout in a new tab (2 items)",
-    );
+    expect(closed.announcement).toMatchObject({
+      text: "Opened Shopify checkout in a new tab (2 items)",
+      tone: "toast",
+    });
     expect(
       demoReducer(opened, { type: "open-external-checkout", itemCount: 1 })
         .announcement,
-    ).toBe("Opened Shopify checkout in a new tab (1 item)");
+    ).toMatchObject({
+      text: "Opened Shopify checkout in a new tab (1 item)",
+      tone: "toast",
+    });
   });
 });

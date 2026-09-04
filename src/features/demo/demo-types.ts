@@ -11,12 +11,25 @@ export interface DemoToast {
   message: string;
 }
 
+/**
+ * What the workspace says out loud after an action. `toast` is the visible
+ * approval notice; `quiet` reaches the screen reader only, so an edit, an undo
+ * or a reset is announced without covering the room. The nonce makes two
+ * identical announcements two distinct states, so the second one restarts the
+ * dismissal timer and is read again.
+ */
+export interface DemoAnnouncement {
+  text: string;
+  nonce: number;
+  tone: "toast" | "quiet";
+}
+
 export interface DemoState {
   mode: DemoMode;
   isCartOpen: boolean;
   cartDraft: CartApprovalDraft | null;
   toast: DemoToast | null;
-  announcement: string | null;
+  announcement: DemoAnnouncement | null;
 }
 
 export type DemoAction =
