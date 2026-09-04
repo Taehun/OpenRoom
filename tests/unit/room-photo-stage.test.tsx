@@ -858,6 +858,53 @@ describe("RoomPhotoStage", () => {
     expect(store.getState().isTransforming).toBe(false);
   });
 
+  // Important QA regression: a capture taken away mid-gesture (a scroll, a
+  // context menu, a re-render of the button) left the preview ref set, so the
+  // stage stayed in a transform that no pointer could finish.
+  test("ends a gesture whose pointer capture is taken away", () => {
+    const store = fixtureStore();
+    store.getState().setToolMode("rotate");
+    const commit = vi.spyOn(store.getState(), "commitTransform");
+    renderStage(store);
+    const handle = screen.getByTestId("rotation-handle-table_01");
+
+    fireEvent.pointerDown(handle, { pointerId: 44, clientX: 500, clientY: 300 });
+    fireEvent.pointerMove(handle, { pointerId: 44, clientX: 650, clientY: 260 });
+    expect(store.getState().isTransforming).toBe(true);
+
+    fireEvent.lostPointerCapture(handle, { pointerId: 44 });
+
+    expect(store.getState().isTransforming).toBe(false);
+    expect(commit).not.toHaveBeenCalled();
+    expect(store.getState().scene.revision).toBe(1);
+
+    // And the stage takes the next gesture, rather than ignoring every pointer.
+    fireEvent.pointerDown(handle, { pointerId: 45, clientX: 500, clientY: 300 });
+    expect(store.getState().isTransforming).toBe(true);
+    fireEvent.pointerMove(handle, { pointerId: 45, clientX: 650, clientY: 260 });
+    fireEvent.pointerUp(handle, { pointerId: 45, clientX: 650, clientY: 260 });
+    expect(commit).toHaveBeenCalledTimes(1);
+  });
+
+  // A normal release nulls the preview on pointerup, so the browser's implicit
+  // capture release that follows must not undo the commit.
+  test("leaves a committed gesture alone when the capture is released after it", () => {
+    const store = fixtureStore();
+    store.getState().setToolMode("rotate");
+    const commit = vi.spyOn(store.getState(), "commitTransform");
+    renderStage(store);
+    const handle = screen.getByTestId("rotation-handle-table_01");
+
+    fireEvent.pointerDown(handle, { pointerId: 46, clientX: 500, clientY: 300 });
+    fireEvent.pointerMove(handle, { pointerId: 46, clientX: 650, clientY: 260 });
+    fireEvent.pointerUp(handle, { pointerId: 46, clientX: 650, clientY: 260 });
+    fireEvent.lostPointerCapture(handle, { pointerId: 46 });
+
+    expect(commit).toHaveBeenCalledTimes(1);
+    expect(store.getState().scene.revision).toBe(2);
+    expect(store.getState().isTransforming).toBe(false);
+  });
+
   test("selects a focused object with Enter or Space in any tool mode", () => {
     const store = fixtureStore();
     store.getState().selectObject(null);

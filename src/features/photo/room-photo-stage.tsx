@@ -641,10 +641,14 @@ export function RoomPhotoStage() {
             object={object}
             onClick={() => sceneStore.getState().selectObject(object.id)}
             onKeyDown={(event) => handleObjectKeyDown(object, event)}
+            onLostPointerCapture={(event) => cancelTransform(object, event)}
             onPointerCancel={(event) => cancelTransform(object, event)}
             onPointerDown={(event) => startTransform(object, event, "move")}
             onPointerMove={(event) => previewMove(object, event)}
             onPointerUp={(event) => finishTransform(object, event)}
+            onRotationLostPointerCapture={(event) =>
+              cancelTransform(object, event)
+            }
             onRotationPointerCancel={(event) =>
               cancelTransform(object, event)
             }
@@ -686,10 +690,14 @@ export function RoomPhotoStage() {
             object={object}
             onClick={() => sceneStore.getState().selectObject(object.id)}
             onKeyDown={(event) => handleObjectKeyDown(object, event)}
+            onLostPointerCapture={(event) => cancelTransform(object, event)}
             onPointerCancel={(event) => cancelTransform(object, event)}
             onPointerDown={(event) => startTransform(object, event, "move")}
             onPointerMove={(event) => previewMove(object, event)}
             onPointerUp={(event) => finishTransform(object, event)}
+            onRotationLostPointerCapture={(event) =>
+              cancelTransform(object, event)
+            }
             onRotationPointerCancel={(event) =>
               cancelTransform(object, event)
             }

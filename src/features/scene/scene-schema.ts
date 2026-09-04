@@ -143,7 +143,8 @@ export type SceneCommand =
   | {
       type: "move";
       objectId: string;
-      position: { x: number; z: number };
+      /** Omitted for a turn in place: the object keeps the floor spot it has. */
+      position?: { x: number; z: number };
       rotationYDegrees?: number;
     };
 

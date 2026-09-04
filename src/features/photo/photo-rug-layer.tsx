@@ -18,10 +18,13 @@ interface PhotoRugLayerProps {
   object: SceneObject;
   onClick(): void;
   onKeyDown: KeyboardEventHandler<HTMLButtonElement>;
+  /** A capture taken away mid-gesture ends it; without this the stage freezes. */
+  onLostPointerCapture: PointerEventHandler<HTMLButtonElement>;
   onPointerCancel: PointerEventHandler<HTMLButtonElement>;
   onPointerDown: PointerEventHandler<HTMLButtonElement>;
   onPointerMove: PointerEventHandler<HTMLButtonElement>;
   onPointerUp: PointerEventHandler<HTMLButtonElement>;
+  onRotationLostPointerCapture: PointerEventHandler<HTMLButtonElement>;
   onRotationPointerCancel: PointerEventHandler<HTMLButtonElement>;
   onRotationPointerDown: PointerEventHandler<HTMLButtonElement>;
   onRotationPointerMove: PointerEventHandler<HTMLButtonElement>;
@@ -67,10 +70,12 @@ export function PhotoRugLayer({
   object,
   onClick,
   onKeyDown,
+  onLostPointerCapture,
   onPointerCancel,
   onPointerDown,
   onPointerMove,
   onPointerUp,
+  onRotationLostPointerCapture,
   onRotationPointerCancel,
   onRotationPointerDown,
   onRotationPointerMove,
@@ -85,6 +90,9 @@ export function PhotoRugLayer({
   const asset = getPhotoAsset(object);
   const rotation = `${(object.rotation[1] * 180) / Math.PI}deg`;
 
+  // Only an asset with no usable floor quad ends up here now: a placement whose
+  // turned corners reach past the floor keeps its homography, so a rug never
+  // swaps to this flat, CSS-rotated picture in the middle of a gesture.
   if (!projection || !asset) {
     const anchorX = asset?.anchorX ?? 0.5;
     const anchorY = asset?.anchorY ?? 1;
@@ -135,6 +143,7 @@ export function PhotoRugLayer({
           data-object-id={object.id}
           onClick={onClick}
           onKeyDown={onKeyDown}
+          onLostPointerCapture={onLostPointerCapture}
           onPointerCancel={onPointerCancel}
           onPointerDown={onPointerDown}
           onPointerMove={onPointerMove}
@@ -172,6 +181,7 @@ export function PhotoRugLayer({
             aria-label={`Rotate ${label}`}
             className={styles.rotationHandle}
             data-testid={`rotation-handle-${object.id}`}
+            onLostPointerCapture={onRotationLostPointerCapture}
             onPointerCancel={onRotationPointerCancel}
             onPointerDown={onRotationPointerDown}
             onPointerMove={onRotationPointerMove}
@@ -228,6 +238,7 @@ export function PhotoRugLayer({
         data-object-id={object.id}
         onClick={onClick}
         onKeyDown={onKeyDown}
+        onLostPointerCapture={onLostPointerCapture}
         onPointerCancel={onPointerCancel}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
@@ -311,6 +322,7 @@ export function PhotoRugLayer({
           className={`${styles.rotationHandle} ${styles.photoRugRotationHandle}`}
           data-destination-quad={destinationQuad}
           data-testid={`rotation-handle-${object.id}`}
+          onLostPointerCapture={onRotationLostPointerCapture}
           onPointerCancel={onRotationPointerCancel}
           onPointerDown={onRotationPointerDown}
           onPointerMove={onRotationPointerMove}

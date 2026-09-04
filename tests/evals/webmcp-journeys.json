@@ -68,5 +68,16 @@
       "The returned lamp's position[1] is the table height plus half the lamp height, above its floor resting height",
       "The seed scene has no side table, so the coffee table table_01 is the supporter the assertions name"
     ]
+  },
+  {
+    "id": "turn-the-rug-flat",
+    "prompt": "Turn the rug 45 degrees",
+    "expectedTools": ["get_scene", "move_object"],
+    "assertions": [
+      "move_object is called with the rug's own XZ centre, so the command is a turn in place",
+      "The 2.4 x 1.7 m rug spans 2.9 m across at 45 degrees and the room is 2.72 m deep, so no floor spot holds it",
+      "The rug keeps the rotation and the position it had, adjustedToFit is true, and the message reads \"Rug kept at 0°: it does not fit the room at 45°.\"",
+      "A turn the room can hold keeps its floor spot, and slides by exactly the corner overshoot when one leaves the floor"
+    ]
   }
 ]

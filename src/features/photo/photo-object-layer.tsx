@@ -16,10 +16,13 @@ interface PhotoObjectLayerProps {
   object: SceneObject;
   onClick(): void;
   onKeyDown: KeyboardEventHandler<HTMLButtonElement>;
+  /** A capture taken away mid-gesture ends it; without this the stage freezes. */
+  onLostPointerCapture: PointerEventHandler<HTMLButtonElement>;
   onPointerCancel: PointerEventHandler<HTMLButtonElement>;
   onPointerDown: PointerEventHandler<HTMLButtonElement>;
   onPointerMove: PointerEventHandler<HTMLButtonElement>;
   onPointerUp: PointerEventHandler<HTMLButtonElement>;
+  onRotationLostPointerCapture: PointerEventHandler<HTMLButtonElement>;
   onRotationPointerCancel: PointerEventHandler<HTMLButtonElement>;
   onRotationPointerDown: PointerEventHandler<HTMLButtonElement>;
   onRotationPointerMove: PointerEventHandler<HTMLButtonElement>;
@@ -37,10 +40,12 @@ export function PhotoObjectLayer({
   object,
   onClick,
   onKeyDown,
+  onLostPointerCapture,
   onPointerCancel,
   onPointerDown,
   onPointerMove,
   onPointerUp,
+  onRotationLostPointerCapture,
   onRotationPointerCancel,
   onRotationPointerDown,
   onRotationPointerMove,
@@ -148,6 +153,7 @@ export function PhotoObjectLayer({
         disabled={false}
         onClick={onClick}
         onKeyDown={onKeyDown}
+        onLostPointerCapture={onLostPointerCapture}
         onPointerCancel={onPointerCancel}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
@@ -215,6 +221,7 @@ export function PhotoObjectLayer({
           aria-label={`Rotate ${label}`}
           className={styles.rotationHandle}
           data-testid={`rotation-handle-${object.id}`}
+          onLostPointerCapture={onRotationLostPointerCapture}
           onPointerCancel={onRotationPointerCancel}
           onPointerDown={onRotationPointerDown}
           onPointerMove={onRotationPointerMove}
