@@ -303,10 +303,9 @@ function StatusBanner({
       {status === null || status.kind === "unsupported-browser" ? null : (
         <div className="md-banner-actions">
           {status.kind === "ready" ? (
-            // eslint-disable-next-line @next/next/no-html-link-for-pages -- same-route query switch must reload: a soft navigation leaves this guide on screen without the Chromium Navigation API.
-            <a className="md-button md-button--filled" href="/?view=dashboard">
+            <Link className="md-button md-button--filled" href="/?view=dashboard">
               Open the demo
-            </a>
+            </Link>
           ) : (
             <>
               {status.kind === "flag-required" ? (
@@ -545,13 +544,12 @@ export function WebMcpGuide({ onCheckAgain, status }: WebMcpGuideProps) {
           </div>
           {/* One link under the grid, not one per card: every card ends at the
               same demo. */}
-          {/* eslint-disable-next-line @next/next/no-html-link-for-pages -- same-route query switch must reload: a soft navigation leaves this guide on screen without the Chromium Navigation API. */}
-          <a
+          <Link
             className={`md-button md-button--text ${styles.connectFooterLink}`}
             href="/?view=dashboard"
           >
             Open the demo
-          </a>
+          </Link>
         </section>
 
         <div className={styles.moreInfo}>

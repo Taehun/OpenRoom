@@ -1,7 +1,7 @@
 import { CORE_TOOL_MANIFEST } from "../../src/webmcp/core-tool-manifest";
 import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, describe, expect, it, test, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, test, vi } from "vitest";
 import { HomeGate } from "../../src/features/home/home-gate";
 import {
   CONNECT_COMMANDS,
@@ -11,6 +11,20 @@ import type {
   BrowserInfo,
   CompatibilityStatus,
 } from "../../src/webmcp/browser-compatibility";
+
+// `HomeGate` reads `?view=` through `useSearchParams` on every render, so the
+// view switches can be soft navigations. The hook needs the App Router, which
+// no unit test mounts; this stands in for it.
+const query = vi.hoisted(() => ({ current: new URLSearchParams() }));
+
+vi.mock("next/navigation", () => ({
+  useSearchParams: () => query.current,
+}));
+
+/** Asks for a view the way a soft navigation to `/?view=…` would. */
+function requestView(view: "dashboard" | "guide" | null) {
+  query.current = new URLSearchParams(view === null ? "" : `view=${view}`);
+}
 
 const CHROME_UA =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36";
@@ -77,10 +91,13 @@ function renderGuide(
   );
 }
 
+beforeEach(() => {
+  requestView(null);
+});
+
 afterEach(() => {
   cleanup();
   while (restores.length > 0) restores.pop()?.();
-  window.history.replaceState({}, "", "/");
 });
 
 
@@ -391,7 +408,7 @@ test("keeps the guide reachable at ?view=guide while WebMCP is present", async (
     userAgent: CHROME_UA,
   });
   stubModelContext();
-  window.history.replaceState({}, "", "/?view=guide");
+  requestView("guide");
 
   render(<HomeGate />);
 
@@ -407,7 +424,7 @@ test("keeps the guide reachable at ?view=guide while WebMCP is present", async (
 
 test("opens the dashboard for a Claude-only browser at ?view=dashboard", async () => {
   stubBrowser({ secureContext: true, userAgent: FIREFOX_UA });
-  window.history.replaceState({}, "", "/?view=dashboard");
+  requestView("dashboard");
 
   render(<HomeGate />);
 
@@ -429,7 +446,7 @@ test("opens the dashboard for a Claude-only browser at ?view=dashboard", async (
 
 test("points a browser without WebMCP at the local companion dashboard", async () => {
   stubBrowser({ secureContext: true, userAgent: FIREFOX_UA });
-  window.history.replaceState({}, "", "/?view=guide");
+  requestView("guide");
 
   render(<HomeGate />);
 

@@ -11,7 +11,7 @@ interface WorkspaceHeaderProps {
   cartButtonRef: RefObject<HTMLButtonElement | null>;
   canUndo: boolean;
   dispatch: Dispatch<DemoAction>;
-  /** Set only by the adaptive home page, which also hosts the guide. */
+  /** Points at `/`, which hosts the guide; both demo routes set it. */
   guideHref?: string | undefined;
   roomTotalMinor: number;
   scene: Scene;
@@ -60,14 +60,14 @@ export function WorkspaceHeader({
 
       <div className={styles.headerActions}>
         {guideHref ? (
-          // Same-route query switch: a soft navigation would leave the
-          // workspace mounted in browsers without the Navigation API.
-          <a
+          // A soft navigation: the Scene store lives in the root layout, so
+          // reading the guide and coming back keeps the room.
+          <Link
             className={`md-button md-button--text ${styles.quietButton}`}
             href={guideHref}
           >
             <span>Guide</span>
-          </a>
+          </Link>
         ) : null}
         <button
           aria-keyshortcuts="Meta+Z Control+Z"

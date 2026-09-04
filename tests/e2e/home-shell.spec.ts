@@ -126,3 +126,49 @@ test("renders the workspace as the dashboard when WebMCP is present", async ({
     page.getByRole("link", { name: "Open the demo" }).first(),
   ).toHaveAttribute("href", "/demo");
 });
+
+// The guide and the demo are two views of one room: the Scene store lives in
+// the root layout, so both view switches have to be soft navigations.
+test("keeps the room across the guide round trip from /demo", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.goto("/demo");
+
+  const diagnostics = page.getByRole("status", { name: "Scene diagnostics" });
+  const roomCanvas = page.getByRole("main", { name: "Room canvas" });
+  const viewCart = page.getByRole("button", { name: /^View cart/ });
+  await expect(roomCanvas).toBeVisible();
+
+  await page.getByRole("button", { name: "Find alternatives" }).click();
+  await page
+    .getByRole("button", { name: "Place Oak Frame Table in room" })
+    .click();
+  await expect(diagnostics).toContainText("Revision 2");
+  await expect(viewCart).toHaveText("View cart1");
+
+  // `/demo` carries the guide link too, and it is a `next/link`: the workspace
+  // unmounts, but the layout's store — and the room — outlives it.
+  await page.getByRole("link", { name: "Guide" }).click();
+  await expect(page).toHaveURL("/?view=guide");
+  const connect = page.getByRole("region", { name: "Connect an AI app" });
+  await expect(connect).toBeVisible();
+
+  // The one link under the connect grid switches the view on the same route.
+  await connect.getByRole("link", { name: "Open the demo" }).click();
+  await expect(page).toHaveURL("/?view=dashboard");
+  await expect(roomCanvas.getByText("Oak Frame Table")).toBeVisible();
+  await expect(diagnostics).toContainText("Revision 2");
+  await expect(viewCart).toHaveText("View cart1");
+
+  // Back through both switches lands on the same room, not a fresh one.
+  await page.goBack();
+  await expect(page).toHaveURL("/?view=guide");
+  await expect(connect).toBeVisible();
+
+  await page.goBack();
+  await expect(page).toHaveURL("/demo");
+  await expect(roomCanvas.getByText("Oak Frame Table")).toBeVisible();
+  await expect(diagnostics).toContainText("Revision 2");
+  await expect(viewCart).toHaveText("View cart1");
+});
