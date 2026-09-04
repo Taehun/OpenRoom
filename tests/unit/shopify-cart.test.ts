@@ -9,12 +9,12 @@ import {
 } from "../../src/features/commerce/shopify-cart";
 import type { CartApprovalDraft } from "../../src/webmcp/tool-context";
 import {
-  DEMO_COMMERCE,
   FIXTURE_AGENT_PROFILE_URL,
   FIXTURE_VARIANTS,
   FIXTURE_VARIANT_IDS,
   PLACEHOLDER_STORE_DOMAIN,
   SHOPIFY_COMMERCE,
+  UNCONFIGURED_COMMERCE,
   fixtureGid,
 } from "../helpers/commerce-fixtures";
 
@@ -166,8 +166,12 @@ describe("buildProductLinks", () => {
 });
 
 describe("buildCommerceDraft", () => {
-  it("returns null in demo mode", () => {
-    expect(buildCommerceDraft(DEMO_COMMERCE, [{ productId: "coffee-table", quantity: 1 }])).toBeNull();
+  it("returns null when no store is configured", () => {
+    expect(
+      buildCommerceDraft(UNCONFIGURED_COMMERCE, [
+        { productId: "coffee-table", quantity: 1 },
+      ]),
+    ).toBeNull();
   });
 
   it("builds public lines, skipped products, endpoint, and permalink in shopify mode", () => {
@@ -208,8 +212,8 @@ describe("buildCommerceDraft", () => {
 });
 
 describe("enrichCartDraft", () => {
-  it("returns the same draft object in demo mode", () => {
-    expect(enrichCartDraft(DEMO_COMMERCE, DRAFT)).toBe(DRAFT);
+  it("returns the same draft object when no store is configured", () => {
+    expect(enrichCartDraft(UNCONFIGURED_COMMERCE, DRAFT)).toBe(DRAFT);
     expect("commerce" in DRAFT).toBe(false);
   });
 

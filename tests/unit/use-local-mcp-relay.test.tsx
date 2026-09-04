@@ -14,7 +14,7 @@ import {
   useLocalMcpRelay,
   type LocalMcpRelay,
 } from "../../src/local-mcp/use-local-mcp-relay";
-import { DEMO_COMMERCE } from "../helpers/commerce-fixtures";
+import { UNCONFIGURED_COMMERCE } from "../helpers/commerce-fixtures";
 import {
   FakeRelayServer,
   RELAY_SESSION_TOKEN,
@@ -54,7 +54,7 @@ function createHarnessContext(scene?: Scene): Harness {
     openCartApproval: (draft) => {
       drafts.push(draft);
     },
-    commerce: DEMO_COMMERCE,
+    commerce: UNCONFIGURED_COMMERCE,
   };
 
   return { context, drafts, commands, store };

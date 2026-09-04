@@ -26,10 +26,10 @@ import type {
 } from "../../src/webmcp/tool-context";
 import type { CommerceContext } from "../../src/features/commerce/commerce-types";
 import {
-  DEMO_COMMERCE,
   FIXTURE_AGENT_PROFILE_URL,
   FIXTURE_VARIANT_IDS,
   SHOPIFY_COMMERCE,
+  UNCONFIGURED_COMMERCE,
   fixtureGid,
   fixtureProductLinks,
 } from "../helpers/commerce-fixtures";
@@ -37,7 +37,7 @@ import {
 function createContext(
   store: SceneStore,
   catalog: readonly CatalogProduct[] = DEMO_PRODUCTS,
-  commerce: CommerceContext = DEMO_COMMERCE,
+  commerce: CommerceContext = UNCONFIGURED_COMMERCE,
 ) {
   const drafts: CartApprovalDraft[] = [];
   const context: ToolContext = {
@@ -653,9 +653,13 @@ describe("WebMCP Core 6 handlers", () => {
 });
 
 describe("add_scene_to_cart commerce block", () => {
-  test("omits commerce in demo mode", async () => {
+  test("omits commerce when no store is configured", async () => {
     const store = createSceneStore();
-    const { context, drafts } = createContext(store, DEMO_PRODUCTS, DEMO_COMMERCE);
+    const { context, drafts } = createContext(
+      store,
+      DEMO_PRODUCTS,
+      UNCONFIGURED_COMMERCE,
+    );
     const tools = createCoreTools(context);
 
     await execute(tools, "replace_object", {

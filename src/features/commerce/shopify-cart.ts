@@ -85,7 +85,7 @@ export function buildCommerceDraft(
   commerce: CommerceContext,
   items: readonly CartLineInput[],
 ): CommerceDraft | null {
-  if (commerce.config.provider !== "shopify") return null;
+  if (commerce.config.status !== "connected") return null;
   const { lines, skipped } = resolveShopifyLines(items, commerce.variants);
   return {
     provider: "shopify",

@@ -8,12 +8,12 @@ import {
 } from "../../src/features/demo/cart-approval-sheet";
 import type { CartApprovalDraft } from "../../src/webmcp/tool-context";
 import {
-  DEMO_COMMERCE,
   FIXTURE_AGENT_PROFILE_URL,
   FIXTURE_VARIANTS,
   FIXTURE_VARIANT_IDS,
   PLACEHOLDER_STORE_DOMAIN,
   SHOPIFY_COMMERCE,
+  UNCONFIGURED_COMMERCE,
   fixtureGid,
   fixtureProductLinks,
 } from "../helpers/commerce-fixtures";
@@ -142,12 +142,12 @@ function agentDraft(): CartApprovalDraft {
   };
 }
 
-describe("CartApprovalSheet in demo mode", () => {
+describe("CartApprovalSheet while unconfigured", () => {
   it("lists the room's products and approves them without leaving the page", () => {
     const dispatch = vi.fn();
     render(
       <CartApprovalSheet
-        commerce={DEMO_COMMERCE}
+        commerce={UNCONFIGURED_COMMERCE}
         dispatch={dispatch}
         draft={mappedDraft()}
       />,
@@ -167,7 +167,7 @@ describe("CartApprovalSheet in demo mode", () => {
   it("names the demo total the way the header does", () => {
     render(
       <CartApprovalSheet
-        commerce={DEMO_COMMERCE}
+        commerce={UNCONFIGURED_COMMERCE}
         dispatch={vi.fn()}
         draft={mappedDraft()}
       />,
@@ -180,7 +180,7 @@ describe("CartApprovalSheet in demo mode", () => {
     const dispatch = vi.fn();
     render(
       <CartApprovalSheet
-        commerce={DEMO_COMMERCE}
+        commerce={UNCONFIGURED_COMMERCE}
         dispatch={dispatch}
         draft={emptyDraft()}
       />,
@@ -387,23 +387,23 @@ describe("CartApprovalSheet in shopify mode", () => {
 });
 
 describe("CartApprovalSheet configuration reasons", () => {
-  function demoCommerce(
-    reason: "default" | "not-configured" | "invalid-domain",
+  function unconfiguredCommerce(
+    reason: "not-configured" | "invalid-domain",
   ): CommerceContext {
-    return { config: { provider: "demo", reason }, variants: FIXTURE_VARIANTS };
+    return { config: { status: "unconfigured", reason }, variants: FIXTURE_VARIANTS };
   }
 
-  it("explains an unconfigured Shopify provider", () => {
+  it("explains that no store is connected", () => {
     render(
       <CartApprovalSheet
-        commerce={demoCommerce("not-configured")}
+        commerce={unconfiguredCommerce("not-configured")}
         dispatch={vi.fn()}
         draft={mappedDraft()}
       />,
     );
     expect(
       screen.getByText(
-        "Shopify checkout is not configured. Set NEXT_PUBLIC_COMMERCE_PROVIDER=shopify and NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN, then rebuild.",
+        "No Shopify store is connected yet.",
       ),
     ).toBeVisible();
   });
@@ -411,31 +411,15 @@ describe("CartApprovalSheet configuration reasons", () => {
   it("explains an invalid store domain", () => {
     render(
       <CartApprovalSheet
-        commerce={demoCommerce("invalid-domain")}
+        commerce={unconfiguredCommerce("invalid-domain")}
         dispatch={vi.fn()}
         draft={mappedDraft()}
       />,
     );
     expect(
       screen.getByText(
-        "Shopify checkout is disabled: NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN must be a bare host such as your-store.myshopify.com. Rebuild after fixing it.",
+        "The configured store address is not a bare host such as your-store.myshopify.com.",
       ),
     ).toBeVisible();
-  });
-
-  it("stays silent and demo-only when commerce is simply off", () => {
-    const dispatch = vi.fn();
-    render(
-      <CartApprovalSheet
-        commerce={demoCommerce("default")}
-        dispatch={dispatch}
-        draft={mappedDraft()}
-      />,
-    );
-    expect(screen.queryByText(/Shopify checkout is/)).toBeNull();
-    fireEvent.click(
-      screen.getByRole("button", { name: "Approve demo cart · $518" }),
-    );
-    expect(dispatch).toHaveBeenCalledWith({ type: "confirm-demo-cart" });
   });
 });

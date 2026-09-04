@@ -46,14 +46,11 @@ function formatPrice(priceMinor: number) {
 }
 
 function configurationNotice(config: CommerceContext["config"]): string | null {
-  if (config.provider !== "demo") return null;
-  if (config.reason === "not-configured") {
-    return "Shopify checkout is not configured. Set NEXT_PUBLIC_COMMERCE_PROVIDER=shopify and NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN, then rebuild.";
-  }
+  if (config.status === "connected") return null;
   if (config.reason === "invalid-domain") {
-    return "Shopify checkout is disabled: NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN must be a bare host such as your-store.myshopify.com. Rebuild after fixing it.";
+    return "The configured store address is not a bare host such as your-store.myshopify.com.";
   }
-  return null;
+  return "No Shopify store is connected yet.";
 }
 
 interface SheetLine {
@@ -72,7 +69,7 @@ export function CartApprovalSheet({
 }: CartApprovalSheetProps) {
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const [blockedUrl, setBlockedUrl] = useState<string | null>(null);
-  const isShopify = commerce.config.provider === "shopify";
+  const isShopify = commerce.config.status === "connected";
 
   const lines = useMemo<SheetLine[]>(
     () =>
@@ -111,7 +108,7 @@ export function CartApprovalSheet({
   const checkoutUrl = commerceDraft?.checkoutPermalink ?? null;
   const canCheckout = isShopify && checkoutUrl !== null;
   const storeDomain =
-    commerce.config.provider === "shopify" ? commerce.config.storeDomain : null;
+    commerce.config.status === "connected" ? commerce.config.storeDomain : null;
   const buttonLabel = isShopify ? "Continue to Shopify" : "Approve demo cart";
   const notice = configurationNotice(commerce.config);
 
