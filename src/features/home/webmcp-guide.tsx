@@ -67,7 +67,7 @@ type ConnectStep =
   | { command: string }
   | { config: string }
   | { note: string }
-  | { address: true };
+  | { address: string };
 
 interface ConnectCardContent {
   title: string;
@@ -80,8 +80,7 @@ const CONNECT_CARDS: ReadonlyArray<ConnectCardContent> = [
     title: "ChatGPT or Codex app",
     body: "Open OpenRoom inside the app's built-in browser. Nothing to install.",
     steps: [
-      { note: "In the app, open its browser and paste this address:" },
-      { address: true },
+      { address: "In the app, open its browser and paste this address:" },
       { note: "Start a chat. The app finds OpenRoom's tools on its own." },
     ],
   },
@@ -417,8 +416,10 @@ function ConnectCard({ card }: { card: ConnectCardContent }) {
               );
 
             if ("address" in step)
+              // The lead-in and the address are one step, not two.
               return (
                 <li key={stepId}>
+                  {step.address}
                   <span className={styles.commandRow}>
                     <code className="md-code" id={stepId}>
                       {origin ?? "this page's address"}

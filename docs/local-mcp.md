@@ -47,7 +47,7 @@ pnpm mcp:openroom ──── HTTP on 127.0.0.1 only ────► OpenRoom p
    ```
 
    Where that text lands depends on the client, because the client owns the
-   process: The client keeps it out of the way, so register the companion
+   process: the client keeps it out of the way, so register the companion
    behind the one-line stderr log wrapper under [Client
    configuration](#client-configuration) and read the code from the log file it
    appends to (`tail -f ~/openroom-mcp.log`). Starting a second companion in

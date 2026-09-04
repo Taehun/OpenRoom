@@ -1,6 +1,6 @@
 # OpenRoom
 
-AI Room Planner & Furniture Shopping
+AI room planner and furniture shopping
 
 [![CI](https://github.com/Taehun/OpenRoom/actions/workflows/ci.yml/badge.svg)](https://github.com/Taehun/OpenRoom/actions/workflows/ci.yml)
 
