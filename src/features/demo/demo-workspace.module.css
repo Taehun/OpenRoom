@@ -548,6 +548,7 @@
 
 .rotationHandle {
   position: absolute;
+  z-index: 1;
   display: grid;
   width: 32px;
   height: 32px;

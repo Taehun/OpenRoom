@@ -102,10 +102,11 @@ export function PhotoRugLayer({
       "--photo-anchor-y": anchorYPercent,
       "--photo-anchor-x-offset": `${anchorX * -100}%`,
       "--photo-anchor-y-offset": `${anchorY * -100}%`,
-      zIndex: placement.zIndex,
     } as CSSProperties;
+    // Stacking belongs to the frame only, so the handle stays reachable.
     const frameStyle = {
       ...customStyle,
+      zIndex: placement.zIndex,
       left,
       top,
       transform: `translate(${-anchorX * 100}%, ${-anchorY * 100}%) rotate(${rotation})`,
@@ -167,8 +168,10 @@ export function PhotoRugLayer({
 
         {showRotationHandle ? (
           <button
+            aria-hidden="true"
             aria-label={`Rotate ${label}`}
             className={styles.rotationHandle}
+            data-testid={`rotation-handle-${object.id}`}
             onPointerCancel={onRotationPointerCancel}
             onPointerDown={onRotationPointerDown}
             onPointerMove={onRotationPointerMove}
@@ -178,6 +181,7 @@ export function PhotoRugLayer({
               top: 0,
               transform: "translate(-50%, -100%)",
             }}
+            tabIndex={-1}
             type="button"
           >
             <span aria-hidden="true">↻</span>
@@ -295,9 +299,11 @@ export function PhotoRugLayer({
 
       {showRotationHandle ? (
         <button
+          aria-hidden="true"
           aria-label={`Rotate ${label}`}
           className={`${styles.rotationHandle} ${styles.photoRugRotationHandle}`}
           data-destination-quad={destinationQuad}
+          data-testid={`rotation-handle-${object.id}`}
           onPointerCancel={onRotationPointerCancel}
           onPointerDown={onRotationPointerDown}
           onPointerMove={onRotationPointerMove}
@@ -311,6 +317,7 @@ export function PhotoRugLayer({
               zIndex: INTERACTION_LAYER + 2,
             } as CSSProperties
           }
+          tabIndex={-1}
           type="button"
         >
           <span aria-hidden="true">↻</span>

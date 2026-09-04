@@ -534,7 +534,7 @@ describe("RoomPhotoStage", () => {
     expect(store.getState().scene.selectedObjectId).toBe("table_01");
     expect(store.getState().isTransforming).toBe(false);
     expect(
-      screen.queryByRole("button", { name: "Rotate Coffee table" }),
+      screen.queryByTestId("rotation-handle-table_01"),
     ).not.toBeInTheDocument();
   });
 
@@ -730,7 +730,7 @@ describe("RoomPhotoStage", () => {
     const rug = screen.getByRole("button", { name: "Rug" });
     const initialRugRotation = objectFromStore(store, "rug_01").rotation[1];
     fireEvent.click(rug);
-    expect(screen.getByRole("button", { name: "Rotate Rug" })).toBeVisible();
+    expect(screen.getByTestId("rotation-handle-rug_01")).toBeVisible();
     expect(fireEvent.keyDown(rug, { key: "ArrowRight" })).toBe(false);
     expect(commit).toHaveBeenCalledTimes(3);
     expect(objectFromStore(store, "rug_01").rotation[1]).toBeCloseTo(
@@ -745,7 +745,7 @@ describe("RoomPhotoStage", () => {
     const commit = vi.spyOn(store.getState(), "commitTransform");
     renderStage(store);
     const rug = screen.getByRole("button", { name: "Rug" });
-    const handle = screen.getByRole("button", { name: "Rotate Rug" });
+    const handle = screen.getByTestId("rotation-handle-rug_01");
     const initialQuad = rug.getAttribute("data-destination-quad");
 
     expect(handle).toHaveAttribute("data-destination-quad", initialQuad);
@@ -792,7 +792,7 @@ describe("RoomPhotoStage", () => {
     store.getState().setToolMode("rotate");
     const commit = vi.spyOn(store.getState(), "commitTransform");
     renderStage(store);
-    const handle = screen.getByRole("button", { name: "Rotate Coffee table" });
+    const handle = screen.getByTestId("rotation-handle-table_01");
 
     fireEvent.pointerDown(handle, {
       pointerId: 12,
@@ -824,7 +824,7 @@ describe("RoomPhotoStage", () => {
     const store = createSceneStore(scene);
     store.getState().setToolMode("rotate");
     renderStage(store);
-    const handle = screen.getByRole("button", { name: "Rotate Coffee table" });
+    const handle = screen.getByTestId("rotation-handle-table_01");
 
     fireEvent.pointerDown(handle, {
       pointerId: 32,
@@ -853,7 +853,7 @@ describe("RoomPhotoStage", () => {
     store.getState().setToolMode("rotate");
     const { stage } = renderStage(store);
     const table = screen.getByRole("button", { name: "Coffee table" });
-    const handle = screen.getByRole("button", { name: "Rotate Coffee table" });
+    const handle = screen.getByTestId("rotation-handle-table_01");
     const anchorX =
       STAGE_RECT.left +
       (Number.parseFloat(table.style.getPropertyValue("--photo-left")) / 100) *
@@ -903,7 +903,7 @@ describe("RoomPhotoStage", () => {
     expect(frame.style.transformOrigin).toBe("50.07% 86.13%");
     const floorAnchor = screen.getByTestId("photo-floor-anchor-table_01");
     const object = screen.getByRole("button", { name: "Coffee table" });
-    const handle = screen.getByRole("button", { name: "Rotate Coffee table" });
+    const handle = screen.getByTestId("rotation-handle-table_01");
     expect(frame).toContainElement(floorAnchor);
     expect(frame).toContainElement(handle);
     expect(floorAnchor.style.left).toBe("50.07%");
@@ -920,6 +920,23 @@ describe("RoomPhotoStage", () => {
     const tableBox = tableView.view.contentBox!;
     expect(handle.style.top).toBe(`${tableBox.top * 100}%`);
     expect(handle.style.transform).toBe("translate(-50%, -100%)");
+  });
+
+  // QA regression: with the handle on the silhouette's top edge it sits inside
+  // the cutout's box, so the button must not carry a z-index of its own.
+  test("keeps the rotate handle above the cutout it belongs to", () => {
+    const store = fixtureStore();
+    store.getState().setToolMode("rotate");
+    renderStage(store);
+
+    const button = screen.getByRole("button", { name: "Coffee table" });
+    const frame = screen.getByTestId("photo-object-frame-table_01");
+    const handle = screen.getByTestId("rotation-handle-table_01");
+    expect(button.style.zIndex).toBe("");
+    expect(frame.style.zIndex).not.toBe("");
+    expect(handle.getAttribute("aria-hidden")).toBe("true");
+    expect(handle.tabIndex).toBe(-1);
+    expect(frame).toContainElement(handle);
   });
 
   // Minor QA finding: the selection used to wrap the padded image box. With a

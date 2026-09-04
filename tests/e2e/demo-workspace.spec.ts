@@ -207,3 +207,40 @@ test("keeps the room across a soft navigation to the home page and back", async 
   await expect(diagnostics).toContainText("Revision 2");
   await expect(viewCart).toHaveText("View cart1");
 });
+
+// QA regression: the rotation handle sits on the silhouette's top edge, inside
+// the cutout's box, so it has to stay above the cutout for pointer input.
+test("drags the rotation handle to turn a piece without moving it", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto("/demo");
+  const stage = page.getByRole("region", { name: "Editable room photo" });
+  await stage.getByRole("button", { name: "Sofa" }).click();
+  await page.getByRole("button", { name: "Rotate tool" }).click();
+
+  const frame = page.getByTestId("photo-object-frame-sofa_01");
+  const readPosition = (node: HTMLElement) => [
+    Number.parseFloat(node.style.left),
+    Number.parseFloat(node.style.top),
+  ];
+  const before = await frame.evaluate(readPosition);
+  const faces = page.locator("dt", { hasText: "Faces" }).locator("xpath=following-sibling::dd[1]");
+  await expect(faces).toHaveText("Toward the camera");
+
+  const handle = page.getByTestId("rotation-handle-sofa_01");
+  const box = await handle.boundingBox();
+  if (!box) throw new Error("Missing rotation handle");
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(box.x + box.width / 2 + 120, box.y + box.height / 2 + 80, { steps: 10 });
+  await page.mouse.up();
+
+  await expect(faces).not.toHaveText("Toward the camera");
+  await expect(faces).toContainText("Turned");
+  // The footprint clamp may nudge a turned piece by a point or two; a drag
+  // that moved it instead of turning it shifts it by far more.
+  const after = await frame.evaluate(readPosition);
+  expect(Math.abs(after[0]! - before[0]!)).toBeLessThan(3);
+  expect(Math.abs(after[1]! - before[1]!)).toBeLessThan(3);
+});

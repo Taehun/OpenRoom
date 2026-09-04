@@ -79,10 +79,13 @@ export function PhotoObjectLayer({
     "--photo-anchor-y": anchorYPercent,
     "--photo-anchor-x-offset": `${anchorX * -100}%`,
     "--photo-anchor-y-offset": `${anchorY * -100}%`,
-    zIndex: placement.zIndex,
   } as CSSProperties;
+  // The stacking order belongs to the frame alone: a z-index on the cutout
+  // button would lift it above the later-in-DOM rotation handle and floor
+  // anchor, which sit inside its box now that they follow the silhouette.
   const frameStyle = {
     ...customStyle,
+    zIndex: placement.zIndex,
     left,
     top,
     transform: `translate(${-anchorX * 100}%, ${-anchorY * 100}%)`,
@@ -199,14 +202,19 @@ export function PhotoObjectLayer({
       ) : null}
 
       {showRotationHandle ? (
+        // Pointer-only: keyboard rotation lives on the cutout (← →), so the
+        // handle stays out of the tab order and the accessibility tree.
         <button
+          aria-hidden="true"
           aria-label={`Rotate ${label}`}
           className={styles.rotationHandle}
+          data-testid={`rotation-handle-${object.id}`}
           onPointerCancel={onRotationPointerCancel}
           onPointerDown={onRotationPointerDown}
           onPointerMove={onRotationPointerMove}
           onPointerUp={onRotationPointerUp}
           style={rotationHandleStyle}
+          tabIndex={-1}
           type="button"
         >
           <span aria-hidden="true">↻</span>
