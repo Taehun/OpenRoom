@@ -638,11 +638,10 @@ test("redesigns the whole photo room through Core 6 and preserves human transfor
     };
   });
   trackCartRequests = true;
-  const cart = await callTool(page, "add_scene_to_cart", {
-    expectedRevision: sceneAfterStaleMove.structuredContent.sceneRevision,
-    expectedStateVersion: sceneAfterStaleMove.structuredContent.stateVersion,
-  });
-  expect(cart.structuredContent.ok).toBe(true);
+  // The default browser journey is intentionally unconfigured. A person can
+  // still review the redesigned room from the header; the agent-side cart
+  // contract is exercised as NO_STORE_CONNECTED in webmcp-core.spec.ts.
+  await page.getByRole("button", { name: /^View cart/ }).click();
   const dialog = page.getByRole("dialog", { name: "Review your room" });
   await expect(dialog.getByRole("listitem")).toHaveCount(6);
   for (const { title } of REPLACEMENTS) {

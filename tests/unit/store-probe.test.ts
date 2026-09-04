@@ -46,12 +46,14 @@ describe("probeStoreCapability", () => {
   });
 
   it("sends a tools/list with no credential", async () => {
-    const fetchImpl = vi.fn(
-      async (_input: RequestInfo | URL, _init?: RequestInit) => toolsResponse(FULL_TOOLS),
-    );
+    let request: Parameters<typeof globalThis.fetch> | undefined;
+    const fetchImpl = vi.fn(async (...args: Parameters<typeof globalThis.fetch>) => {
+      request = args;
+      return toolsResponse(FULL_TOOLS);
+    });
     await probeStoreCapability(DOMAIN, { fetch: fetchImpl });
 
-    const [url, init] = fetchImpl.mock.calls[0]!;
+    const [url, init] = request!;
     expect(url).toBe(`https://${DOMAIN}/api/ucp/mcp`);
     expect(JSON.parse(String(init?.body))).toMatchObject({ method: "tools/list" });
     const headers = new Headers(init?.headers);
@@ -61,7 +63,7 @@ describe("probeStoreCapability", () => {
     expect(init?.credentials).toBe("omit");
   });
 
-  // The row that justifies probing rather than pinging: the retired /api/mcp
+  // The row that justifies probing rather than pinging: the retired endpoint
   // answers 200 and lists a tool while the cart surface is gone.
   it("reports missing-cart-tools when only the policies tool is offered", async () => {
     const fetchImpl = vi.fn(async () => toolsResponse(["search_shop_policies_and_faqs"]));

@@ -472,7 +472,7 @@ describe("variants", () => {
 
   it("replaces only its own key in an .env.local body", () => {
     const body = [
-      "NEXT_PUBLIC_COMMERCE_PROVIDER=shopify",
+      "NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN=store.myshopify.com",
       "NEXT_PUBLIC_SHOPIFY_VARIANTS=stale=gid://shopify/ProductVariant/0",
       "SHOPIFY_ADMIN_ACCESS_TOKEN=keep-me",
       "",
@@ -481,7 +481,7 @@ describe("variants", () => {
 
     expect(upsertEnvLine(body, line)).toBe(
       [
-        "NEXT_PUBLIC_COMMERCE_PROVIDER=shopify",
+        "NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN=store.myshopify.com",
         line,
         "SHOPIFY_ADMIN_ACCESS_TOKEN=keep-me",
         "",

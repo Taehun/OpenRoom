@@ -202,6 +202,10 @@ test("opens a Shopify cart permalink in a new tab without any request from OpenR
 test("returns Shopify lines and the store MCP endpoint from add_scene_to_cart", async ({
   page,
 }) => {
+  const probeRequests: string[] = [];
+  page.on("request", (request) => {
+    if (request.url().includes("/api/ucp/mcp")) probeRequests.push(request.url());
+  });
   const { storeRequests, foreign, consoleErrors } = await watchNetwork(page);
   await captureModelContextTools(page);
 
@@ -279,6 +283,7 @@ test("returns Shopify lines and the store MCP endpoint from add_scene_to_cart", 
 
   // Building the draft is local: nothing left the app origin, and nothing was
   // sent to the store — the permalink is data on the draft, not a request.
+  expect(probeRequests).toEqual([]);
   expect(storeRequests).toEqual([]);
   expect(foreign).toEqual([]);
   expect(consoleErrors).toEqual([]);
