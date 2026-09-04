@@ -150,15 +150,15 @@ describe("createSceneStore", () => {
       .getState()
       .scene.objects.find(({ id }) => id === "chair_01")!;
 
-    // A 45-degree chair reaches half its diagonal past its centre, so the target stays
-    // inside the 0.1 m inset at the seed room's depth and is committed verbatim.
-    const targetZ = 0.5;
+    // A 45-degree chair reaches half its diagonal past its centre, so this small
+    // forward move stays inside the inset and clear of the centred table.
+    const targetZ = 0.65;
     store.getState().setTransforming(true);
     const result = store
       .getState()
       .commitTransform(
         "chair_01",
-        [before.position[0] - 0.25, before.position[1], targetZ],
+        [before.position[0], before.position[1], targetZ],
         Math.PI / 4,
       );
 
@@ -248,22 +248,26 @@ describe("createSceneStore", () => {
     expect(store.getState().stateVersion).toBe(3);
   });
 
-  // Each replacement is one command commit. These products already fit their
-  // current floor positions, so the command-level collision resolver leaves X/Z alone.
-  test("completes a collision-free agent redesign without moving anything", () => {
+  // Each replacement is one command commit. A larger product may move itself to the
+  // nearest open floor position, but it never pushes another object out of the way.
+  test("completes a collision-free agent redesign by moving only replaced pieces", () => {
     const events: SceneCommitEvent[] = [];
     const store = createSceneStore(undefined, {
       onCommit: (event) => events.push(event),
     });
-    const seedPlacements = placementById(store.getState().scene);
     const objectIds = store.getState().scene.objects.map(({ id }) => id);
 
     for (const objectId of objectIds.slice(0, -1)) {
+      const before = placementById(store.getState().scene);
       expect(replaceDemoObject(store, objectId).ok).toBe(true);
-      expect(placementById(store.getState().scene)).toEqual(seedPlacements);
+      const after = placementById(store.getState().scene);
+      for (const otherId of objectIds) {
+        if (otherId !== objectId) expect(after[otherId]).toEqual(before[otherId]);
+      }
     }
 
     const beforeFinal = structuredClone(store.getState().scene);
+    const beforeFinalPlacements = placementById(beforeFinal);
     const result = replaceDemoObject(
       store,
       objectIds.at(-1)!,
@@ -276,7 +280,10 @@ describe("createSceneStore", () => {
       scene: { revision: beforeFinal.revision + 1 },
     });
     expect(store.getState().scene).toEqual(result.scene);
-    expect(placementById(store.getState().scene)).toEqual(seedPlacements);
+    const afterFinalPlacements = placementById(store.getState().scene);
+    for (const otherId of objectIds.slice(0, -1)) {
+      expect(afterFinalPlacements[otherId]).toEqual(beforeFinalPlacements[otherId]);
+    }
     expect(store.getState().stateVersion).toBe(7);
     expect(store.getState().history).toHaveLength(6);
     expect(store.getState().history.at(-1)).toEqual(beforeFinal);
