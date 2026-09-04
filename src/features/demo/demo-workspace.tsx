@@ -27,7 +27,7 @@ import styles from "./demo-workspace.module.css";
 import type { ToolContext } from "../../webmcp/tool-context";
 import { useWebMcpTools } from "../../webmcp/use-webmcp-tools";
 import { useLocalMcpRelay } from "../../local-mcp/use-local-mcp-relay";
-import { ACTIVE_COMMERCE } from "../commerce/commerce-runtime";
+import { useCommerceContext } from "../commerce/use-commerce-context";
 import { cartDraftForScene } from "../commerce/scene-cart";
 import { enrichCartDraft } from "../commerce/shopify-cart";
 import type { CommerceContext } from "../commerce/commerce-types";
@@ -42,11 +42,7 @@ interface DemoWorkspaceProps {
   guideHref?: string;
 }
 
-export function DemoWorkspace({
-  store,
-  commerce = ACTIVE_COMMERCE,
-  guideHref,
-}: DemoWorkspaceProps = {}) {
+export function DemoWorkspace({ store, commerce, guideHref }: DemoWorkspaceProps = {}) {
   return (
     <SceneStoreProvider store={store}>
       <DemoWorkspaceContent commerce={commerce} guideHref={guideHref} />
@@ -55,12 +51,15 @@ export function DemoWorkspace({
 }
 
 function DemoWorkspaceContent({
-  commerce,
+  commerce: commerceOverride,
   guideHref,
 }: {
-  commerce: CommerceContext;
+  /** Injected by the tests; the running app uses the hook. */
+  commerce?: CommerceContext | undefined;
   guideHref?: string | undefined;
 }) {
+  const controller = useCommerceContext();
+  const commerce = commerceOverride ?? controller.commerce;
   const [state, dispatch] = useReducer(
     demoReducer,
     undefined,
