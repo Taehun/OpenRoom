@@ -21,20 +21,25 @@ export interface CommerceController {
   setStoreDomain(domain: string | null): boolean;
 }
 
+interface StoredStoreState {
+  hydrated: boolean;
+  storedDomain: string | null;
+}
+
 export function useCommerceContext(): CommerceController {
-  const [storedDomain, setStoredDomain] = useState<string | null>(null);
-  const [hydrated, setHydrated] = useState(false);
+  const [{ hydrated, storedDomain }, setStoredStore] =
+    useState<StoredStoreState>({ hydrated: false, storedDomain: null });
 
   // The site is a static export, so the first paint is always the build
   // default; storage can only be consulted once we are in the browser.
   useEffect(() => {
-    setStoredDomain(readStoredStoreDomain());
-    setHydrated(true);
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- This is the intentional server-to-browser storage handoff.
+    setStoredStore({ hydrated: true, storedDomain: readStoredStoreDomain() });
   }, []);
 
   const setStoreDomain = useCallback((domain: string | null) => {
     const persisted = writeStoredStoreDomain(domain);
-    setStoredDomain(domain);
+    setStoredStore((current) => ({ ...current, storedDomain: domain }));
     return persisted;
   }, []);
 

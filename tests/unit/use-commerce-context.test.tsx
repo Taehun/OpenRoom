@@ -1,4 +1,5 @@
 import { act, cleanup, renderHook } from "@testing-library/react";
+import { renderToString } from "react-dom/server";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { useCommerceContext } from "../../src/features/commerce/use-commerce-context";
@@ -10,6 +11,17 @@ afterEach(() => {
 });
 
 describe("useCommerceContext", () => {
+  it("keeps the server first paint neutral until storage can be read", () => {
+    window.localStorage.setItem(STORE_DOMAIN_KEY, "stored.myshopify.com");
+
+    function FirstPaint() {
+      const { hydrated, storedDomain } = useCommerceContext();
+      return <output>{`${hydrated ? "hydrated" : "waiting"}:${storedDomain ?? "none"}`}</output>;
+    }
+
+    expect(renderToString(<FirstPaint />)).toContain("waiting:none");
+  });
+
   it("reports hydrated after the first effect, with no stored value", () => {
     const { result } = renderHook(() => useCommerceContext());
     expect(result.current.hydrated).toBe(true);
