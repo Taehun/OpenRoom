@@ -1,8 +1,5 @@
 import { describe, expect, test } from "vitest";
-import {
-  OBJECT_ABBREVIATIONS,
-  OBJECT_LABELS,
-} from "../../src/features/demo/room-canvas";
+import { OBJECT_LABELS } from "../../src/features/demo/room-canvas";
 import {
   projectContactShadow,
 } from "../../src/features/photo/photo-projection";
@@ -134,15 +131,10 @@ describe("per-category tables", () => {
     }
   });
 
-  test("every placeable type has a rail label and initials", () => {
+  test("every placeable type has a rail label", () => {
     for (const type of PLACEABLE_TYPES) {
       expect(OBJECT_LABELS[type], type).toMatch(/\S/);
-      expect(OBJECT_ABBREVIATIONS[type], type).toMatch(/^[A-Z]{2}$/);
     }
-    expect(OBJECT_ABBREVIATIONS.side_table).toBe("SI");
-    expect(OBJECT_ABBREVIATIONS.bookshelf).toBe("BS");
-    const initials = PLACEABLE_TYPES.map((type) => OBJECT_ABBREVIATIONS[type]);
-    expect(new Set(initials).size).toBe(initials.length);
   });
 });
 

@@ -253,28 +253,51 @@
   list-style: none;
 }
 
+/* Same anatomy as the tool buttons above: a round thumbnail with the piece's
+   name under it, so the rail reads without a legend. */
 .objectButton,
 .objectButtonSelected {
-  width: 36px;
-  height: 36px;
-  border: 1px solid transparent;
+  display: grid;
+  justify-items: center;
+  gap: 3px;
+  width: 54px;
+  min-height: 52px;
+  padding: 4px 0;
+  border: 0;
+  border-radius: var(--md-sys-shape-corner-small);
+  background: transparent;
+  color: var(--muted-text);
+  font-size: var(--md-sys-typescale-label-medium-size);
+  font-weight: 500;
+  line-height: 1.15;
+  text-align: center;
+}
+
+.objectButton:hover,
+.objectButtonSelected {
+  background: var(--md-sys-color-surface-container-high);
+  color: var(--md-sys-color-on-surface);
+}
+
+.objectThumb {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  overflow: hidden;
   border-radius: 50%;
   background: var(--md-sys-color-surface-container);
-  color: var(--muted-text);
-  font-size: 0.58rem;
-  font-weight: 700;
-  letter-spacing: 0.03em;
 }
 
-.objectButton:hover {
-  border-color: var(--warm-divider);
-  color: var(--ink);
+.objectThumb img {
+  width: 100%;
+  height: 100%;
+  padding: 3px;
+  box-sizing: border-box;
+  object-fit: contain;
 }
 
-.objectButtonSelected {
-  border-color: var(--moss);
-  background: var(--md-sys-color-primary);
-  color: var(--md-sys-color-on-primary);
+.objectButtonSelected .objectThumb {
   box-shadow: 0 0 0 2px var(--paper), 0 0 0 3px var(--moss);
 }
 
