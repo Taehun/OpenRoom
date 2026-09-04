@@ -8,6 +8,7 @@ export type ToolErrorCode =
   | "PRODUCT_NOT_FOUND"
   | "CATALOG_DATA_INVALID"
   | "NO_CART_ITEMS"
+  | "NO_STORE_CONNECTED"
   | SceneCommandErrorCode;
 
 export type ToolIssue = { path: string; message: string };

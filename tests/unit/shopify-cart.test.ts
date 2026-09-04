@@ -3,21 +3,22 @@ import { describe, expect, it } from "vitest";
 import {
   buildCartPermalink,
   buildCommerceDraft,
+  buildProductLinks,
   enrichCartDraft,
   resolveShopifyLines,
 } from "../../src/features/commerce/shopify-cart";
-import type { CartApprovalDraft } from "../../src/webmcp/tool-context";
+import type { CartDraftBase } from "../../src/webmcp/tool-context";
 import {
-  DEMO_COMMERCE,
   FIXTURE_AGENT_PROFILE_URL,
   FIXTURE_VARIANTS,
   FIXTURE_VARIANT_IDS,
   PLACEHOLDER_STORE_DOMAIN,
   SHOPIFY_COMMERCE,
+  UNCONFIGURED_COMMERCE,
   fixtureGid,
 } from "../helpers/commerce-fixtures";
 
-const DRAFT: CartApprovalDraft = {
+const DRAFT: CartDraftBase = {
   id: "scene-demo-rev-3",
   sceneId: "demo",
   sceneRevision: 3,
@@ -134,9 +135,43 @@ describe("buildCartPermalink", () => {
   });
 });
 
+describe("buildProductLinks", () => {
+  it("links every requested product by handle, mapped or not", () => {
+    expect(
+      buildProductLinks(PLACEHOLDER_STORE_DOMAIN, [
+        { productId: "oak-frame-table", quantity: 1 },
+        { productId: "plant", quantity: 1 },
+      ]),
+    ).toEqual([
+      {
+        productId: "oak-frame-table",
+        url: `https://${PLACEHOLDER_STORE_DOMAIN}/products/oak-frame-table`,
+      },
+      {
+        productId: "plant",
+        url: `https://${PLACEHOLDER_STORE_DOMAIN}/products/plant`,
+      },
+    ]);
+  });
+
+  it("lists each product once and drops non-positive quantities", () => {
+    expect(
+      buildProductLinks(PLACEHOLDER_STORE_DOMAIN, [
+        { productId: "rug", quantity: 1 },
+        { productId: "rug", quantity: 2 },
+        { productId: "coffee-table", quantity: 0 },
+      ]).map(({ productId }) => productId),
+    ).toEqual(["rug"]);
+  });
+});
+
 describe("buildCommerceDraft", () => {
-  it("returns null in demo mode", () => {
-    expect(buildCommerceDraft(DEMO_COMMERCE, [{ productId: "coffee-table", quantity: 1 }])).toBeNull();
+  it("returns null when no store is configured", () => {
+    expect(
+      buildCommerceDraft(UNCONFIGURED_COMMERCE, [
+        { productId: "coffee-table", quantity: 1 },
+      ]),
+    ).toBeNull();
   });
 
   it("builds public lines, skipped products, endpoint, and permalink in shopify mode", () => {
@@ -155,6 +190,16 @@ describe("buildCommerceDraft", () => {
       ],
       skipped: [{ productId: "plant", reason: "unmapped" }],
       checkoutPermalink: `https://${PLACEHOLDER_STORE_DOMAIN}/cart/${FIXTURE_VARIANT_IDS["coffee-table"]}:1`,
+      productLinks: [
+        {
+          productId: "coffee-table",
+          url: `https://${PLACEHOLDER_STORE_DOMAIN}/products/coffee-table`,
+        },
+        {
+          productId: "plant",
+          url: `https://${PLACEHOLDER_STORE_DOMAIN}/products/plant`,
+        },
+      ],
     });
   });
 
@@ -167,15 +212,16 @@ describe("buildCommerceDraft", () => {
 });
 
 describe("enrichCartDraft", () => {
-  it("returns the same draft object in demo mode", () => {
-    expect(enrichCartDraft(DEMO_COMMERCE, DRAFT)).toBe(DRAFT);
-    expect("commerce" in DRAFT).toBe(false);
+  it("rejects enrichment when no store is configured", () => {
+    expect(() => enrichCartDraft(UNCONFIGURED_COMMERCE, DRAFT)).toThrow(
+      "Cannot enrich a cart draft without a connected store",
+    );
   });
 
   it("adds a commerce block without mutating the input in shopify mode", () => {
     const enriched = enrichCartDraft(SHOPIFY_COMMERCE, DRAFT);
     expect(enriched).not.toBe(DRAFT);
-    expect(DRAFT.commerce).toBeUndefined();
+    expect("commerce" in DRAFT).toBe(false);
     expect(enriched.items).toBe(DRAFT.items);
     expect(enriched.commerce).toEqual({
       provider: "shopify",
@@ -188,6 +234,20 @@ describe("enrichCartDraft", () => {
       ],
       skipped: [{ productId: "rice-paper-floor-lamp", reason: "unmapped" }],
       checkoutPermalink: `https://${PLACEHOLDER_STORE_DOMAIN}/cart/${FIXTURE_VARIANT_IDS["oak-frame-table"]}:1,${FIXTURE_VARIANT_IDS["woven-jute-rug"]}:1`,
+      productLinks: [
+        {
+          productId: "oak-frame-table",
+          url: `https://${PLACEHOLDER_STORE_DOMAIN}/products/oak-frame-table`,
+        },
+        {
+          productId: "woven-jute-rug",
+          url: `https://${PLACEHOLDER_STORE_DOMAIN}/products/woven-jute-rug`,
+        },
+        {
+          productId: "rice-paper-floor-lamp",
+          url: `https://${PLACEHOLDER_STORE_DOMAIN}/products/rice-paper-floor-lamp`,
+        },
+      ],
     });
   });
 });

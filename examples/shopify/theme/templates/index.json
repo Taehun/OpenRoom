@@ -1,0 +1,472 @@
+/*
+ * ------------------------------------------------------------
+ * IMPORTANT: The contents of this file are auto-generated.
+ *
+ * This file may be updated by the Shopify admin theme editor
+ * or related systems. Please exercise caution as any changes
+ * made to this file may be overwritten.
+ * ------------------------------------------------------------
+ */{
+  "sections": {
+    "hero_openroom": {
+      "type": "hero",
+      "blocks": {
+        "eyebrow": {
+          "type": "text",
+          "settings": {
+            "text": "<p>A WebMCP demonstration store</p>",
+            "type_preset": "h6",
+            "width": "fit-content",
+            "max_width": "normal",
+            "alignment": "left",
+            "wrap": "pretty",
+            "text_color": "#FBF9F4"
+          }
+        },
+        "heading": {
+          "type": "text",
+          "settings": {
+            "text": "<h1>A shop an AI<br/>assistant can use.</h1>",
+            "type_preset": "h1",
+            "width": "fit-content",
+            "max_width": "narrow",
+            "alignment": "left",
+            "wrap": "pretty",
+            "text_color": "#FBF9F4"
+          }
+        },
+        "sub": {
+          "type": "text",
+          "settings": {
+            "text": "<p>Arrange a room with an assistant, then send the whole arrangement to the cart. Forty-three pieces, each listed at its measured size.</p>",
+            "type_preset": "rte",
+            "width": "fit-content",
+            "max_width": "narrow",
+            "alignment": "left",
+            "wrap": "pretty",
+            "text_color": "#FBF9F4"
+          }
+        },
+        "cta": {
+          "type": "button",
+          "settings": {
+            "label": "Browse the catalog",
+            "link": "shopify://collections/all",
+            "style_class": "button-custom",
+            "custom_button_background": "#FBF9F4",
+            "custom_button_text": "#1B1C19",
+            "custom_button_border": "#FBF9F4",
+            "width": "fit-content"
+          }
+        }
+      },
+      "block_order": [
+        "eyebrow",
+        "heading",
+        "sub",
+        "cta"
+      ],
+      "name": "Hero",
+      "settings": {
+        "media_type_1": "image",
+        "content_direction": "column",
+        "vertical_on_mobile": true,
+        "horizontal_alignment_flex_direction_column": "flex-start",
+        "vertical_alignment_flex_direction_column": "center",
+        "gap": 20,
+        "section_width": "page-width",
+        "section_height": "medium",
+        "background_color": "#4B6543",
+        "toggle_overlay": false,
+        "padding-block-start": 96,
+        "padding-block-end": 96
+      }
+    },
+    "categories": {
+      "type": "collection-list",
+      "blocks": {
+        "header": {
+          "type": "group",
+          "settings": {
+            "content_direction": "column",
+            "horizontal_alignment_flex_direction_column": "flex-start",
+            "gap": 8,
+            "width": "fill",
+            "height": "fit"
+          },
+          "blocks": {
+            "heading": {
+              "type": "text",
+              "settings": {
+                "text": "<h2>Shop by category</h2>",
+                "type_preset": "h3",
+                "width": "fit-content",
+                "max_width": "normal",
+                "alignment": "left",
+                "wrap": "pretty"
+              }
+            },
+            "sub": {
+              "type": "text",
+              "settings": {
+                "text": "<p>Eight categories, forty-three pieces.</p>",
+                "type_preset": "rte",
+                "width": "fit-content",
+                "max_width": "normal",
+                "alignment": "left",
+                "wrap": "pretty",
+                "text_color": "#43483F"
+              }
+            }
+          },
+          "block_order": [
+            "heading",
+            "sub"
+          ]
+        },
+        "static-collection-card": {
+          "type": "_collection-card",
+          "static": true,
+          "settings": {
+            "border": "none",
+            "border_radius": 12,
+            "placement": "below_image",
+            "horizontal_alignment": "flex-start",
+            "vertical_alignment": "flex-end"
+          },
+          "blocks": {
+            "collection-card-image": {
+              "type": "_collection-card-image",
+              "static": true,
+              "settings": {
+                "image_ratio": "square",
+                "border_radius": 12
+              }
+            },
+            "collection-title": {
+              "type": "collection-title",
+              "settings": {
+                "type_preset": "rte",
+                "alignment": "left",
+                "width": "fit-content",
+                "background": false,
+                "padding-block-start": 10
+              }
+            }
+          },
+          "block_order": [
+            "collection-title"
+          ]
+        }
+      },
+      "block_order": [
+        "header"
+      ],
+      "name": "Shop by category",
+      "settings": {
+        "collection_list": [
+          "sofa",
+          "chair",
+          "coffee-table",
+          "side-table",
+          "bookshelf",
+          "floor-lamp",
+          "rug",
+          "plant"
+        ],
+        "layout_type": "grid",
+        "columns": 4,
+        "mobile_columns": "2",
+        "carousel_on_mobile": false,
+        "columns_gap": 16,
+        "rows_gap": 28,
+        "section_width": "page-width",
+        "gap": 28,
+        "background_color": "#FBF9F4",
+        "padding-block-start": 64,
+        "padding-block-end": 40
+      }
+    },
+    "featured_sofa": {
+      "type": "product-list",
+      "blocks": {
+        "static-header": {
+          "type": "_product-list-content",
+          "static": true,
+          "settings": {
+            "content_direction": "row",
+            "horizontal_alignment": "space-between",
+            "vertical_alignment": "flex-end",
+            "gap": 12,
+            "width": "fill"
+          },
+          "blocks": {
+            "heading": {
+              "type": "text",
+              "settings": {
+                "text": "<h2>Sofas</h2>",
+                "type_preset": "h4",
+                "width": "fit-content",
+                "max_width": "normal",
+                "alignment": "left",
+                "wrap": "pretty"
+              }
+            },
+            "view_all": {
+              "type": "_product-list-button",
+              "settings": {
+                "label": "View all",
+                "style_class": "link"
+              }
+            }
+          },
+          "block_order": [
+            "heading",
+            "view_all"
+          ]
+        },
+        "static-product-card": {
+          "type": "_product-card",
+          "static": true,
+          "settings": {
+            "product_card_gap": 6,
+            "border": "none"
+          },
+          "blocks": {
+            "gallery": {
+              "type": "_product-card-gallery",
+              "settings": {
+                "image_ratio": "square",
+                "border_radius": 12
+              }
+            },
+            "title": {
+              "type": "product-title",
+              "settings": {
+                "width": "100%",
+                "alignment": "left",
+                "type_preset": "rte",
+                "padding-block-start": 6
+              }
+            },
+            "price": {
+              "type": "price",
+              "settings": {
+                "type_preset": "h6",
+                "width": "100%",
+                "alignment": "left"
+              }
+            }
+          },
+          "block_order": [
+            "gallery",
+            "title",
+            "price"
+          ]
+        }
+      },
+      "name": "Sofas",
+      "settings": {
+        "collection": "sofa",
+        "layout_type": "grid",
+        "carousel_on_mobile": true,
+        "max_products": 5,
+        "columns": 4,
+        "mobile_columns": "2",
+        "columns_gap": 16,
+        "rows_gap": 28,
+        "section_width": "page-width",
+        "gap": 28,
+        "background_color": "#FBF9F4",
+        "padding-block-start": 56,
+        "padding-block-end": 56
+      }
+    },
+    "brand_story": {
+      "type": "section",
+      "blocks": {
+        "group": {
+          "type": "group",
+          "settings": {
+            "content_direction": "column",
+            "horizontal_alignment_flex_direction_column": "flex-start",
+            "gap": 16,
+            "width": "fill",
+            "height": "fit",
+            "background_media": "none",
+            "border": "none",
+            "border_radius": 12,
+            "padding-block-start": 48,
+            "padding-block-end": 48,
+            "padding-inline-start": 40,
+            "padding-inline-end": 40
+          },
+          "blocks": {
+            "eyebrow": {
+              "type": "text",
+              "settings": {
+                "text": "<p>Why OpenRoom</p>",
+                "type_preset": "h6",
+                "width": "fit-content",
+                "max_width": "normal",
+                "alignment": "left",
+                "wrap": "pretty",
+                "text_color": "#43483F"
+              }
+            },
+            "heading": {
+              "type": "text",
+              "settings": {
+                "text": "<h2>What this store is for</h2>",
+                "type_preset": "h3",
+                "width": "fit-content",
+                "max_width": "narrow",
+                "alignment": "left",
+                "wrap": "pretty"
+              }
+            },
+            "body": {
+              "type": "text",
+              "settings": {
+                "text": "<p>OpenRoom is a room planner an AI assistant can drive. Describe the room you want, watch the furniture land where it fits, then send the finished arrangement here as a cart — the whole room, not one product at a time.</p><p>The catalog is a demonstration one. The dimensions are real, because the planner needs honest sizes to place anything; the prices, the stock, and the checkout are not. Nothing ordered here is fulfilled.</p>",
+                "type_preset": "rte",
+                "width": "fit-content",
+                "max_width": "narrow",
+                "alignment": "left",
+                "wrap": "pretty"
+              }
+            },
+            "cta": {
+              "type": "button",
+              "settings": {
+                "label": "Read more",
+                "link": "/pages/about",
+                "style_class": "button-secondary",
+                "width": "fit-content"
+              }
+            }
+          },
+          "block_order": [
+            "eyebrow",
+            "heading",
+            "body",
+            "cta"
+          ]
+        }
+      },
+      "block_order": [
+        "group"
+      ],
+      "name": "Why OpenRoom",
+      "settings": {
+        "section_width": "page-width",
+        "section_height": "fit",
+        "background_color": "#EFEDE8",
+        "padding-block-start": 40,
+        "padding-block-end": 40
+      }
+    },
+    "featured_lighting": {
+      "type": "product-list",
+      "blocks": {
+        "static-header": {
+          "type": "_product-list-content",
+          "static": true,
+          "settings": {
+            "content_direction": "row",
+            "horizontal_alignment": "space-between",
+            "vertical_alignment": "flex-end",
+            "gap": 12,
+            "width": "fill"
+          },
+          "blocks": {
+            "heading": {
+              "type": "text",
+              "settings": {
+                "text": "<h2>Lighting</h2>",
+                "type_preset": "h4",
+                "width": "fit-content",
+                "max_width": "normal",
+                "alignment": "left",
+                "wrap": "pretty"
+              }
+            },
+            "view_all": {
+              "type": "_product-list-button",
+              "settings": {
+                "label": "View all",
+                "style_class": "link"
+              }
+            }
+          },
+          "block_order": [
+            "heading",
+            "view_all"
+          ]
+        },
+        "static-product-card": {
+          "type": "_product-card",
+          "static": true,
+          "settings": {
+            "product_card_gap": 6,
+            "border": "none"
+          },
+          "blocks": {
+            "gallery": {
+              "type": "_product-card-gallery",
+              "settings": {
+                "image_ratio": "square",
+                "border_radius": 12
+              }
+            },
+            "title": {
+              "type": "product-title",
+              "settings": {
+                "width": "100%",
+                "alignment": "left",
+                "type_preset": "rte",
+                "padding-block-start": 6
+              }
+            },
+            "price": {
+              "type": "price",
+              "settings": {
+                "type_preset": "h6",
+                "width": "100%",
+                "alignment": "left"
+              }
+            }
+          },
+          "block_order": [
+            "gallery",
+            "title",
+            "price"
+          ]
+        }
+      },
+      "name": "Lighting",
+      "settings": {
+        "collection": "floor-lamp",
+        "layout_type": "grid",
+        "carousel_on_mobile": true,
+        "max_products": 8,
+        "columns": 4,
+        "mobile_columns": "2",
+        "columns_gap": 16,
+        "rows_gap": 28,
+        "section_width": "page-width",
+        "gap": 28,
+        "background_color": "#FBF9F4",
+        "padding-block-start": 56,
+        "padding-block-end": 56
+      }
+    }
+  },
+  "order": [
+    "hero_openroom",
+    "categories",
+    "featured_sofa",
+    "brand_story",
+    "featured_lighting"
+  ]
+}

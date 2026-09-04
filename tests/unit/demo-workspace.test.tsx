@@ -18,6 +18,7 @@ import {
 import { DemoWorkspace } from "../../src/features/demo/demo-workspace";
 import { createSceneStore } from "../../src/features/scene/scene-store";
 import type { ModelContextTool } from "../../src/webmcp/tool-handlers";
+import { SHOPIFY_COMMERCE } from "../helpers/commerce-fixtures";
 import {
   FakeRelayServer,
   RELAY_SESSION_TOKEN,
@@ -61,7 +62,17 @@ test("connects the Core 6 journey to the shared Scene and approval UI", async ()
     },
   });
   const fetchSpy = vi.spyOn(globalThis, "fetch");
-  const { unmount } = render(<DemoWorkspace />);
+  const { unmount } = render(
+    <DemoWorkspace
+      commerce={{
+        ...SHOPIFY_COMMERCE,
+        variants: {
+          ...SHOPIFY_COMMERCE.variants,
+          "travertine-plinth-table": "gid://shopify/ProductVariant/4435246599375",
+        },
+      }}
+    />,
+  );
 
   await waitFor(() => expect(registrations).toHaveLength(6));
   expect(registrations.map(({ tool }) => tool.name).sort()).toEqual([
@@ -116,7 +127,9 @@ test("connects the Core 6 journey to the shared Scene and approval UI", async ()
   expect(within(sheet).getByText("Travertine Plinth Table")).toBeVisible();
   expect(within(sheet).getByText("$249 USD")).toBeVisible();
   expect(
-    within(sheet).getByText("1 item from your room is ready for approval. Nothing is ordered until you approve."),
+    within(sheet).getByText(
+      "Approving opens Shopify checkout in a new tab. OpenRoom sends nothing itself.",
+    ),
   ).toBeVisible();
   expect(fetchSpy).not.toHaveBeenCalled();
 
@@ -196,6 +209,29 @@ test("links the workspace header to the public repository", () => {
   expect(repoLink.getAttribute("rel")).toContain("noopener");
 });
 
+test("opens store settings from an unconfigured cart", async () => {
+  const user = userEvent.setup();
+  const store = createSceneStore();
+  render(<DemoWorkspace store={store} />);
+
+  await user.click(screen.getByRole("button", { name: "Find alternatives" }));
+  await user.click(
+    screen.getByRole("button", { name: "Place Oak Frame Table in room" }),
+  );
+  await user.click(screen.getByRole("button", { name: /View cart/ }));
+  const cart = screen.getByRole("dialog", { name: "Review your room" });
+  await user.click(within(cart).getByRole("button", { name: "Connect a store" }));
+
+  expect(screen.queryByRole("dialog", { name: "Review your room" })).toBeNull();
+  expect(screen.getByRole("dialog", { name: "Store connection" })).toBeVisible();
+  expect(screen.getByTestId("workspace-surface")).toHaveAttribute("inert");
+  expect(screen.getByTestId("workspace-surface")).toHaveAttribute(
+    "aria-hidden",
+    "true",
+  );
+  expect(screen.getByLabelText("Store address")).toHaveFocus();
+});
+
 test("shows three alternatives for the selected chair category", async () => {
   const user = userEvent.setup();
   render(<DemoWorkspace />);
@@ -261,8 +297,9 @@ test("opens an empty cart for a room that holds no catalog product yet", async (
 
 test("dismisses the approval announcement after four seconds", () => {
   vi.useFakeTimers();
+  const open = vi.spyOn(window, "open").mockReturnValue({} as Window);
   try {
-    render(<DemoWorkspace />);
+    render(<DemoWorkspace commerce={SHOPIFY_COMMERCE} />);
     // Synchronous events only: userEvent's own timers would stall under fake
     // timers, and the reducer path is the same either way.
     fireEvent.click(screen.getByRole("button", { name: "Find alternatives" }));
@@ -272,9 +309,9 @@ test("dismisses the approval announcement after four seconds", () => {
     fireEvent.click(screen.getByRole("button", { name: /^View cart/ }));
     const sheet = screen.getByRole("dialog", { name: "Review your room" });
     fireEvent.click(
-      within(sheet).getByRole("button", { name: "Approve demo cart · $169" }),
+      within(sheet).getByRole("button", { name: "Continue to Shopify · $169" }),
     );
-    const announcement = "Demo approved — nothing was ordered.";
+    const announcement = "Opened Shopify checkout in a new tab (1 item)";
     expect(screen.getByText(announcement)).toBeVisible();
 
     act(() => {
@@ -286,6 +323,7 @@ test("dismisses the approval announcement after four seconds", () => {
     });
     expect(screen.queryByText(announcement)).toBeNull();
   } finally {
+    open.mockRestore();
     vi.useRealTimers();
   }
 });
@@ -294,8 +332,9 @@ test("dismisses the approval announcement after four seconds", () => {
 // left the live region untouched and its four seconds ran from the first one.
 test("two approvals produce two live-region updates", () => {
   vi.useFakeTimers();
+  const open = vi.spyOn(window, "open").mockReturnValue({} as Window);
   try {
-    render(<DemoWorkspace />);
+    render(<DemoWorkspace commerce={SHOPIFY_COMMERCE} />);
     fireEvent.click(screen.getByRole("button", { name: "Find alternatives" }));
     fireEvent.click(
       screen.getByRole("button", { name: "Place Oak Frame Table in room" }),
@@ -307,10 +346,10 @@ test("two approvals produce two live-region updates", () => {
       fireEvent.click(
         within(
           screen.getByRole("dialog", { name: "Review your room" }),
-        ).getByRole("button", { name: "Approve demo cart · $169" }),
+        ).getByRole("button", { name: "Continue to Shopify · $169" }),
       );
     };
-    const announcement = "Demo approved — nothing was ordered.";
+    const announcement = "Opened Shopify checkout in a new tab (1 item)";
 
     approve();
     expect(toast()).toHaveTextContent(announcement);
@@ -324,7 +363,7 @@ test("two approvals produce two live-region updates", () => {
     fireEvent.click(
       within(screen.getByRole("dialog", { name: "Review your room" })).getByRole(
         "button",
-        { name: "Approve demo cart · $169" },
+        { name: "Continue to Shopify · $169" },
       ),
     );
 
@@ -340,6 +379,7 @@ test("two approvals produce two live-region updates", () => {
     });
     expect(toast()).toBeEmptyDOMElement();
   } finally {
+    open.mockRestore();
     vi.useRealTimers();
   }
 });
@@ -438,7 +478,7 @@ test("Cmd+Z in the pairing code field does not undo the room", async () => {
   );
 });
 
-test("counts the room's products in the badge and approves them without an external cart request", async () => {
+test("counts the room's products and offers store setup without an external request", async () => {
   const fetchSpy = vi.spyOn(globalThis, "fetch");
   const user = userEvent.setup();
   render(<DemoWorkspace />);
@@ -456,17 +496,14 @@ test("counts the room's products in the badge and approves them without an exter
 
   await user.click(
     within(sheet).getByRole("button", {
-      name: "Approve demo cart · $169",
+      name: "Connect a store",
     }),
   );
 
   expect(
     screen.queryByRole("dialog", { name: "Review your room" }),
   ).not.toBeInTheDocument();
-  expect(
-    screen.getByText("Demo approved — nothing was ordered."),
-  ).toBeVisible();
-  expect(viewCart).toHaveFocus();
+  expect(screen.getByRole("dialog", { name: "Store connection" })).toBeVisible();
   expect(fetchSpy).not.toHaveBeenCalled();
 });
 
@@ -481,8 +518,8 @@ test("keeps keyboard focus inside the cart approval sheet", async () => {
   const close = within(sheet).getByRole("button", {
     name: "Close cart",
   });
-  const continueToShopify = within(sheet).getByRole("button", {
-    name: "Approve demo cart · $169",
+  const connectStore = within(sheet).getByRole("button", {
+    name: "Connect a store",
   });
   const keepEditing = within(sheet).getByRole("button", {
     name: "Keep editing",
@@ -490,7 +527,7 @@ test("keeps keyboard focus inside the cart approval sheet", async () => {
 
   expect(close).toHaveFocus();
   await user.tab();
-  expect(continueToShopify).toHaveFocus();
+  expect(connectStore).toHaveFocus();
   await user.tab();
   expect(keepEditing).toHaveFocus();
   await user.tab();
@@ -533,6 +570,24 @@ test("Escape closes the cart before clearing the selected object", async () => {
 
   await user.keyboard("{Escape}");
   expect(coffeeTable).toHaveAttribute("aria-pressed", "false");
+});
+
+test("does not undo the hidden room from inside the cart", async () => {
+  const user = userEvent.setup();
+  render(<DemoWorkspace />);
+  await previewOakFrameTable(user);
+  expect(screen.getByTestId("scene-diagnostics")).toHaveTextContent(
+    "Revision 2 · table_01 · oak-frame-table",
+  );
+
+  await user.click(screen.getByRole("button", { name: /^View cart/ }));
+  const keepEditing = screen.getByRole("button", { name: "Keep editing" });
+  fireEvent.keyDown(keepEditing, { key: "z", metaKey: true });
+
+  expect(screen.getByTestId("scene-diagnostics")).toHaveTextContent(
+    "Revision 2 · table_01 · oak-frame-table",
+  );
+  expect(screen.getByRole("dialog", { name: "Review your room" })).toBeVisible();
 });
 
 test("offers Select and Rotate only, with Select as the default tool", async () => {
@@ -1040,6 +1095,7 @@ test("shows an On row only while the selected object is supported", () => {
   const state = {
     mode: "inspector" as const,
     isCartOpen: false,
+    isStoreSettingsOpen: false,
     cartDraft: null,
     toast: null,
     announcement: null,
@@ -1072,6 +1128,7 @@ test("shows an On row only while the selected object is supported", () => {
 const INSPECTOR_STATE = {
   mode: "inspector" as const,
   isCartOpen: false,
+  isStoreSettingsOpen: false,
   cartDraft: null,
   toast: null,
   announcement: null,

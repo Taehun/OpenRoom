@@ -9,7 +9,7 @@ import {
 } from "../../src/webmcp/core-tool-manifest";
 import { CORE_TOOL_NAMES } from "../../src/webmcp/tool-contracts";
 import type { ToolContext } from "../../src/webmcp/tool-context";
-import { DEMO_COMMERCE } from "../helpers/commerce-fixtures";
+import { UNCONFIGURED_COMMERCE } from "../helpers/commerce-fixtures";
 
 function fakeToolContext(): ToolContext {
   const store = createSceneStore();
@@ -21,7 +21,7 @@ function fakeToolContext(): ToolContext {
     resolveProduct: () => undefined,
     applyCommand: (request) => store.getState().applyCommand(request),
     openCartApproval: () => undefined,
-    commerce: DEMO_COMMERCE,
+    commerce: UNCONFIGURED_COMMERCE,
   };
 }
 
@@ -111,5 +111,13 @@ describe("Core 6 manifest", () => {
         untrustedContentHint: true,
       });
     }
+  });
+
+  it("describes both cart handoffs and the unconfigured failure", () => {
+    const description = CORE_TOOL_MANIFEST.find(
+      ({ name }) => name === "add_scene_to_cart",
+    )?.description;
+    expect(description).toContain("productLinks");
+    expect(description).toContain("NO_STORE_CONNECTED");
   });
 });

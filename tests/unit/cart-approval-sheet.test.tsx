@@ -6,15 +6,16 @@ import {
   CartApprovalSheet,
   openInNewTab,
 } from "../../src/features/demo/cart-approval-sheet";
-import type { CartApprovalDraft } from "../../src/webmcp/tool-context";
+import type { CartReviewDraft } from "../../src/webmcp/tool-context";
 import {
-  DEMO_COMMERCE,
   FIXTURE_AGENT_PROFILE_URL,
   FIXTURE_VARIANTS,
   FIXTURE_VARIANT_IDS,
   PLACEHOLDER_STORE_DOMAIN,
   SHOPIFY_COMMERCE,
+  UNCONFIGURED_COMMERCE,
   fixtureGid,
+  fixtureProductLinks,
 } from "../helpers/commerce-fixtures";
 
 const PERMALINK = `https://${PLACEHOLDER_STORE_DOMAIN}/cart/${FIXTURE_VARIANT_IDS["oak-frame-table"]}:1,${FIXTURE_VARIANT_IDS["woven-jute-rug"]}:1`;
@@ -25,7 +26,7 @@ afterEach(() => {
 });
 
 /** A room holding two catalog products, both mapped to Shopify variants. */
-function mappedDraft(): CartApprovalDraft {
+function mappedDraft(): CartReviewDraft {
   return {
     id: "scene-demo-rev-3",
     sceneId: "demo",
@@ -68,12 +69,13 @@ function mappedDraft(): CartApprovalDraft {
       ],
       skipped: [],
       checkoutPermalink: PERMALINK,
+      productLinks: fixtureProductLinks("oak-frame-table", "woven-jute-rug"),
     },
   };
 }
 
 /** A room with nothing product-backed in it — the seed room's cart. */
-function emptyDraft(commerceBlock = false): CartApprovalDraft {
+function emptyDraft(commerceBlock = false): CartReviewDraft {
   return {
     id: "scene-demo-rev-1",
     sceneId: "demo",
@@ -90,13 +92,14 @@ function emptyDraft(commerceBlock = false): CartApprovalDraft {
             lines: [],
             skipped: [],
             checkoutPermalink: null,
+            productLinks: [],
           },
         }
       : {}),
   };
 }
 
-function agentDraft(): CartApprovalDraft {
+function agentDraft(): CartReviewDraft {
   return {
     id: "scene-demo-rev-4",
     sceneId: "demo",
@@ -134,16 +137,17 @@ function agentDraft(): CartApprovalDraft {
       ],
       skipped: [{ productId: "rice-paper-floor-lamp", reason: "unmapped" }],
       checkoutPermalink: TABLE_PERMALINK,
+      productLinks: fixtureProductLinks("oak-frame-table", "rice-paper-floor-lamp"),
     },
   };
 }
 
-describe("CartApprovalSheet in demo mode", () => {
-  it("lists the room's products and approves them without leaving the page", () => {
+describe("CartApprovalSheet while unconfigured", () => {
+  it("lists the room's products and offers to connect a store", () => {
     const dispatch = vi.fn();
     render(
       <CartApprovalSheet
-        commerce={DEMO_COMMERCE}
+        commerce={UNCONFIGURED_COMMERCE}
         dispatch={dispatch}
         draft={mappedDraft()}
       />,
@@ -153,30 +157,17 @@ describe("CartApprovalSheet in demo mode", () => {
     expect(screen.getByText("Woven Jute Rug")).toBeVisible();
     expect(screen.getAllByText("Qty 1")).toHaveLength(2);
     expect(screen.queryByText(/Demo fixture|Scene product/)).toBeNull();
-    fireEvent.click(
-      screen.getByRole("button", { name: "Approve demo cart · $518" }),
-    );
-    expect(dispatch).toHaveBeenCalledWith({ type: "confirm-demo-cart" });
+    fireEvent.click(screen.getByRole("button", { name: "Connect a store" }));
+    expect(dispatch).toHaveBeenCalledWith({ type: "open-store-settings" });
+    expect(screen.queryByRole("button", { name: /Approve demo cart/ })).toBeNull();
     expect(screen.queryByText("Not mapped to a Shopify variant")).toBeNull();
-  });
-
-  it("names the demo total the way the header does", () => {
-    render(
-      <CartApprovalSheet
-        commerce={DEMO_COMMERCE}
-        dispatch={vi.fn()}
-        draft={mappedDraft()}
-      />,
-    );
-    expect(screen.getByText("Room total")).toBeVisible();
-    expect(screen.getByText("Taxes and delivery calculated later")).toBeVisible();
   });
 
   it("says the room is empty and offers only Keep editing", () => {
     const dispatch = vi.fn();
     render(
       <CartApprovalSheet
-        commerce={DEMO_COMMERCE}
+        commerce={UNCONFIGURED_COMMERCE}
         dispatch={dispatch}
         draft={emptyDraft()}
       />,
@@ -189,10 +180,8 @@ describe("CartApprovalSheet in demo mode", () => {
     expect(screen.queryAllByRole("listitem")).toHaveLength(0);
     // Nothing to approve, so the sheet offers no approval at all — and no $0
     // total or checkout disclosure to explain away.
-    expect(
-      screen.queryByRole("button", { name: /Approve demo cart/ }),
-    ).toBeNull();
-    expect(screen.queryByText("Room total")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Connect a store" })).toBeNull();
+    expect(screen.queryByText("Catalog estimate")).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Keep editing" }));
     expect(dispatch).toHaveBeenCalledWith({ type: "close-cart" });
   });
@@ -347,12 +336,11 @@ describe("CartApprovalSheet in shopify mode", () => {
     ).toBeNull();
   });
 
-  it("disables checkout when nothing is mapped", () => {
-    const dispatch = vi.fn();
+  it("offers product links inline when no permalink is available", () => {
     const base = agentDraft();
     const commerceBlock = base.commerce;
     if (!commerceBlock) throw new Error("Expected a commerce block");
-    const draft: CartApprovalDraft = {
+    const draft: CartReviewDraft = {
       ...base,
       commerce: {
         ...commerceBlock,
@@ -367,13 +355,27 @@ describe("CartApprovalSheet in shopify mode", () => {
     render(
       <CartApprovalSheet
         commerce={SHOPIFY_COMMERCE}
-        dispatch={dispatch}
+        dispatch={vi.fn()}
         draft={draft}
       />,
     );
-    expect(
-      screen.getByRole("button", { name: "Continue to Shopify · $0" }),
-    ).toBeDisabled();
+    const button = screen.getByRole("button", {
+      name: `Open 2 products on ${PLACEHOLDER_STORE_DOMAIN}`,
+    });
+    expect(button).toHaveAttribute("aria-expanded", "false");
+    fireEvent.click(button);
+    expect(button).toHaveAttribute("aria-expanded", "true");
+
+    const links = screen.getAllByRole("link", {
+      name: /Oak Frame Table|Rice Paper Floor Lamp/,
+    });
+    expect(links).toHaveLength(2);
+    expect(links[0]).toHaveAttribute(
+      "href",
+      `https://${PLACEHOLDER_STORE_DOMAIN}/products/oak-frame-table`,
+    );
+    expect(links[0]).toHaveAttribute("target", "_blank");
+    expect(links[0]).toHaveAttribute("rel", "noreferrer");
     expect(
       screen.getByText(
         "No item in this cart is mapped to a Shopify variant yet.",
@@ -383,23 +385,23 @@ describe("CartApprovalSheet in shopify mode", () => {
 });
 
 describe("CartApprovalSheet configuration reasons", () => {
-  function demoCommerce(
-    reason: "default" | "not-configured" | "invalid-domain",
+  function unconfiguredCommerce(
+    reason: "not-configured" | "invalid-domain",
   ): CommerceContext {
-    return { config: { provider: "demo", reason }, variants: FIXTURE_VARIANTS };
+    return { config: { status: "unconfigured", reason }, variants: FIXTURE_VARIANTS };
   }
 
-  it("explains an unconfigured Shopify provider", () => {
+  it("explains that no store is connected", () => {
     render(
       <CartApprovalSheet
-        commerce={demoCommerce("not-configured")}
+        commerce={unconfiguredCommerce("not-configured")}
         dispatch={vi.fn()}
         draft={mappedDraft()}
       />,
     );
     expect(
       screen.getByText(
-        "Shopify checkout is not configured. Set NEXT_PUBLIC_COMMERCE_PROVIDER=shopify and NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN, then rebuild.",
+        "No Shopify store is connected yet.",
       ),
     ).toBeVisible();
   });
@@ -407,31 +409,15 @@ describe("CartApprovalSheet configuration reasons", () => {
   it("explains an invalid store domain", () => {
     render(
       <CartApprovalSheet
-        commerce={demoCommerce("invalid-domain")}
+        commerce={unconfiguredCommerce("invalid-domain")}
         dispatch={vi.fn()}
         draft={mappedDraft()}
       />,
     );
     expect(
       screen.getByText(
-        "Shopify checkout is disabled: NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN must be a bare host such as your-store.myshopify.com. Rebuild after fixing it.",
+        "The configured store address is not a bare host such as your-store.myshopify.com.",
       ),
     ).toBeVisible();
-  });
-
-  it("stays silent and demo-only when commerce is simply off", () => {
-    const dispatch = vi.fn();
-    render(
-      <CartApprovalSheet
-        commerce={demoCommerce("default")}
-        dispatch={dispatch}
-        draft={mappedDraft()}
-      />,
-    );
-    expect(screen.queryByText(/Shopify checkout is/)).toBeNull();
-    fireEvent.click(
-      screen.getByRole("button", { name: "Approve demo cart · $518" }),
-    );
-    expect(dispatch).toHaveBeenCalledWith({ type: "confirm-demo-cart" });
   });
 });

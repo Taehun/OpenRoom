@@ -67,7 +67,7 @@ export const CORE_TOOL_MANIFEST = deepFreeze([
   {
     name: "add_scene_to_cart",
     description:
-      "Open a local approval draft for product-backed Scene objects. In Shopify mode the draft's commerce block carries the merchandise lines, a cart permalink, the store's UCP MCP endpoint (mcpEndpoint) for create_cart/update_cart/get_cart, and agentProfileUrl, the UCP agent profile every call to that endpoint must name.",
+      "Open a local approval draft for product-backed Scene objects. Fails with NO_STORE_CONNECTED when no Shopify store is connected. The draft's required commerce block carries merchandise lines, productLinks for every requested product, a cart permalink when variants are mapped, the store's UCP MCP endpoint (mcpEndpoint) for create_cart/update_cart/get_cart, and agentProfileUrl, the UCP agent profile every call to that endpoint must name.",
     inputSchema: ADD_SCENE_TO_CART_JSON_SCHEMA,
     annotations: { readOnlyHint: false, untrustedContentHint: true },
   },

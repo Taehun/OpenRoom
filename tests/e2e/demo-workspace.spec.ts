@@ -189,7 +189,7 @@ test("completes the deterministic spatial commerce UI journey", async ({
   await expect(dialog.getByText("Oak Frame Table")).toBeVisible();
   await expect(dialog.getByText("$169 USD")).toBeVisible();
   await expect(
-    dialog.getByRole("button", { name: "Approve demo cart · $169" }),
+    dialog.getByRole("button", { name: "Connect a store" }),
   ).toBeInViewport();
   await page.keyboard.press("Escape");
   await expect(dialog).toBeHidden();

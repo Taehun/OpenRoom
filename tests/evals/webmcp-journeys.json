@@ -20,7 +20,7 @@
   },
   {
     "id": "cart-approval-only",
-    "prompt": "Add the product-backed scene objects to the cart",
+    "prompt": "A Shopify store is connected. Add the product-backed scene objects to the cart",
     "expectedTools": ["add_scene_to_cart"],
     "assertions": [
       "A visible approval dialog is opened",
@@ -32,11 +32,22 @@
     "prompt": "Add the product-backed scene objects to the cart, then create the Shopify cart through the store's UCP MCP server",
     "expectedTools": ["add_scene_to_cart"],
     "assertions": [
-      "In shopify mode the draft carries commerce.lines with merchandiseId and quantity plus commerce.mcpEndpoint",
+      "With a store connected, the draft carries commerce.lines with merchandiseId and quantity plus commerce.mcpEndpoint",
       "commerce.mcpEndpoint is the store's /api/ucp/mcp endpoint, and commerce.agentProfileUrl names the UCP agent profile every call to it must carry",
+      "commerce.productLinks carries one product page for every requested product, mapped or unmapped",
       "Draft items carry demoVariantId (the demo catalog id); only commerce.lines[].merchandiseId is sent to create_cart",
       "Unmapped products appear in commerce.skipped and are not sent anywhere",
       "OpenRoom makes no external request; the agent calls create_cart and get_cart on the store MCP itself"
+    ]
+  },
+  {
+    "id": "cart-without-a-store",
+    "prompt": "No Shopify store is connected. Try to add the product-backed scene objects to the cart",
+    "expectedTools": ["add_scene_to_cart"],
+    "assertions": [
+      "With no store connected, add_scene_to_cart fails with NO_STORE_CONNECTED and opens no dialog",
+      "The error is retryable and names connecting a store as the fix",
+      "No external request is made"
     ]
   },
   {

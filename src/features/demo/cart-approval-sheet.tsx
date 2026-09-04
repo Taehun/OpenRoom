@@ -1,5 +1,6 @@
 import {
   useEffect,
+  useId,
   useMemo,
   useRef,
   useState,
@@ -9,7 +10,7 @@ import {
 import type { DemoAction } from "./demo-types";
 import { OpenRoomIcon } from "./open-room-icon";
 import styles from "./demo-workspace.module.css";
-import type { CartApprovalDraft } from "../../webmcp/tool-context";
+import type { CartReviewDraft } from "../../webmcp/tool-context";
 import type { CommerceContext, CommerceDraft } from "../commerce/commerce-types";
 import { PHOTO_ASSETS } from "../photo/photo-assets";
 
@@ -17,7 +18,7 @@ interface CartApprovalSheetProps {
   commerce: CommerceContext;
   dispatch: Dispatch<DemoAction>;
   /** The room, as a cart. Every opener builds it with `cartDraftForScene`. */
-  draft: CartApprovalDraft;
+  draft: CartReviewDraft;
   openWindow?: (url: string) => Window | null;
 }
 
@@ -46,14 +47,11 @@ function formatPrice(priceMinor: number) {
 }
 
 function configurationNotice(config: CommerceContext["config"]): string | null {
-  if (config.provider !== "demo") return null;
-  if (config.reason === "not-configured") {
-    return "Shopify checkout is not configured. Set NEXT_PUBLIC_COMMERCE_PROVIDER=shopify and NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN, then rebuild.";
-  }
+  if (config.status === "connected") return null;
   if (config.reason === "invalid-domain") {
-    return "Shopify checkout is disabled: NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN must be a bare host such as your-store.myshopify.com. Rebuild after fixing it.";
+    return "The configured store address is not a bare host such as your-store.myshopify.com.";
   }
-  return null;
+  return "No Shopify store is connected yet.";
 }
 
 interface SheetLine {
@@ -72,7 +70,9 @@ export function CartApprovalSheet({
 }: CartApprovalSheetProps) {
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const [blockedUrl, setBlockedUrl] = useState<string | null>(null);
-  const isShopify = commerce.config.provider === "shopify";
+  const [showProductLinks, setShowProductLinks] = useState(false);
+  const productLinksId = useId();
+  const isConnected = commerce.config.status === "connected";
 
   const lines = useMemo<SheetLine[]>(
     () =>
@@ -88,8 +88,8 @@ export function CartApprovalSheet({
   const isEmpty = lines.length === 0;
 
   const commerceDraft = useMemo<CommerceDraft | null>(
-    () => (isShopify ? (draft.commerce ?? null) : null),
-    [draft, isShopify],
+    () => (isConnected ? (draft.commerce ?? null) : null),
+    [draft, isConnected],
   );
 
   const mappedProductIds = useMemo(
@@ -102,17 +102,20 @@ export function CartApprovalSheet({
     [commerceDraft],
   );
 
-  const totalMinor = isShopify
+  const totalMinor = isConnected
     ? lines
         .filter(({ productId }) => mappedProductIds.has(productId))
         .reduce((total, line) => total + line.priceMinor, 0)
     : draft.totalMinor;
   const total = formatPrice(totalMinor);
   const checkoutUrl = commerceDraft?.checkoutPermalink ?? null;
-  const canCheckout = isShopify && checkoutUrl !== null;
+  const productLinks = commerceDraft?.productLinks ?? [];
+  const titleByProductId = useMemo(
+    () => new Map(lines.map(({ productId, title }) => [productId, title])),
+    [lines],
+  );
   const storeDomain =
-    commerce.config.provider === "shopify" ? commerce.config.storeDomain : null;
-  const buttonLabel = isShopify ? "Continue to Shopify" : "Approve demo cart";
+    commerce.config.status === "connected" ? commerce.config.storeDomain : null;
   const notice = configurationNotice(commerce.config);
 
   useEffect(() => {
@@ -148,10 +151,6 @@ export function CartApprovalSheet({
   }
 
   function handleContinue() {
-    if (!isShopify) {
-      dispatch({ type: "confirm-demo-cart" });
-      return;
-    }
     if (!commerceDraft || checkoutUrl === null) return;
     const opened = openWindow(checkoutUrl);
     if (opened === null) {
@@ -195,9 +194,11 @@ export function CartApprovalSheet({
 
         {isEmpty ? null : (
           <p className={styles.sheetIntro}>
-            {isShopify
+            {isConnected && checkoutUrl
               ? "Approving opens Shopify checkout in a new tab. OpenRoom sends nothing itself."
-              : `${draft.items.length} item${draft.items.length === 1 ? "" : "s"} from your room ${draft.items.length === 1 ? "is" : "are"} ready for approval. Nothing is ordered until you approve.`}
+              : isConnected
+                ? "Open product pages one at a time. OpenRoom sends nothing itself."
+              : `${draft.items.length} item${draft.items.length === 1 ? "" : "s"} from your room ${draft.items.length === 1 ? "is" : "are"} ready to review.`}
           </p>
         )}
 
@@ -228,7 +229,7 @@ export function CartApprovalSheet({
                 <span className={styles.cartItemCopy}>
                   <strong>{line.title}</strong>
                   <small>{line.detail}</small>
-                  {isShopify && skippedProductIds.has(line.productId) ? (
+                  {isConnected && skippedProductIds.has(line.productId) ? (
                     <small className={styles.cartSkipped}>
                       Not mapped to a Shopify variant
                     </small>
@@ -244,33 +245,48 @@ export function CartApprovalSheet({
           <>
             <div className={styles.cartTotal}>
               <span>
-                <strong>{isShopify ? "Catalog estimate" : "Room total"}</strong>
+                <strong>Catalog estimate</strong>
                 <small>
-                  {isShopify
+                  {isConnected
                     ? "Shopify shows the store's prices at checkout."
-                    : "Taxes and delivery calculated later"}
+                    : "Connect a store to see its prices."}
                 </small>
               </span>
               <strong>{total} USD</strong>
             </div>
 
-            <div className={styles.sheetDisclosure}>
-              <span aria-hidden="true">i</span>
-              <p>
-                {isShopify && storeDomain
-                  ? `Checkout opens on ${storeDomain} in a new tab. OpenRoom stores no Shopify credentials and makes no request of its own.`
-                  : "Demo only: approving closes this sheet and orders nothing."}
-              </p>
-            </div>
+            {isConnected && storeDomain ? (
+              <div className={styles.sheetDisclosure}>
+                <span aria-hidden="true">i</span>
+                <p>
+                  {checkoutUrl
+                    ? `Checkout opens on ${storeDomain} in a new tab. OpenRoom stores no Shopify credentials and makes no request of its own.`
+                    : `Product pages open on ${storeDomain} in new tabs only when you choose a link. OpenRoom stores no Shopify credentials.`}
+                </p>
+              </div>
+            ) : null}
           </>
         )}
 
         {notice ? <p className={styles.sheetNotice}>{notice}</p> : null}
 
-        {isShopify && !isEmpty && !canCheckout ? (
+        {isConnected && !isEmpty && checkoutUrl === null ? (
           <p className={styles.sheetNotice} role="status">
             No item in this cart is mapped to a Shopify variant yet.
           </p>
+        ) : null}
+
+        {showProductLinks ? (
+          <ul className={styles.productLinks} id={productLinksId}>
+            {productLinks.map(({ productId, url }) => (
+              <li key={productId}>
+                <a href={url} rel="noreferrer" target="_blank">
+                  {titleByProductId.get(productId) ?? productId}
+                  <span className={styles.visuallyHidden}> (opens in a new tab)</span>
+                </a>
+              </li>
+            ))}
+          </ul>
         ) : null}
 
         {blockedUrl ? (
@@ -283,18 +299,37 @@ export function CartApprovalSheet({
         ) : null}
 
         <div className={styles.sheetActions}>
-          {isEmpty ? null : (
+          {isEmpty ? null : checkoutUrl !== null ? (
             <button
-              aria-label={`${buttonLabel} · ${total}`}
+              aria-label={`Continue to Shopify · ${total}`}
               className={styles.commerceButton}
-              disabled={isShopify && !canCheckout}
               onClick={handleContinue}
               type="button"
             >
-              <span>{buttonLabel}</span>
+              <span>Continue to Shopify</span>
               <strong>{total}</strong>
             </button>
-          )}
+          ) : isConnected && storeDomain && productLinks.length > 0 ? (
+            <button
+              aria-controls={productLinksId}
+              aria-expanded={showProductLinks}
+              className={styles.commerceButton}
+              onClick={() => setShowProductLinks((visible) => !visible)}
+              type="button"
+            >
+              <span>
+                Open {productLinks.length} product{productLinks.length === 1 ? "" : "s"} on {storeDomain}
+              </span>
+            </button>
+          ) : !isConnected ? (
+            <button
+              className={styles.commerceButton}
+              onClick={() => dispatch({ type: "open-store-settings" })}
+              type="button"
+            >
+              <span>Connect a store</span>
+            </button>
+          ) : null}
           <button
             className={styles.cancelButton}
             onClick={() => dispatch({ type: "close-cart" })}

@@ -268,22 +268,21 @@ test("completes WebMCP Core 6 against the shared demo Scene", async ({
     ),
   );
   expect(cart?.structuredContent).toMatchObject({
-    ok: true,
+    ok: false,
     sceneRevision: 2,
     stateVersion: 2,
+    error: {
+      code: "NO_STORE_CONNECTED",
+      retryable: true,
+    },
   });
-  const dialog = page.getByRole("dialog", { name: "Review your room" });
-  await expect(dialog.getByRole("listitem")).toHaveCount(1);
-  await expect(dialog.getByText("Travertine Plinth Table")).toBeVisible();
-  await expect(dialog.getByText("$249 USD")).toBeVisible();
   await expect(
-    dialog.getByText(/from your room (is|are) ready for approval/),
-  ).toBeVisible();
+    page.getByRole("dialog", { name: "Review your room" }),
+  ).toHaveCount(0);
   expect(await page.evaluate(() => window.__webMcpFetchCount)).toBe(0);
   trackCartRequests = false;
   expect(externalRequestsDuringCart).toEqual([]);
 
-  await page.keyboard.press("Escape");
   await page.getByRole("link", { name: "OpenRoom home" }).click();
 
   // Orientation can arrive as a facing vector instead of degrees: facing -x is

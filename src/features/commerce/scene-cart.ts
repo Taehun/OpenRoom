@@ -1,4 +1,4 @@
-import type { CartApprovalDraft } from "../../webmcp/tool-context";
+import type { CartDraftBase } from "../../webmcp/tool-context";
 import type { Scene, SceneObject } from "../scene/scene-schema";
 
 /**
@@ -10,7 +10,7 @@ import type { Scene, SceneObject } from "../scene/scene-schema";
 export function cartDraftForScene(
   scene: Scene,
   objects: readonly SceneObject[],
-): CartApprovalDraft {
+): CartDraftBase {
   const items = objects.flatMap((object) => {
     if (object.source !== "product" || !object.product) return [];
     return [{

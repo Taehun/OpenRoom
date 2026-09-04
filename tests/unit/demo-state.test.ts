@@ -4,9 +4,9 @@ import {
   createInitialDemoState,
   demoReducer,
 } from "../../src/features/demo/demo-state";
-import type { CartApprovalDraft } from "../../src/webmcp/tool-context";
+import type { CartReviewDraft } from "../../src/webmcp/tool-context";
 
-const AGENT_CART_DRAFT: CartApprovalDraft = {
+const AGENT_CART_DRAFT: CartReviewDraft = {
   id: "scene-demo-living-room-rev-2",
   sceneId: "demo-living-room",
   sceneRevision: 2,
@@ -28,6 +28,7 @@ describe("demoReducer", () => {
     expect(createInitialDemoState()).toEqual({
       mode: "inspector",
       isCartOpen: false,
+      isStoreSettingsOpen: false,
       cartDraft: null,
       toast: null,
       announcement: null,
@@ -40,6 +41,7 @@ describe("demoReducer", () => {
     expect(preview).toEqual({
       mode: "products",
       isCartOpen: false,
+      isStoreSettingsOpen: false,
       cartDraft: null,
       toast: null,
       announcement: null,
@@ -89,32 +91,32 @@ describe("demoReducer", () => {
   // "Keep editing" action.
   test("clears any standing announcement when the cart opens", () => {
     const approved = demoReducer(createInitialDemoState(), {
-      type: "confirm-demo-cart",
+      type: "open-external-checkout",
+      itemCount: 1,
     });
     expect(approved.announcement).not.toBeNull();
     expect(demoReducer(approved, { type: "open-cart" }).announcement).toBeNull();
   });
 
-  test("keeps cart confirmation local and explicit", () => {
-    const opened = demoReducer(createInitialDemoState(), {
-      type: "open-cart",
+  test("moves from the cart to store settings without leaving both overlays open", () => {
+    const cart = demoReducer(createInitialDemoState(), { type: "open-cart" });
+    const settings = demoReducer(cart, { type: "open-store-settings" });
+    expect(settings).toMatchObject({
+      isCartOpen: false,
+      isStoreSettingsOpen: true,
+      cartDraft: null,
     });
-    const confirmed = demoReducer(opened, { type: "confirm-demo-cart" });
-
-    expect(confirmed.isCartOpen).toBe(false);
-    expect(confirmed.announcement).toMatchObject({
-      text: "Demo approved — nothing was ordered.",
-      tone: "toast",
-    });
-    // A second approval is a new announcement object, so the live region reads
-    // it again instead of bailing out on an unchanged string.
-    const again = demoReducer(confirmed, { type: "confirm-demo-cart" });
-    expect(again.announcement).not.toBe(confirmed.announcement);
+    expect(
+      demoReducer(settings, { type: "close-store-settings" }),
+    ).toMatchObject({ isStoreSettingsOpen: false });
   });
 
   test("clears the announcement once and returns the same state when there is none", () => {
     const opened = demoReducer(createInitialDemoState(), { type: "open-cart" });
-    const confirmed = demoReducer(opened, { type: "confirm-demo-cart" });
+    const confirmed = demoReducer(opened, {
+      type: "open-external-checkout",
+      itemCount: 1,
+    });
     const cleared = demoReducer(confirmed, { type: "clear-announcement" });
     expect(cleared.announcement).toBeNull();
     expect(cleared.isCartOpen).toBe(false);
@@ -137,9 +139,6 @@ describe("demoReducer", () => {
     });
 
     expect(demoReducer(agentCart, { type: "close-cart" }).cartDraft).toBeNull();
-    expect(
-      demoReducer(agentCart, { type: "confirm-demo-cart" }).cartDraft,
-    ).toBeNull();
     expect(demoReducer(agentCart, { type: "reset" }).cartDraft).toBeNull();
   });
 

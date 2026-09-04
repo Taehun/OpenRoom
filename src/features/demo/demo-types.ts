@@ -1,5 +1,5 @@
 import type { SceneProduct } from "../scene/scene-schema";
-import type { CartApprovalDraft } from "../../webmcp/tool-context";
+import type { CartReviewDraft } from "../../webmcp/tool-context";
 
 export type DemoMode = "inspector" | "products" | "activity";
 
@@ -27,7 +27,8 @@ export interface DemoAnnouncement {
 export interface DemoState {
   mode: DemoMode;
   isCartOpen: boolean;
-  cartDraft: CartApprovalDraft | null;
+  isStoreSettingsOpen: boolean;
+  cartDraft: CartReviewDraft | null;
   toast: DemoToast | null;
   announcement: DemoAnnouncement | null;
 }
@@ -38,9 +39,10 @@ export type DemoAction =
   | { type: "show-activity" }
   | { type: "select-object"; objectId: string | null }
   | { type: "preview-product"; productId: string }
-  | { type: "open-cart"; draft?: CartApprovalDraft }
+  | { type: "open-cart"; draft?: CartReviewDraft }
   | { type: "close-cart" }
-  | { type: "confirm-demo-cart" }
+  | { type: "open-store-settings" }
+  | { type: "close-store-settings" }
   | { type: "clear-announcement" }
   | { type: "open-external-checkout"; itemCount: number }
   | { type: "undo" }

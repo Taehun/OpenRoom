@@ -1,9 +1,13 @@
-import type { CartApprovalDraft } from "../../webmcp/tool-context";
+import type {
+  CartApprovalDraft,
+  CartDraftBase,
+} from "../../webmcp/tool-context";
 import type {
   CartLineInput,
   CommerceContext,
   CommerceDraft,
   CommerceLine,
+  ProductLink,
   ShopifyVariantMap,
   SkippedLine,
 } from "./commerce-types";
@@ -65,11 +69,26 @@ export function buildCartPermalink(
   return `https://${storeDomain}/cart/${path}`;
 }
 
+export function buildProductLinks(
+  storeDomain: string,
+  items: readonly CartLineInput[],
+): ProductLink[] {
+  const seen = new Set<string>();
+  const links: ProductLink[] = [];
+  for (const { productId, quantity } of items) {
+    if (!Number.isInteger(quantity) || quantity <= 0) continue;
+    if (seen.has(productId)) continue;
+    seen.add(productId);
+    links.push({ productId, url: `https://${storeDomain}/products/${productId}` });
+  }
+  return links;
+}
+
 export function buildCommerceDraft(
   commerce: CommerceContext,
   items: readonly CartLineInput[],
 ): CommerceDraft | null {
-  if (commerce.config.provider !== "shopify") return null;
+  if (commerce.config.status !== "connected") return null;
   const { lines, skipped } = resolveShopifyLines(items, commerce.variants);
   return {
     provider: "shopify",
@@ -83,16 +102,22 @@ export function buildCommerceDraft(
     })),
     skipped,
     checkoutPermalink: buildCartPermalink(commerce.config.storeDomain, lines),
+    productLinks: buildProductLinks(commerce.config.storeDomain, items),
   };
 }
 
 export function enrichCartDraft(
   commerce: CommerceContext,
-  draft: CartApprovalDraft,
+  draft: CartDraftBase,
 ): CartApprovalDraft {
   const block = buildCommerceDraft(
     commerce,
     draft.items.map(({ productId, quantity }) => ({ productId, quantity })),
   );
-  return block === null ? draft : { ...draft, commerce: block };
+  // Tool handlers reject an unconfigured store before enriching. Keeping the
+  // check here makes that trust boundary explicit for every future caller.
+  if (block === null) {
+    throw new Error("Cannot enrich a cart draft without a connected store");
+  }
+  return { ...draft, commerce: block };
 }

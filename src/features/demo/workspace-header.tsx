@@ -1,5 +1,5 @@
 import Link from "next/link";
-import type { Dispatch, RefObject } from "react";
+import type { Dispatch, ReactNode, RefObject } from "react";
 import { GitHubMark } from "../home/github-mark";
 import { REPOSITORY_URL } from "../home/repository";
 import type { Scene } from "../scene/scene-schema";
@@ -15,6 +15,7 @@ interface WorkspaceHeaderProps {
   guideHref?: string | undefined;
   roomTotalMinor: number;
   scene: Scene;
+  storeChip?: ReactNode;
 }
 
 function formatRoomTotal(totalMinor: number) {
@@ -35,6 +36,7 @@ export function WorkspaceHeader({
   guideHref,
   roomTotalMinor,
   scene,
+  storeChip,
 }: WorkspaceHeaderProps) {
   const cartCount = cartCountOf(scene);
 
@@ -52,6 +54,7 @@ export function WorkspaceHeader({
       </div>
 
       <div className={styles.headerStatus}>
+        {storeChip}
         <div className={styles.roomTotal}>
           <small>Room total</small>
           <strong>{formatRoomTotal(roomTotalMinor)}</strong>

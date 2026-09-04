@@ -22,6 +22,15 @@ export function fixtureGid(productId: keyof typeof FIXTURE_VARIANT_IDS): string 
   return `gid://shopify/ProductVariant/${FIXTURE_VARIANT_IDS[productId]}`;
 }
 
+export function fixtureProductLinks(
+  ...productIds: readonly string[]
+): { productId: string; url: string }[] {
+  return productIds.map((productId) => ({
+    productId,
+    url: `https://${PLACEHOLDER_STORE_DOMAIN}/products/${productId}`,
+  }));
+}
+
 export const FIXTURE_VARIANTS: ShopifyVariantMap = {
   "coffee-table": fixtureGid("coffee-table"),
   rug: fixtureGid("rug"),
@@ -43,14 +52,14 @@ export const FIXTURE_VARIANT_OVERRIDES = (
   .map((productId) => `${productId}=${fixtureGid(productId)}`)
   .join(",");
 
-export const DEMO_COMMERCE: CommerceContext = {
-  config: { provider: "demo", reason: "default" },
+export const UNCONFIGURED_COMMERCE: CommerceContext = {
+  config: { status: "unconfigured", reason: "not-configured" },
   variants: FIXTURE_VARIANTS,
 };
 
 export const SHOPIFY_COMMERCE: CommerceContext = {
   config: {
-    provider: "shopify",
+    status: "connected",
     storeDomain: PLACEHOLDER_STORE_DOMAIN,
     mcpEndpoint: `https://${PLACEHOLDER_STORE_DOMAIN}/api/ucp/mcp`,
     agentProfileUrl: FIXTURE_AGENT_PROFILE_URL,

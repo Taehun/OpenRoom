@@ -23,17 +23,31 @@ import { RoomCanvas } from "./room-canvas";
 import Link from "next/link";
 import { OpenRoomIcon } from "./open-room-icon";
 import { WorkspaceHeader } from "./workspace-header";
+import { StoreChip } from "./store-chip";
 import styles from "./demo-workspace.module.css";
-import type { ToolContext } from "../../webmcp/tool-context";
+import type {
+  CartDraftBase,
+  CartReviewDraft,
+  ToolContext,
+} from "../../webmcp/tool-context";
 import { useWebMcpTools } from "../../webmcp/use-webmcp-tools";
 import { useLocalMcpRelay } from "../../local-mcp/use-local-mcp-relay";
-import { ACTIVE_COMMERCE } from "../commerce/commerce-runtime";
+import { useCommerceContext } from "../commerce/use-commerce-context";
 import { cartDraftForScene } from "../commerce/scene-cart";
 import { enrichCartDraft } from "../commerce/shopify-cart";
 import type { CommerceContext } from "../commerce/commerce-types";
 
 /** How long an approval announcement stays on screen. */
 const ANNOUNCEMENT_MS = 4000;
+
+function cartReviewDraft(
+  commerce: CommerceContext,
+  draft: CartDraftBase,
+): CartReviewDraft {
+  return commerce.config.status === "connected"
+    ? enrichCartDraft(commerce, draft)
+    : draft;
+}
 
 interface DemoWorkspaceProps {
   store?: SceneStore;
@@ -42,11 +56,7 @@ interface DemoWorkspaceProps {
   guideHref?: string;
 }
 
-export function DemoWorkspace({
-  store,
-  commerce = ACTIVE_COMMERCE,
-  guideHref,
-}: DemoWorkspaceProps = {}) {
+export function DemoWorkspace({ store, commerce, guideHref }: DemoWorkspaceProps = {}) {
   return (
     <SceneStoreProvider store={store}>
       <DemoWorkspaceContent commerce={commerce} guideHref={guideHref} />
@@ -55,12 +65,15 @@ export function DemoWorkspace({
 }
 
 function DemoWorkspaceContent({
-  commerce,
+  commerce: commerceOverride,
   guideHref,
 }: {
-  commerce: CommerceContext;
+  /** Injected by the tests; the running app uses the hook. */
+  commerce?: CommerceContext | undefined;
   guideHref?: string | undefined;
 }) {
+  const controller = useCommerceContext();
+  const commerce = commerceOverride ?? controller.commerce;
   const [state, dispatch] = useReducer(
     demoReducer,
     undefined,
@@ -189,7 +202,7 @@ function DemoWorkspaceContent({
       if (action.type === "open-cart" && !action.draft) {
         dispatch({
           type: "open-cart",
-          draft: enrichCartDraft(
+          draft: cartReviewDraft(
             commerce,
             cartDraftForScene(store.scene, store.scene.objects),
           ),
@@ -203,12 +216,16 @@ function DemoWorkspaceContent({
   );
 
   useEffect(() => {
-    if (wasCartOpenRef.current && !state.isCartOpen) {
+    if (
+      wasCartOpenRef.current &&
+      !state.isCartOpen &&
+      !state.isStoreSettingsOpen
+    ) {
       cartButtonRef.current?.focus();
     }
 
     wasCartOpenRef.current = state.isCartOpen;
-  }, [state.isCartOpen]);
+  }, [state.isCartOpen, state.isStoreSettingsOpen]);
 
   useEffect(() => {
     function handleWorkspaceKeyDown(event: KeyboardEvent) {
@@ -219,6 +236,7 @@ function DemoWorkspaceContent({
       if (
         event.defaultPrevented ||
         document.querySelector("dialog[open]") ||
+        document.querySelector("[data-store-settings-dialog]") ||
         (event.target instanceof HTMLElement &&
           (/^(INPUT|TEXTAREA|SELECT)$/.test(event.target.tagName) ||
             event.target.isContentEditable))
@@ -234,6 +252,11 @@ function DemoWorkspaceContent({
         );
         return;
       }
+
+      // The modal cart owns every key while it is open. In particular, an
+      // undo from one of its buttons must not mutate the hidden room behind a
+      // draft that was already calculated from the previous Scene.
+      if (state.isCartOpen) return;
 
       if (
         event.key.toLowerCase() === "z" &&
@@ -251,7 +274,13 @@ function DemoWorkspaceContent({
 
   return (
     <div className={styles.workspace}>
-      <div aria-hidden={state.isCartOpen || undefined} inert={state.isCartOpen}>
+      <div
+        aria-hidden={
+          state.isCartOpen || state.isStoreSettingsOpen || undefined
+        }
+        data-testid="workspace-surface"
+        inert={state.isCartOpen || state.isStoreSettingsOpen}
+      >
         <WorkspaceHeader
           cartButtonRef={cartButtonRef}
           canUndo={historyLength > 0}
@@ -259,6 +288,17 @@ function DemoWorkspaceContent({
           guideHref={guideHref}
           roomTotalMinor={roomTotalMinor}
           scene={scene}
+          storeChip={
+            <StoreChip
+              controller={controller}
+              onOpenChange={(open) =>
+                routeAction({
+                  type: open ? "open-store-settings" : "close-store-settings",
+                })
+              }
+              open={state.isStoreSettingsOpen}
+            />
+          }
         />
         <div className={styles.workspaceBody}>
           <RoomCanvas
@@ -327,7 +367,7 @@ function DemoWorkspaceContent({
           // sheet honest if some future dispatcher forgets to.
           draft={
             state.cartDraft ??
-            enrichCartDraft(commerce, cartDraftForScene(scene, scene.objects))
+            cartReviewDraft(commerce, cartDraftForScene(scene, scene.objects))
           }
         />
       ) : null}

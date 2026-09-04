@@ -36,16 +36,17 @@ pnpm install --frozen-lockfile
 pnpm dev
 ```
 
-Open <http://localhost:3000/demo>. The default `demo` commerce mode is fully
-local and makes no external cart request, so no environment file is needed to
-run OpenRoom. `.env.example` documents the two things that do use one: the
-public Shopify build flags below, and the API keys the offline asset scripts
-read. Copy it to `.env.local` only when you need either.
+Open <http://localhost:3000/demo>. With no store domain, OpenRoom is
+unconfigured: the room editor and agent tools still work locally, and the cart
+offers to connect a store. No environment file is needed. `.env.example`
+documents the public Shopify build defaults below and the API keys the offline
+asset scripts read. Copy it to `.env.local` only when you need either.
 
 ## Connect Shopify
 
-Shopify mode needs three **public build variables**. It does not need an Admin
-API token, a Storefront API token, or a server route.
+OpenRoom is connected when the build names a default store or a presenter uses
+the store chip in the header. Both paths use only a public store domain; they do
+not need an Admin API token, a Storefront API token, or a server route.
 
 ### 1. Copy the variant IDs
 
@@ -60,36 +61,57 @@ OpenRoom product ID: hinoki-low-sofa
 Shopify variant ID:  44352465993
 ```
 
-### 2. Set three variables
+### 2. Name the build-default store
 
 Add these values to `.env.local` for local development, or to the Production
 build environment in Cloudflare Pages:
 
 ```bash
-NEXT_PUBLIC_COMMERCE_PROVIDER=shopify
 NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN=your-store.myshopify.com
 NEXT_PUBLIC_SHOPIFY_VARIANTS=hinoki-low-sofa=44352465993,oak-frame-table=44352465994
+NEXT_PUBLIC_SITE_ORIGIN=https://openroom.example
 ```
 
-Use the bare store host—no `https://` and no trailing path. The variant map is a
-comma-separated list of `OpenRoom product ID=Shopify variant ID` pairs. Full
-`gid://shopify/ProductVariant/...` values also work.
+The store domain alone turns the build's connected state on; omit it and the
+app starts unconfigured. Use the bare host—no `https://` and no trailing path.
+The optional variant map is a comma-separated list of
+`OpenRoom product ID=Shopify variant ID` pairs; full
+`gid://shopify/ProductVariant/...` values also work. `NEXT_PUBLIC_SITE_ORIGIN`
+is optional and lets agents use the published UCP profile.
 
 ### 3. Rebuild
 
 Restart `pnpm dev` locally. On Cloudflare Pages, trigger a new deployment or
-push to `main` after saving the variables. These values are embedded in the
+push to `main` after saving the variables. These defaults are embedded in the
 browser bundle at build time, so changing them does not affect an existing
 deployment.
 
-That is the complete runtime integration. When a customer approves the room:
+### Switch stores from the header
+
+The store chip shows the connected domain, or **Connect a store** when neither
+the build nor this browser has one. Open it, paste a store address, and press
+**Save**. OpenRoom normalizes the address and sends an unauthenticated
+`tools/list` request to `https://<store>/api/ucp/mcp` to confirm what cart tools
+the store offers before remembering the domain in this browser. **Use the
+sample store** clears that browser choice and returns to the build default.
+
+That Save probe is the only external request OpenRoom issues. It sends no
+credential; page load, room editing, product search, and `add_scene_to_cart`
+remain local. A store that answers without cart tools can still be saved with a
+warning because checkout and product links continue to work.
+
+When a connected customer reviews the room:
 
 - **Continue to Shopify** opens a cart permalink in a new tab.
-- Products without a variant mapping are clearly listed and skipped.
+- When no variant is mapped, the sheet offers per-product links on the
+  connected store instead.
+- Products without a variant mapping are clearly listed.
 - `add_scene_to_cart` also returns `https://<store>/api/ucp/mcp`, the published
-  UCP agent profile that endpoint requires, and the mapped cart lines, for
-  agents that would rather build the cart themselves.
-- OpenRoom itself sends no request to Shopify and stores no credentials.
+  UCP agent profile that endpoint requires, the mapped cart lines, and a handle
+  link for every requested product, for agents that would rather build the cart
+  themselves.
+- OpenRoom stores no Shopify credentials. If no store is connected, the sheet
+  offers the store chip and `add_scene_to_cart` reports `NO_STORE_CONNECTED`.
 
 To import the demo catalog into a Shopify development store, use the checked-in
 CSV or the optional Admin API seed tools described in
@@ -143,7 +165,7 @@ generation is developer-run only, never part of the app or CI. See
 | `pnpm typecheck` | Type-check without emitting files. |
 | `pnpm lint` | Run ESLint. |
 | `pnpm test:e2e` | Run the demo Playwright journeys. |
-| `pnpm test:e2e:commerce` | Run Shopify-mode journeys against a stubbed store. |
+| `pnpm test:e2e:commerce` | Run connected-store journeys against a stubbed store. |
 | `pnpm build:pages` | Create the static Cloudflare Pages output in `out/`. |
 | `pnpm build` | Build the vinext Worker target. Unused by the deployment; kept for runtime compatibility checks. |
 | `pnpm build:next` | Run the standard Next.js compatibility build. |
@@ -168,9 +190,10 @@ Use these Pages build settings:
 | Build output directory | `out` |
 | Node.js | `24.13.1` |
 
-The Shopify variables above belong in the Pages **build environment**, because
-Next.js inlines `NEXT_PUBLIC_*` values while building. No Cloudflare runtime
-binding is required for the static deployment.
+The Shopify build defaults above belong in the Pages **build environment**,
+because Next.js inlines `NEXT_PUBLIC_*` values while building. A store selected
+with the header chip is browser-local and needs no deployment or Cloudflare
+runtime binding.
 
 GitHub Actions only checks: type checking, linting, Vitest, both Playwright
 smoke suites, and both builds. Deployment belongs to Cloudflare Pages' own Git

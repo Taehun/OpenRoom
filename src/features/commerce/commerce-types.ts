@@ -1,10 +1,6 @@
 export type CommerceConfig =
   | {
-      provider: "demo";
-      reason: "default" | "not-configured" | "invalid-domain";
-    }
-  | {
-      provider: "shopify";
+      status: "connected";
       storeDomain: string;
       /**
        * The store's UCP MCP endpoint. Shopify's older `/api/mcp` cart tools
@@ -18,10 +14,13 @@ export type CommerceConfig =
        * configured, in which case the agent has to bring its own profile.
        */
       agentProfileUrl: string | null;
+    }
+  | {
+      status: "unconfigured";
+      reason: "not-configured" | "invalid-domain";
     };
 
 export interface CommerceEnv {
-  NEXT_PUBLIC_COMMERCE_PROVIDER?: string | undefined;
   NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN?: string | undefined;
   NEXT_PUBLIC_SITE_ORIGIN?: string | undefined;
 }
@@ -44,6 +43,11 @@ export interface SkippedLine {
   reason: "unmapped" | "invalid";
 }
 
+export interface ProductLink {
+  productId: string;
+  url: string;
+}
+
 export interface CommerceDraft {
   provider: "shopify";
   storeDomain: string;
@@ -52,6 +56,13 @@ export interface CommerceDraft {
   lines: readonly CommerceLine[];
   skipped: readonly SkippedLine[];
   checkoutPermalink: string | null;
+  /**
+   * One link per requested product, mapped or not. The seed kit writes the
+   * OpenRoom product id as the Shopify handle, so these stay correct on any
+   * store seeded with it — which is what makes switching stores useful rather
+   * than decorative.
+   */
+  productLinks: readonly ProductLink[];
 }
 
 export interface CommerceContext {

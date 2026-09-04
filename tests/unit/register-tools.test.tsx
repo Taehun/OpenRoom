@@ -5,7 +5,7 @@ import { createSceneStore } from "../../src/features/scene/scene-store";
 import { CORE_TOOL_MANIFEST } from "../../src/webmcp/core-tool-manifest";
 import { CORE_TOOL_NAMES } from "../../src/webmcp/tool-contracts";
 import type { ToolContext } from "../../src/webmcp/tool-context";
-import { DEMO_COMMERCE } from "../helpers/commerce-fixtures";
+import { UNCONFIGURED_COMMERCE } from "../helpers/commerce-fixtures";
 import type { ModelContextTool } from "../../src/webmcp/tool-handlers";
 import {
   getDocumentModelContext,
@@ -87,7 +87,7 @@ function createToolContext(): ToolContext {
     resolveProduct: () => undefined,
     applyCommand: (request) => store.getState().applyCommand(request),
     openCartApproval: () => undefined,
-    commerce: DEMO_COMMERCE,
+    commerce: UNCONFIGURED_COMMERCE,
   };
 }
 
