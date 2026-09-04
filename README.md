@@ -33,12 +33,14 @@ repository.
 
 ```bash
 pnpm install --frozen-lockfile
-cp .env.example .env.local
 pnpm dev
 ```
 
 Open <http://localhost:3000/demo>. The default `demo` commerce mode is fully
-local and makes no external cart request.
+local and makes no external cart request, so no environment file is needed to
+run OpenRoom. `.env.example` documents the two things that do use one: the
+public Shopify build flags below, and the API keys the offline asset scripts
+read. Copy it to `.env.local` only when you need either.
 
 ## Connect Shopify
 

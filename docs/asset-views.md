@@ -17,9 +17,8 @@ three-quarter, and a straight back — are produced **once, offline**, by
 `src/features/photo/photo-views.generated.ts`.
 
 These scripts are the only place in the project that calls an image model. The
-app has no inference route, no API key, and no runtime generation;
-`ASSET_PROVIDER` stays `cached`. CI never runs a pipeline, and no test ever
-touches the network.
+app has no inference route, no API key, and no runtime generation. CI never
+runs a pipeline, and no test ever touches the network.
 
 ## What it does
 
