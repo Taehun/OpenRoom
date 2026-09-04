@@ -81,11 +81,30 @@ test("completes the deterministic spatial commerce UI journey", async ({
   await page.setViewportSize({ width: 1280, height: 800 });
   await page.goto("/demo");
 
-  const appIcon = page.locator('link[rel="icon"]');
+  const appIcon = page.locator('link[rel="icon"][href*="/icon.svg"]');
   await expect(appIcon).toHaveAttribute("href", /\/icon\.svg/);
   const appIconHref = await appIcon.getAttribute("href");
   if (!appIconHref) throw new Error("Missing app icon href");
   expect((await page.request.get(appIconHref)).ok()).toBe(true);
+  const favicon = page.locator('link[rel="icon"][href*="/favicon.ico"]');
+  await expect(favicon).toHaveCount(1);
+  const manifest = page.locator('link[rel="manifest"]');
+  await expect(manifest).toHaveAttribute("href", /\/manifest\.webmanifest/);
+  const appleIcon = page.locator('link[rel="apple-touch-icon"]');
+  await expect(appleIcon).toHaveAttribute(
+    "href",
+    "/apple-icon.png",
+  );
+  const maskIcon = page.locator('link[rel="mask-icon"]');
+  await expect(maskIcon).toHaveAttribute(
+    "href",
+    "/icons/openroom-mask-icon.svg",
+  );
+  for (const asset of [favicon, manifest, appleIcon, maskIcon]) {
+    const href = await asset.getAttribute("href");
+    if (!href) throw new Error("Missing application icon asset href");
+    expect((await page.request.get(href)).ok()).toBe(true);
+  }
 
   const stage = page.getByRole("region", { name: "Editable room photo" });
   const objectRail = page.getByRole("region", { name: "Objects in room" });

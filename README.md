@@ -126,8 +126,10 @@ discovery
 | Asset registry | `src/features/photo/photo-assets.ts` | Explicit dimensions and bottom-anchor metadata. |
 
 The photo inventory is 26 WebPs total: two room images, six seed cutouts, and
-eighteen catalog cutouts. `app/icon.svg` supplies the local application icon so
-browser QA has no missing-resource console error.
+eighteen catalog cutouts. The application icon suite includes the scalable
+browser icon and multi-resolution favicon in `app/`, an Apple touch icon, and
+192px, 512px, maskable, and 1024px PNGs in `public/icons/`. `app/manifest.ts`
+publishes the installable-web-app variants.
 
 ## Facing and views
 

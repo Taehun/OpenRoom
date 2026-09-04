@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
 import { Roboto, Roboto_Mono } from "next/font/google";
 import { SceneStoreProvider } from "../src/features/scene/scene-context";
@@ -21,6 +21,28 @@ const mono = Roboto_Mono({
 export const metadata: Metadata = {
   title: "OpenRoom",
   description: "AI room planner and furniture shopping",
+  applicationName: "OpenRoom",
+  appleWebApp: {
+    capable: true,
+    title: "OpenRoom",
+    statusBarStyle: "default",
+  },
+  icons: {
+    icon: { url: "/icon.svg", type: "image/svg+xml", sizes: "any" },
+    apple: { url: "/apple-icon.png", type: "image/png", sizes: "180x180" },
+    other: [
+      {
+        rel: "mask-icon",
+        url: "/icons/openroom-mask-icon.svg",
+        color: "#4B6543",
+      },
+    ],
+  },
+};
+
+export const viewport: Viewport = {
+  colorScheme: "light",
+  themeColor: "#4B6543",
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
