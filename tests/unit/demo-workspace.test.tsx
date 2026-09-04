@@ -534,25 +534,30 @@ test("Escape closes the cart before clearing the selected object", async () => {
   expect(coffeeTable).toHaveAttribute("aria-pressed", "false");
 });
 
-test("activates move and rotate tools for Scene transforms", async () => {
+test("offers Select and Rotate only, with Select as the default tool", async () => {
   const user = userEvent.setup();
   render(<DemoWorkspace />);
 
   const select = screen.getByRole("button", { name: "Select tool" });
-  const move = screen.getByRole("button", { name: "Move tool" });
   const rotate = screen.getByRole("button", { name: "Rotate tool" });
 
+  // Move was indistinguishable from Select: both dragged, both nudged.
+  expect(screen.queryByRole("button", { name: "Move tool" })).toBeNull();
   expect(select).toHaveAttribute("aria-pressed", "true");
-  expect(move).toBeEnabled();
+  // The instruction was nowhere on screen; the tooltip is now also the button's
+  // accessible description, so it reaches a screen reader too.
+  expect(select).toHaveAccessibleDescription(
+    "Select — drag to move, arrow keys to nudge (Shift for bigger steps)",
+  );
   expect(rotate).toBeEnabled();
-
-  await user.click(move);
-  expect(move).toHaveAttribute("aria-pressed", "true");
-  expect(select).toHaveAttribute("aria-pressed", "false");
 
   await user.click(rotate);
   expect(rotate).toHaveAttribute("aria-pressed", "true");
-  expect(move).toHaveAttribute("aria-pressed", "false");
+  expect(select).toHaveAttribute("aria-pressed", "false");
+
+  await user.click(select);
+  expect(select).toHaveAttribute("aria-pressed", "true");
+  expect(rotate).toHaveAttribute("aria-pressed", "false");
 });
 
 test("copies prompt guidance without changing Scene revision or state version", async () => {
@@ -581,6 +586,10 @@ test("copies prompt guidance without changing Scene revision or state version", 
   if (!getScene) throw new Error("Missing get_scene");
   const signal = new AbortController().signal;
   const before = await getScene.execute({}, { signal });
+  // The live region has to exist before it fills, or the confirmation is never
+  // announced: idle it is present, empty, and visually hidden.
+  const copyStatus = screen.getByRole("status", { name: "Prompt copy status" });
+  expect(copyStatus).toHaveTextContent("");
 
   await user.click(
     screen.getByRole("button", { name: "Copy redesign prompt" }),

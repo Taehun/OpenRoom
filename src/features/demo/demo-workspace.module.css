@@ -565,24 +565,6 @@
 }
 
 /*
- * A human may turn an object further than any registered view can show. The
- * nearest view is still drawn; this discloses that it is only approximate.
- */
-.photoApproximateBadge {
-  position: absolute;
-  top: 4px;
-  left: 4px;
-  padding: 4px 6px;
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--md-sys-color-tertiary) 92%, transparent);
-  color: var(--md-sys-color-on-tertiary);
-  font-size: 0.58rem;
-  font-weight: 750;
-  line-height: 1;
-  pointer-events: none;
-}
-
-/*
  * A floor-projected rug is clipped to its quad while the layer holding the badge spans
  * the whole stage, so the shared corner offsets park the badge outside the rug where it
  * is never drawn. Its inline left/top carry the quad's centre instead.
@@ -836,15 +818,33 @@
   line-height: var(--md-sys-typescale-body-small-line-height);
 }
 
+/*
+ * The copy status is always in the DOM so the live region exists before it
+ * fills; idle it is hidden the same way `.visuallyHidden` hides anything.
+ */
+.copyStatusIdle {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  border: 0;
+  white-space: nowrap;
+}
+
 .copyStatusSuccess,
 .copyStatusError {
   position: absolute;
   right: 14px;
-  bottom: 13px;
+  /* The two-line failure note is taller at label-medium, so it is anchored
+     closer to the composer's edge and still clears the copy button. */
+  bottom: 6px;
   max-width: 168px;
   padding: 5px 7px;
   border-radius: var(--md-sys-shape-corner-extra-small);
-  font-size: 0.61rem;
+  font-size: var(--md-sys-typescale-label-medium-size);
   font-weight: 700;
   line-height: 1.25;
 }

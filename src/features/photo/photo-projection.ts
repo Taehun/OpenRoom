@@ -8,7 +8,6 @@ import {
   footprintCorners,
   objectFootprint,
 } from "../placement/footprint-geometry";
-import type { PointXZ } from "../placement/placement-types";
 import type { PhotoViewName } from "./photo-facing";
 import type { PhotoViewSymmetry } from "./photo-views";
 import type {
@@ -121,15 +120,6 @@ export function unprojectStagePoint(
   };
 }
 
-function pointIsInsideRoom(point: PointXZ, room: SceneRoom) {
-  return (
-    point.x >= -room.width / 2 &&
-    point.x <= room.width / 2 &&
-    point.z >= -room.depth / 2 &&
-    point.z <= room.depth / 2
-  );
-}
-
 export function projectRugPlacement(
   object: SceneObject,
   asset: PhotoAsset,
@@ -163,8 +153,12 @@ export function projectRugPlacement(
     return null;
   }
 
+  // Every committed placement keeps its corners on the floor (`clampTurnInPlace`
+  // and `clampPositionToRoom` both guarantee it), and a drag preview that runs
+  // past a wall is projected onto the floor's edge rather than abandoned: giving
+  // up here swapped the homography for the flat fallback mid-gesture, which drew
+  // a turned rug as a diamond climbing the wall.
   const corners = footprintCorners(objectFootprint(object));
-  if (!corners.every((corner) => pointIsInsideRoom(corner, room))) return null;
 
   const destinationNormalized = corners.map(({ x, z }) => {
     const projected = projectRoomPoint({ x, z }, room);

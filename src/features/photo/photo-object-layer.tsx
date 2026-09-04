@@ -16,10 +16,13 @@ interface PhotoObjectLayerProps {
   object: SceneObject;
   onClick(): void;
   onKeyDown: KeyboardEventHandler<HTMLButtonElement>;
+  /** A capture taken away mid-gesture ends it; without this the stage freezes. */
+  onLostPointerCapture: PointerEventHandler<HTMLButtonElement>;
   onPointerCancel: PointerEventHandler<HTMLButtonElement>;
   onPointerDown: PointerEventHandler<HTMLButtonElement>;
   onPointerMove: PointerEventHandler<HTMLButtonElement>;
   onPointerUp: PointerEventHandler<HTMLButtonElement>;
+  onRotationLostPointerCapture: PointerEventHandler<HTMLButtonElement>;
   onRotationPointerCancel: PointerEventHandler<HTMLButtonElement>;
   onRotationPointerDown: PointerEventHandler<HTMLButtonElement>;
   onRotationPointerMove: PointerEventHandler<HTMLButtonElement>;
@@ -37,10 +40,12 @@ export function PhotoObjectLayer({
   object,
   onClick,
   onKeyDown,
+  onLostPointerCapture,
   onPointerCancel,
   onPointerDown,
   onPointerMove,
   onPointerUp,
+  onRotationLostPointerCapture,
   onRotationPointerCancel,
   onRotationPointerDown,
   onRotationPointerMove,
@@ -128,6 +133,9 @@ export function PhotoObjectLayer({
   return (
     <div
       className={styles.photoObjectFrame}
+      // The room shows the piece, not a caption about it: the disclosure that a
+      // facing is only approximated lives in the inspector and in the cutout's
+      // alt text. The flag stays here for the tests and the stylesheet.
       data-photo-approximate={view ? String(!view.exact) : undefined}
       data-photo-mirrored={view ? String(view.mirrored) : undefined}
       data-photo-view={view?.view.view}
@@ -148,6 +156,7 @@ export function PhotoObjectLayer({
         disabled={false}
         onClick={onClick}
         onKeyDown={onKeyDown}
+        onLostPointerCapture={onLostPointerCapture}
         onPointerCancel={onPointerCancel}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
@@ -189,15 +198,6 @@ export function PhotoObjectLayer({
         />
       ) : null}
 
-      {view && !view.exact ? (
-        <span
-          className={styles.photoApproximateBadge}
-          data-testid={`photo-approximate-${object.id}`}
-        >
-          Approximate view
-        </span>
-      ) : null}
-
       {selected ? (
         <span
           aria-hidden="true"
@@ -215,6 +215,7 @@ export function PhotoObjectLayer({
           aria-label={`Rotate ${label}`}
           className={styles.rotationHandle}
           data-testid={`rotation-handle-${object.id}`}
+          onLostPointerCapture={onRotationLostPointerCapture}
           onPointerCancel={onRotationPointerCancel}
           onPointerDown={onRotationPointerDown}
           onPointerMove={onRotationPointerMove}

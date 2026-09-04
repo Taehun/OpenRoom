@@ -246,6 +246,127 @@ describe("applySceneCommand", () => {
     expect(sofa.position[2]).toBeGreaterThan(0);
   });
 
+  // Important QA regression: every rotation step re-centred the turned bounding
+  // box, so a piece walked across the floor as it turned and never walked back.
+  test("keeps a turned piece where it stands while its corners stay on the floor", () => {
+    const seed = createDemoScene();
+    const chair = seed.objects.find(({ id }) => id === "chair_01")!;
+    const before = [...chair.position];
+
+    const turned = applySceneCommand(seed, {
+      expectedRevision: 1,
+      actor: "human",
+      command: {
+        type: "move",
+        objectId: "chair_01",
+        position: { x: chair.position[0], z: chair.position[2] },
+        rotationYDegrees: 20,
+      },
+    });
+
+    expect(turned.ok).toBe(true);
+    if (!turned.ok) return;
+    const after = turned.scene.objects.find(({ id }) => id === "chair_01")!;
+    expect(after.position[0]).toBe(before[0]);
+    expect(after.position[2]).toBe(before[2]);
+    expect(after.rotation[1]).toBeCloseTo((20 * Math.PI) / 180);
+    expect(turned.adjustedToFit).toBe(false);
+  });
+
+  test("turns in place when the command carries no position at all", () => {
+    const seed = createDemoScene();
+    const chair = seed.objects.find(({ id }) => id === "chair_01")!;
+    const before = [...chair.position];
+
+    const turned = applySceneCommand(seed, {
+      expectedRevision: 1,
+      actor: "agent",
+      command: { type: "move", objectId: "chair_01", rotationYDegrees: -20 },
+    });
+
+    expect(turned.ok).toBe(true);
+    if (!turned.ok) return;
+    const after = turned.scene.objects.find(({ id }) => id === "chair_01")!;
+    expect(after.position).toEqual(before);
+    expect(after.rotation[1]).toBeCloseTo((-20 * Math.PI) / 180);
+    expect(turned.adjustedToFit).toBe(false);
+  });
+
+  test("slides a turn by exactly the corner overshoot, not by re-centring", () => {
+    const seed = createDemoScene();
+    const sofa = seed.objects.find(({ id }) => id === "sofa_01")!;
+    expect(sofa.position[2]).toBeCloseTo(-0.55, 12);
+
+    const turned = applySceneCommand(seed, {
+      expectedRevision: 1,
+      actor: "human",
+      command: {
+        type: "move",
+        objectId: "sofa_01",
+        position: { x: sofa.position[0], z: sofa.position[2] },
+        rotationYDegrees: 30,
+      },
+    });
+
+    expect(turned.ok).toBe(true);
+    if (!turned.ok) return;
+    const after = turned.scene.objects.find(({ id }) => id === "sofa_01")!;
+    // The 2 x 0.9 m sofa turned 30° reaches 0.08 m through the back wall, so it
+    // steps forward by that much and no more: its back corner now rests on the
+    // wall. The old centre clamp pushed it 0.18 m, to the room inset instead.
+    const radians = (30 * Math.PI) / 180;
+    const halfExtentZ =
+      Math.abs(Math.sin(radians)) * (after.dimensionsM.width / 2) +
+      Math.abs(Math.cos(radians)) * (after.dimensionsM.depth / 2);
+    expect(after.position[0]).toBe(sofa.position[0]);
+    expect(after.position[2]).toBeCloseTo(
+      -turned.scene.room.depth / 2 + halfExtentZ,
+      12,
+    );
+    expect(after.position[2] - sofa.position[2]).toBeLessThan(0.1);
+    expect(turned.adjustedToFit).toBe(true);
+  });
+
+  // A 2.4 x 1.7 m rug spans 2.9 m corner to corner at 45°, and the room is only
+  // 2.72 m deep: no floor spot holds it, so the turn is refused outright rather
+  // than half-applied with the rug climbing a wall.
+  test("refuses a turn no floor spot can hold and names both angles", () => {
+    const seed = createDemoScene();
+    const held = applySceneCommand(seed, {
+      expectedRevision: 1,
+      actor: "human",
+      command: {
+        type: "move",
+        objectId: "rug_01",
+        position: { x: -0.2, z: 0.38 },
+        rotationYDegrees: 15,
+      },
+    });
+    expect(held.ok).toBe(true);
+    if (!held.ok) return;
+
+    const refused = applySceneCommand(held.scene, {
+      expectedRevision: held.scene.revision,
+      actor: "human",
+      command: {
+        type: "move",
+        objectId: "rug_01",
+        rotationYDegrees: 45,
+      },
+    });
+
+    expect(refused.ok).toBe(true);
+    if (!refused.ok) return;
+    const heldRug = held.scene.objects.find(({ id }) => id === "rug_01")!;
+    const rug = refused.scene.objects.find(({ id }) => id === "rug_01")!;
+    expect(rug.rotation[1]).toBeCloseTo((15 * Math.PI) / 180, 12);
+    expect(rug.position).toEqual(heldRug.position);
+    expect(refused.adjustedToFit).toBe(true);
+    expect(refused.message).toBe(
+      "Rug kept at 15°: it does not fit the room at 45°.",
+    );
+  });
+
   test("centres a footprint wider than the room instead of rejecting the move", () => {
     const seed = createDemoScene();
     const wide = structuredClone(seed);

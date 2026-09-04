@@ -741,7 +741,8 @@ describe("RoomPhotoStage", () => {
 
   test("moves a focused object by one keyboard command with normal and Shift steps", () => {
     const store = fixtureStore();
-    store.getState().setToolMode("move");
+    // Select is the default tool: the arrows nudge without picking anything.
+    expect(store.getState().toolMode).toBe("select");
     const commit = vi.spyOn(store.getState(), "commitTransform");
     const initial = structuredClone(objectFromStore(store, "table_01"));
     renderStage(store);
@@ -760,6 +761,31 @@ describe("RoomPhotoStage", () => {
     expect(objectFromStore(store, "table_01").position[2]).toBeCloseTo(
       initial.position[2] - 0.24,
     );
+  });
+
+  // A keyboard nudge moved pixels and said nothing; the room now narrates it.
+  test("announces each keyboard nudge and turn in a polite live region", () => {
+    const store = fixtureStore();
+    const { stage } = renderStage(store);
+    const table = screen.getByRole("button", { name: "Coffee table" });
+    const note = within(stage).getByRole("status");
+    expect(note).toHaveAttribute("aria-live", "polite");
+    expect(note).toHaveTextContent("");
+
+    fireEvent.keyDown(table, { key: "ArrowRight" });
+    expect(note).toHaveTextContent("Coffee table moved right");
+    fireEvent.keyDown(table, { key: "ArrowUp" });
+    expect(note).toHaveTextContent("Coffee table moved back");
+    fireEvent.keyDown(table, { key: "ArrowDown" });
+    expect(note).toHaveTextContent("Coffee table moved forward");
+    fireEvent.keyDown(table, { key: "ArrowLeft" });
+    expect(note).toHaveTextContent("Coffee table moved left");
+
+    act(() => store.getState().setToolMode("rotate"));
+    fireEvent.keyDown(table, { key: "ArrowRight", shiftKey: true });
+    expect(note).toHaveTextContent("Coffee table turned 15° to the right");
+    fireEvent.keyDown(table, { key: "ArrowLeft" });
+    expect(note).toHaveTextContent("Coffee table turned 5° to the left");
   });
 
   test("rotates focused vertical objects and rugs by keyboard", () => {
@@ -829,6 +855,53 @@ describe("RoomPhotoStage", () => {
 
     expect(commit).toHaveBeenCalledOnce();
     expect(store.getState().history).toHaveLength(1);
+    expect(store.getState().isTransforming).toBe(false);
+  });
+
+  // Important QA regression: a capture taken away mid-gesture (a scroll, a
+  // context menu, a re-render of the button) left the preview ref set, so the
+  // stage stayed in a transform that no pointer could finish.
+  test("ends a gesture whose pointer capture is taken away", () => {
+    const store = fixtureStore();
+    store.getState().setToolMode("rotate");
+    const commit = vi.spyOn(store.getState(), "commitTransform");
+    renderStage(store);
+    const handle = screen.getByTestId("rotation-handle-table_01");
+
+    fireEvent.pointerDown(handle, { pointerId: 44, clientX: 500, clientY: 300 });
+    fireEvent.pointerMove(handle, { pointerId: 44, clientX: 650, clientY: 260 });
+    expect(store.getState().isTransforming).toBe(true);
+
+    fireEvent.lostPointerCapture(handle, { pointerId: 44 });
+
+    expect(store.getState().isTransforming).toBe(false);
+    expect(commit).not.toHaveBeenCalled();
+    expect(store.getState().scene.revision).toBe(1);
+
+    // And the stage takes the next gesture, rather than ignoring every pointer.
+    fireEvent.pointerDown(handle, { pointerId: 45, clientX: 500, clientY: 300 });
+    expect(store.getState().isTransforming).toBe(true);
+    fireEvent.pointerMove(handle, { pointerId: 45, clientX: 650, clientY: 260 });
+    fireEvent.pointerUp(handle, { pointerId: 45, clientX: 650, clientY: 260 });
+    expect(commit).toHaveBeenCalledTimes(1);
+  });
+
+  // A normal release nulls the preview on pointerup, so the browser's implicit
+  // capture release that follows must not undo the commit.
+  test("leaves a committed gesture alone when the capture is released after it", () => {
+    const store = fixtureStore();
+    store.getState().setToolMode("rotate");
+    const commit = vi.spyOn(store.getState(), "commitTransform");
+    renderStage(store);
+    const handle = screen.getByTestId("rotation-handle-table_01");
+
+    fireEvent.pointerDown(handle, { pointerId: 46, clientX: 500, clientY: 300 });
+    fireEvent.pointerMove(handle, { pointerId: 46, clientX: 650, clientY: 260 });
+    fireEvent.pointerUp(handle, { pointerId: 46, clientX: 650, clientY: 260 });
+    fireEvent.lostPointerCapture(handle, { pointerId: 46 });
+
+    expect(commit).toHaveBeenCalledTimes(1);
+    expect(store.getState().scene.revision).toBe(2);
     expect(store.getState().isTransforming).toBe(false);
   });
 
@@ -1209,7 +1282,65 @@ describe("RoomPhotoStage", () => {
     expect(frame.dataset.photoApproximate).toBe("true");
     expect(frame.dataset.photoMirrored).toBe("true");
     expect(frame.style.transform).not.toContain("rotate(");
-    expect(screen.getByText(/approximate/i)).toBeInTheDocument();
+    // The pill is gone from the room: the flag stays on the frame and on the
+    // drawn picture, and the words belong to the inspector.
+    expect(screen.queryByText("Approximate view")).toBeNull();
+    expect(
+      within(frame).getByRole("button").querySelector("img"),
+    ).toHaveAttribute("data-photo-approximate", "true");
+  });
+
+  // Important QA regression: dragging a piece past the room's centre line
+  // re-ran the room-centre tie-break, so the cutout flipped left/right under
+  // the pointer. The twin is re-decided on release instead.
+  test("keeps a dragged cutout's twin until the pointer is released", () => {
+    const store = fixtureStore();
+    const start = objectFromStore(store, "sofa_01");
+    act(() => {
+      store
+        .getState()
+        .commitTransform("sofa_01", [-0.4, start.position[1], start.position[2]], 0);
+    });
+    renderStage(store);
+    const sofa = screen.getByRole("button", { name: "Sofa" });
+    const mirrored = () =>
+      screen.getByTestId("photo-object-frame-sofa_01").dataset.photoMirrored;
+    expect(mirrored()).toBe("false");
+
+    fireEvent.pointerDown(sofa, { pointerId: 61, clientX: 500, clientY: 400 });
+    fireEvent.pointerMove(sofa, { pointerId: 61, clientX: 620, clientY: 400 });
+    expect(mirrored()).toBe("false");
+    fireEvent.pointerMove(sofa, { pointerId: 61, clientX: 760, clientY: 400 });
+    expect(mirrored()).toBe("false");
+
+    fireEvent.pointerUp(sofa, { pointerId: 61, clientX: 760, clientY: 400 });
+
+    expect(objectFromStore(store, "sofa_01").position[0]).toBeGreaterThan(0);
+    expect(mirrored()).toBe("true");
+  });
+
+  // Important QA regression: the pill appeared on a 15° turn (the mirrored twin
+  // the tie-break picked sits 50° away) but not on a 30° one.
+  test("does not call a front-quarter turn approximate on either side", () => {
+    const store = fixtureStore();
+    store.getState().selectObject("chair_01");
+    store.getState().setToolMode("rotate");
+    renderStage(store);
+    const chair = screen.getByRole("button", { name: "Chair" });
+    const frame = screen.getByTestId("photo-object-frame-chair_01");
+
+    act(() => store.getState().commitTransform("chair_01", [1.4, 0.425, 0.6], 0));
+    expect(frame.dataset.photoMirrored).toBe("true");
+    expect(frame.dataset.photoApproximate).toBe("false");
+
+    fireEvent.keyDown(chair, { key: "ArrowRight", shiftKey: true });
+    expect(objectFromStore(store, "chair_01").rotation[1]).toBeCloseTo(
+      (15 * Math.PI) / 180,
+    );
+    expect(frame.dataset.photoApproximate).toBe("false");
+
+    fireEvent.keyDown(chair, { key: "ArrowRight", shiftKey: true });
+    expect(frame.dataset.photoApproximate).toBe("false");
   });
 });
 
@@ -1315,20 +1446,64 @@ describe("keyboard focus", () => {
     expect(document.activeElement).toBe(field);
   });
 
-  test("reaches the cutout when the move tool is picked, so arrows move it", () => {
+  test("reaches the cutout when a tool is picked, so arrows reach the piece", () => {
     const { store } = renderStage();
     expect(store.getState().scene.selectedObjectId).toBe("table_01");
-    const before = objectFromStore(store, "table_01").position[0];
+    const before = objectFromStore(store, "table_01").rotation[1];
 
-    act(() => store.getState().setToolMode("move"));
+    act(() => store.getState().setToolMode("rotate"));
 
     const table = screen.getByRole("button", { name: "Coffee table" });
     expect(document.activeElement).toBe(table);
 
     fireEvent.keyDown(document.activeElement!, { key: "ArrowRight" });
 
-    expect(objectFromStore(store, "table_01").position[0]).toBeCloseTo(
-      before + 0.08,
+    expect(objectFromStore(store, "table_01").rotation[1]).toBeCloseTo(
+      before + (5 * Math.PI) / 180,
     );
+  });
+
+  // Important QA regression: clicking the already-active tool, or the rail item
+  // for the already-selected piece, was a silent no-op that left focus (and so
+  // the arrow keys) on the button that was clicked.
+  test("clicking Rotate twice keeps arrows working", () => {
+    const store = fixtureStore();
+    vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockReturnValue(
+      STAGE_RECT,
+    );
+    render(
+      <SceneStoreProvider store={store}>
+        <button
+          data-rail-object-id="table_01"
+          onClick={() => store.getState().selectObject("table_01")}
+          type="button"
+        >
+          Coffee table rail
+        </button>
+        <RoomPhotoStage />
+      </SceneStoreProvider>,
+    );
+    const rotateTool = () => act(() => store.getState().setToolMode("rotate"));
+    const table = screen.getByRole("button", { name: "Coffee table" });
+    const rail = screen.getByRole("button", { name: "Coffee table rail" });
+
+    rotateTool();
+    expect(document.activeElement).toBe(table);
+
+    // The keyboard user walks back to the rail, then re-picks the same tool.
+    act(() => rail.focus());
+    rotateTool();
+    expect(document.activeElement).toBe(table);
+
+    const before = objectFromStore(store, "table_01").rotation[1];
+    fireEvent.keyDown(document.activeElement!, { key: "ArrowRight" });
+    expect(objectFromStore(store, "table_01").rotation[1]).toBeCloseTo(
+      before + (5 * Math.PI) / 180,
+    );
+
+    // And re-clicking the rail item for the piece that is already selected.
+    act(() => rail.focus());
+    fireEvent.click(rail);
+    expect(document.activeElement).toBe(table);
   });
 });

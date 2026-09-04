@@ -35,7 +35,9 @@ import {
 } from "./photo-projection";
 import {
   getPhotoAssetSet,
+  isRadial,
   selectPhotoView,
+  type IncumbentView,
   type SelectedPhotoView,
 } from "./photo-views";
 import type { NormalizedPoint } from "./photo-calibration";
@@ -49,6 +51,12 @@ interface TransformPreview {
   startPointerAngle: number;
   startPosition: Vec3;
   startRotationY: number;
+  /**
+   * The twin the cutout was already drawn with when the gesture began. The
+   * preview keeps it, so a piece dragged past the room's centre line does not
+   * flip left/right under the pointer; the choice is re-made on release.
+   */
+  incumbentView: IncumbentView | undefined;
   position: Vec3;
   rotationY: number;
   changed: boolean;
@@ -82,8 +90,22 @@ const NON_TEXT_INPUT_TYPES = new Set([
   "submit",
 ]);
 
+type NudgeDirection = "left" | "right" | "back" | "forward";
+
 function objectLabel(object: SceneObject) {
   return object.product?.title ?? OBJECT_LABELS[object.type];
+}
+
+/**
+ * A radial cutout is the same photograph at every angle, so turning a lamp or a
+ * plant changes nothing anyone can see — except the floor clamp sliding it
+ * sideways. A rug is the exception: its floor homography draws the turn, so the
+ * one radial type that can show a rotation keeps its handle and its arrow keys.
+ */
+export function turnIsVisible(object: Pick<SceneObject, "assetId" | "type">) {
+  return (
+    object.type === "rug" || !isRadial(object.type, getPhotoAssetSet(object))
+  );
 }
 
 /**
@@ -135,13 +157,21 @@ function pointerAngle(point: NormalizedPoint, anchor: NormalizedPoint) {
 export function RoomPhotoStage() {
   const scene = useSceneStore((state) => state.scene);
   const toolMode = useSceneStore((state) => state.toolMode);
+  // Every tool pick and every rail click bumps this, so re-picking the active
+  // tool still hands the arrow keys back to the room.
+  const focusRequest = useSceneStore((state) => state.focusRequest);
   const selectedObjectId = scene.selectedObjectId;
   const sceneStore = useSceneStoreApi();
   const stageRef = useRef<HTMLElement>(null);
   // Initialised to the mounted values, so neither the mount nor Strict Mode's
-  // repeated mount effect counts as a change: pulling focus into the room on
+  // repeated mount effect counts as a request: pulling focus into the room on
   // load would skip the header and the rail for keyboard users.
-  const lastFocusTargetRef = useRef({ id: selectedObjectId, tool: toolMode });
+  const lastFocusRequestRef = useRef({
+    id: selectedObjectId,
+    request: focusRequest,
+    tool: toolMode,
+  });
+  const [srNote, setSrNote] = useState("");
   const transformPreviewRef = useRef<TransformPreview | null>(null);
   const previewListenersRef = useRef(new Set<() => void>());
   const subscribeToTransformPreview = useCallback((listener: () => void) => {
@@ -192,24 +222,31 @@ export function RoomPhotoStage() {
   // be left pressing arrows at the rail. Focus follows the selection into the
   // room instead, and follows a tool change too, so the arrows work at once.
   useEffect(() => {
-    const last = lastFocusTargetRef.current;
-    const changed = last.id !== selectedObjectId || last.tool !== toolMode;
-    lastFocusTargetRef.current = { id: selectedObjectId, tool: toolMode };
-    if (!changed) return;
+    const last = lastFocusRequestRef.current;
+    const requested =
+      last.request !== focusRequest ||
+      last.id !== selectedObjectId ||
+      last.tool !== toolMode;
+    lastFocusRequestRef.current = {
+      id: selectedObjectId,
+      request: focusRequest,
+      tool: toolMode,
+    };
+    if (!requested) return;
     // Deselecting (Escape, or a click on the backdrop) leaves the cutout focused,
     // so the room still paints a focus ring on a piece the inspector calls
     // unselected. Focus goes back where the selection came from: the rail button
     // for that object, or the stage itself when the rail is not rendered.
     if (!selectedObjectId) {
       const active = document.activeElement;
-      if (
-        last.id &&
-        active instanceof HTMLElement &&
-        stageRef.current?.contains(active) &&
-        active.closest("[data-object-id]")
-      ) {
+      const cutout =
+        active instanceof HTMLElement && stageRef.current?.contains(active)
+          ? active.closest<HTMLElement>("[data-object-id]")
+          : null;
+      const clearedId = cutout?.dataset.objectId;
+      if (clearedId) {
         const rail = document.querySelector<HTMLElement>(
-          `[data-rail-object-id="${CSS.escape(last.id)}"]`,
+          `[data-rail-object-id="${CSS.escape(clearedId)}"]`,
         );
         (rail ?? stageRef.current)?.focus({ preventScroll: true });
       }
@@ -228,7 +265,7 @@ export function RoomPhotoStage() {
 
     const cutout = stageRef.current?.querySelector<HTMLButtonElement>(selector);
     cutout?.focus({ preventScroll: true });
-  }, [selectedObjectId, toolMode]);
+  }, [focusRequest, selectedObjectId, toolMode]);
 
   function startTransform(
     object: SceneObject,
@@ -247,9 +284,17 @@ export function RoomPhotoStage() {
       scene.room,
     );
 
+    const set = getPhotoAssetSet(object);
+    // Rugs are drawn by floor homography, never by a chosen twin.
+    const incumbentView =
+      set && object.type !== "rug"
+        ? { mirrored: selectPhotoView(object, set).mirrored }
+        : undefined;
+
     capturePointer(event.currentTarget, event.pointerId);
     transformPreviewRef.current = {
       kind,
+      incumbentView,
       pointerId: event.pointerId,
       objectId: object.id,
       startPointer,
@@ -396,25 +441,38 @@ export function RoomPhotoStage() {
 
     if (object.locked || scene.selectedObjectId !== object.id) return;
 
-    if (toolMode === "move") {
+    // Select is the default tool and the one a piece is dragged with, so the
+    // arrows nudge there too; Rotate keeps the horizontal pair for turning.
+    if (toolMode === "select") {
       const step = event.shiftKey ? MOVE_SHIFT_STEP_M : MOVE_STEP_M;
       const position: Vec3 = [...object.position];
+      let direction: NudgeDirection;
 
-      if (event.key === "ArrowLeft") position[0] -= step;
-      else if (event.key === "ArrowRight") position[0] += step;
-      else if (event.key === "ArrowUp") position[2] -= step;
-      else if (event.key === "ArrowDown") position[2] += step;
-      else return;
+      if (event.key === "ArrowLeft") {
+        position[0] -= step;
+        direction = "left";
+      } else if (event.key === "ArrowRight") {
+        position[0] += step;
+        direction = "right";
+      } else if (event.key === "ArrowUp") {
+        position[2] -= step;
+        direction = "back";
+      } else if (event.key === "ArrowDown") {
+        position[2] += step;
+        direction = "forward";
+      } else return;
 
       event.preventDefault();
       sceneStore
         .getState()
         .commitTransform(object.id, position, object.rotation[1]);
+      setSrNote(`${objectLabel(object)} moved ${direction}`);
       return;
     }
 
     if (
       toolMode === "rotate" &&
+      turnIsVisible(object) &&
       (event.key === "ArrowLeft" || event.key === "ArrowRight")
     ) {
       const step = event.shiftKey
@@ -427,6 +485,11 @@ export function RoomPhotoStage() {
         object.id,
         object.position,
         object.rotation[1] + direction * step,
+      );
+      setSrNote(
+        `${objectLabel(object)} turned ${Math.round((step * 180) / Math.PI)}° to the ${
+          direction === -1 ? "left" : "right"
+        }`,
       );
     }
   }
@@ -475,7 +538,13 @@ export function RoomPhotoStage() {
       // vertical cutouts are chosen by front vector.
       if (object.type === "rug") continue;
       const set = getPhotoAssetSet(object);
-      const selected = set ? selectPhotoView(object, set) : null;
+      // Mid-gesture the twin recorded at pointer-down wins the tie-break, so the
+      // cutout is steady under the pointer; released, the room decides again.
+      const incumbent =
+        transformPreview?.objectId === object.id
+          ? transformPreview.incumbentView
+          : undefined;
+      const selected = set ? selectPhotoView(object, set, incumbent) : null;
       views.set(object.id, selected);
       presentations.set(object.id, {
         view: selected?.view.view,
@@ -569,6 +638,19 @@ export function RoomPhotoStage() {
       // stage is never a tab stop: -1 makes it programmatically focusable only.
       tabIndex={-1}
     >
+      {/*
+        A keyboard nudge or turn moves pixels only; without this the change is
+        silent for a screen reader. It lives inside the stage so it survives
+        every re-render of the cutouts above it.
+      */}
+      <span
+        aria-live="polite"
+        className={styles.visuallyHidden}
+        role="status"
+      >
+        {srNote}
+      </span>
+
       {renderModel.rugObjects.map((object) => {
         const placement = renderModel.placements.get(object.id)!;
         const selected = scene.selectedObjectId === object.id;
@@ -580,10 +662,14 @@ export function RoomPhotoStage() {
             object={object}
             onClick={() => sceneStore.getState().selectObject(object.id)}
             onKeyDown={(event) => handleObjectKeyDown(object, event)}
+            onLostPointerCapture={(event) => cancelTransform(object, event)}
             onPointerCancel={(event) => cancelTransform(object, event)}
             onPointerDown={(event) => startTransform(object, event, "move")}
             onPointerMove={(event) => previewMove(object, event)}
             onPointerUp={(event) => finishTransform(object, event)}
+            onRotationLostPointerCapture={(event) =>
+              cancelTransform(object, event)
+            }
             onRotationPointerCancel={(event) =>
               cancelTransform(object, event)
             }
@@ -625,10 +711,14 @@ export function RoomPhotoStage() {
             object={object}
             onClick={() => sceneStore.getState().selectObject(object.id)}
             onKeyDown={(event) => handleObjectKeyDown(object, event)}
+            onLostPointerCapture={(event) => cancelTransform(object, event)}
             onPointerCancel={(event) => cancelTransform(object, event)}
             onPointerDown={(event) => startTransform(object, event, "move")}
             onPointerMove={(event) => previewMove(object, event)}
             onPointerUp={(event) => finishTransform(object, event)}
+            onRotationLostPointerCapture={(event) =>
+              cancelTransform(object, event)
+            }
             onRotationPointerCancel={(event) =>
               cancelTransform(object, event)
             }
@@ -640,7 +730,10 @@ export function RoomPhotoStage() {
             placement={placement}
             selected={selected}
             showRotationHandle={
-              selected && toolMode === "rotate" && !object.locked
+              selected &&
+              toolMode === "rotate" &&
+              !object.locked &&
+              turnIsVisible(object)
             }
             view={renderModel.views.get(object.id) ?? null}
             visualWidth={objectVisualWidth(object, scene.room, presentationFor(object))}

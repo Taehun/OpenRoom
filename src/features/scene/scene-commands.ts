@@ -1,3 +1,4 @@
+import { objectDisplayName } from "../demo/object-labels";
 import {
   footprintCorners,
   objectFootprint,
@@ -16,6 +17,8 @@ import { settleElevations } from "./support";
 const ROOM_INSET_M = 0.1;
 /** A corner this far outside the room is floating-point noise, not an overhang. */
 const CORNER_EPSILON = 1e-9;
+/** A requested XZ this close to the current one is the same floor spot. */
+const POSITION_EPSILON_M = 1e-9;
 
 function failure(
   scene: Scene,
@@ -106,6 +109,73 @@ export function clampPositionToRoom(
   return {
     position: [x, object.position[1], z],
     adjustedToFit: x !== requested.x || z !== requested.z,
+  };
+}
+
+/** Yaw in degrees, folded into (-180, 180] and rounded for a human to read. */
+function readableDegrees(radiansOrDegrees: number, isRadians: boolean): number {
+  const degrees = isRadians
+    ? (radiansOrDegrees * 180) / Math.PI
+    : radiansOrDegrees;
+  const folded = ((((degrees + 180) % 360) + 360) % 360) - 180;
+  const rounded = Math.round(folded === -180 ? 180 : folded);
+  return rounded === 0 ? 0 : rounded;
+}
+
+/**
+ * A turn in place: the request either carried no position or asked for the one
+ * the object already occupies. The keyboard, the rotation handle and a
+ * `move_object` call that only sets `rotationYDegrees` all arrive this way.
+ */
+function isTurnInPlace(
+  object: SceneObject,
+  requested: { x: number; z: number } | undefined,
+): boolean {
+  return (
+    requested === undefined ||
+    (Math.abs(requested.x - object.position[0]) <= POSITION_EPSILON_M &&
+      Math.abs(requested.z - object.position[2]) <= POSITION_EPSILON_M)
+  );
+}
+
+/**
+ * Spec §4, turning in place: a turn is not a move, so the object keeps its floor
+ * spot unless a corner of the *turned* rectangle would leave the room, and then
+ * it slides by exactly that overshoot. Re-centring the turned bounding box (what
+ * a full move does) walked a piece across the floor on every rotation step and
+ * never walked it back. `null` means no position can hold the turned footprint:
+ * the 2.4 x 1.7 m rug spans 2.9 m diagonally in a 2.72 m deep room.
+ */
+export function clampTurnInPlace(
+  scene: Scene,
+  object: SceneObject,
+): { position: Vec3; adjustedToFit: boolean } | null {
+  const corners = footprintCorners(objectFootprint(object));
+  const xs = corners.map((corner) => corner.x);
+  const zs = corners.map((corner) => corner.z);
+  const minimumX = Math.min(...xs);
+  const maximumX = Math.max(...xs);
+  const minimumZ = Math.min(...zs);
+  const maximumZ = Math.max(...zs);
+  if (
+    maximumX - minimumX > scene.room.width + CORNER_EPSILON ||
+    maximumZ - minimumZ > scene.room.depth + CORNER_EPSILON
+  ) {
+    return null;
+  }
+
+  const halfWidth = scene.room.width / 2;
+  const halfDepth = scene.room.depth / 2;
+  let x = object.position[0];
+  let z = object.position[2];
+  if (minimumX < -halfWidth - CORNER_EPSILON) x += -halfWidth - minimumX;
+  else if (maximumX > halfWidth + CORNER_EPSILON) x -= maximumX - halfWidth;
+  if (minimumZ < -halfDepth - CORNER_EPSILON) z += -halfDepth - minimumZ;
+  else if (maximumZ > halfDepth + CORNER_EPSILON) z -= maximumZ - halfDepth;
+
+  return {
+    position: [x, object.position[1], z],
+    adjustedToFit: x !== object.position[0] || z !== object.position[2],
   };
 }
 
@@ -209,6 +279,13 @@ export function applySceneCommand(
     );
   }
 
+  const previousRotationY = object.rotation[1];
+  // Measured before the rotation lands, so "the position it already has" is the
+  // one the caller could have read from the Scene.
+  const requestedPosition = isTurnInPlace(object, request.command.position)
+    ? undefined
+    : request.command.position;
+
   // The rotation lands first: the footprint clamp below measures the oriented
   // rectangle, and a turn changes how far the object reaches toward each wall.
   if (request.command.rotationYDegrees !== undefined) {
@@ -218,11 +295,40 @@ export function applySceneCommand(
       object.rotation[2],
     ];
   }
-  const { position, adjustedToFit } = clampPositionToRoom(
-    nextScene,
-    object,
-    request.command.position,
-  );
+
+  let position: Vec3;
+  let adjustedToFit: boolean;
+  let message = `${object.id} moved.`;
+  if (requestedPosition === undefined) {
+    const held = clampTurnInPlace(nextScene, object);
+    if (held) {
+      ({ position, adjustedToFit } = held);
+    } else {
+      // Nowhere on this floor holds the turned footprint, so the turn is
+      // refused outright rather than half-applied against a wall.
+      const requestedDegrees = readableDegrees(
+        request.command.rotationYDegrees ?? previousRotationY,
+        request.command.rotationYDegrees === undefined,
+      );
+      object.rotation = [
+        object.rotation[0],
+        previousRotationY,
+        object.rotation[2],
+      ];
+      position = [...object.position];
+      adjustedToFit = true;
+      message = `${objectDisplayName(object)} kept at ${readableDegrees(
+        previousRotationY,
+        true,
+      )}°: it does not fit the room at ${requestedDegrees}°.`;
+    }
+  } else {
+    ({ position, adjustedToFit } = clampPositionToRoom(
+      nextScene,
+      object,
+      requestedPosition,
+    ));
+  }
   object.position = position;
   object.addedBy = request.actor;
   nextScene.revision += 1;
@@ -232,7 +338,7 @@ export function applySceneCommand(
   const settledScene = settleElevations(nextScene);
   const settledObject = findObject(settledScene, request.command.objectId);
 
-  return success(scene, settledScene, `${object.id} moved.`, {
+  return success(scene, settledScene, message, {
     adjustedToFit,
     appliedPosition: settledObject?.position ?? position,
   });

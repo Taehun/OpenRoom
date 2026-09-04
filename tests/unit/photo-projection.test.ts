@@ -562,8 +562,28 @@ describe("photo projection", () => {
       .toBeNull();
     expect(projectRugPlacement(rug, asset, scene.room, { ...stage, height: 0 }))
       .toBeNull();
+  });
+
+  // Important QA regression: a rug turned past ~30° pushes a corner off the
+  // floor, the projection gave up, and the layer swapped to the flat fallback
+  // mid-gesture — a CSS-rotated rug drawn as a diamond climbing the back wall.
+  it("keeps projecting a rug whose turned corners reach past the floor", () => {
+    const scene = completedProductScene();
+    const rug = structuredClone(
+      scene.objects.find(({ id }) => id === "rug_01")!,
+    );
+    const asset = PHOTO_ASSETS[rug.assetId!]!;
+    const stage = { width: 1024, height: 576 };
+
+    for (const degrees of [15, 30, 45, 60]) {
+      rug.rotation[1] = (degrees * Math.PI) / 180;
+      expect(projectRugPlacement(rug, asset, scene.room, stage)).not.toBeNull();
+    }
+
+    // Even a drag preview run into the wall keeps its homography: the corners
+    // are projected onto the floor's edge rather than abandoned.
     rug.position[0] = scene.room.width / 2;
-    expect(projectRugPlacement(rug, asset, scene.room, stage)).toBeNull();
+    expect(projectRugPlacement(rug, asset, scene.room, stage)).not.toBeNull();
   });
 
   it("serializes a homography in DOMMatrix column order", () => {
