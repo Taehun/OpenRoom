@@ -658,7 +658,7 @@
   position: relative;
   z-index: 3;
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-columns: auto minmax(0, 1fr);
   align-items: start;
   gap: 10px;
   min-height: 128px;
@@ -693,8 +693,12 @@
   min-width: 0;
 }
 
+/* The status chips and the one action share a row that wraps as a unit, so
+   the composer stays two rows tall from 1000px up. */
 .composerChips {
-  display: grid;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
   gap: 6px;
 }
 
@@ -706,25 +710,29 @@
   line-height: var(--md-sys-typescale-body-small-line-height);
 }
 
+/* Takes the width the action leaves and wraps chip by chip inside it, so the
+   pair never pushes the action onto a row of its own. */
 .agentStatusRow {
   display: flex;
+  flex: 1 1 0;
   flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+/* Nested in `.agentStatusRow`, so the pair reads as one row and wraps as one
+   wherever the composer is wide enough to hold it. */
+.localAgent {
+  display: flex;
   align-items: center;
   gap: 6px;
 }
 
 .composer .agentButton {
-  grid-column: 3;
-  grid-row: 1;
-  height: 44px;
-  margin-top: 1px;
-}
-
-/* Nested in `.agentStatusRow`, so the pair reads as one row and wraps as one. */
-.localAgent {
-  display: flex;
-  align-items: center;
-  gap: 6px;
+  align-self: center;
+  height: 36px;
+  margin-inline-start: auto;
 }
 
 /* Scoped to `[open]` so the closed dialog keeps the UA `display: none`. */
@@ -1428,26 +1436,12 @@
     grid-template-columns: minmax(0, 1fr) 320px;
   }
 
-  /* Under 1280px the status chips share one wrapping row. */
-  .composerChips {
-    display: flex;
-    flex-wrap: wrap;
-  }
-
-  .agentStatusRow {
+  /* Under 1280px the composer cannot hold the status pair as a block. Both
+     wrappers step out of the box tree so every chip and the action pack one
+     wrapping row, which keeps the composer two rows tall down to 1000px. */
+  .agentStatusRow,
+  .localAgent {
     display: contents;
-  }
-
-  /* The prompt takes the full width and the button drops under the chips. */
-  .composer {
-    grid-template-columns: auto minmax(0, 1fr);
-  }
-
-  .composer .agentButton {
-    grid-column: 2;
-    grid-row: 2;
-    justify-self: end;
-    margin-top: 0;
   }
 }
 

@@ -257,15 +257,15 @@ export function RoomCanvas({
                 </div>
                 <LocalAgentStatus relay={localMcp} />
               </div>
+              <button
+                className={`md-button md-button--filled ${styles.agentButton}`}
+                onClick={copyPrompt}
+                type="button"
+              >
+                Copy redesign prompt
+              </button>
             </div>
           </div>
-          <button
-            className={`md-button md-button--filled ${styles.agentButton}`}
-            onClick={copyPrompt}
-            type="button"
-          >
-            Copy redesign prompt
-          </button>
           {copyStatus ? (
             <span
               aria-label="Prompt copy status"
