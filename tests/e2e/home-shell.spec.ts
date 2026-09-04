@@ -135,7 +135,7 @@ test("keeps the room across the guide round trip from /demo", async ({
   await page.setViewportSize({ width: 1280, height: 800 });
   await page.goto("/demo");
 
-  const diagnostics = page.getByRole("status", { name: "Scene diagnostics" });
+  const diagnostics = page.getByTestId("scene-diagnostics");
   const roomCanvas = page.getByRole("main", { name: "Room canvas" });
   const viewCart = page.getByRole("button", { name: /^View cart/ });
   await expect(roomCanvas).toBeVisible();
