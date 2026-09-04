@@ -34,7 +34,7 @@
     "start:vinext": "wrangler dev --config dist/server/wrangler.json",
     "deploy:vinext": "vinext-cloudflare deploy --config dist/server/wrangler.json",
     "build:pages": "NEXT_OUTPUT=export next build --webpack",
-    "deploy:pages": "wrangler pages deploy out --project-name openroom --branch main --commit-dirty=true"
+    "deploy:pages": "wrangler pages deploy out --project-name openroom-webmcp --branch main --commit-dirty=true"
   },
   "dependencies": {
     "@modelcontextprotocol/server": "^2.0.0",
