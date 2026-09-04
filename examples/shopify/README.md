@@ -49,11 +49,16 @@ In the same dashboard, **Apps** → **Create app** → **Start from Dev Dashboar
    **API access → Scopes** enter exactly:
 
    ```text
-   read_products,write_products,write_publications
+   read_products,write_products,write_publications,write_online_store_navigation,write_online_store_pages
    ```
 
    Then select **Release**. Without a released version the scopes are not
    granted, and the token below comes back with an empty `scope`.
+
+   The first three are all `pnpm shop:seed`, `shop:variants`, and
+   `shop:collections` need. The last two belong to `pnpm shop:content`, which
+   writes the storefront's pages and rewrites its menus; leave them out and
+   that one script stops and names what is missing.
 2. **Home** → **Install app** → pick the development store → **Install**. The
    browser lands on the app URL with `hmac` and `host` query parameters; that
    redirect *is* the completed install, and the page itself does not matter.
