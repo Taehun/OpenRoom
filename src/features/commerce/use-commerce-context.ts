@@ -8,6 +8,8 @@ import { BUILD_COMMERCE } from "./commerce-runtime";
 import { readStoredStoreDomain, writeStoredStoreDomain } from "./store-storage";
 import { ACTIVE_SHOPIFY_VARIANTS } from "./shopify-variants";
 
+const EMPTY_SHOPIFY_VARIANTS = Object.freeze({});
+
 const BUILD_ENV = {
   NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN: process.env.NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN,
   NEXT_PUBLIC_SITE_ORIGIN: process.env.NEXT_PUBLIC_SITE_ORIGIN,
@@ -44,13 +46,22 @@ export function useCommerceContext(): CommerceController {
   }, []);
 
   const commerce = useMemo<CommerceContext>(
-    () =>
-      hydrated && storedDomain !== null
-        ? {
-            config: resolveCommerceConfig(BUILD_ENV, storedDomain),
-            variants: ACTIVE_SHOPIFY_VARIANTS,
-          }
-        : BUILD_COMMERCE,
+    () => {
+      if (!hydrated || storedDomain === null) return BUILD_COMMERCE;
+
+      const config = resolveCommerceConfig(BUILD_ENV, storedDomain);
+      const usesBuildStore =
+        config.status !== "connected" ||
+        (BUILD_COMMERCE.config.status === "connected" &&
+          config.storeDomain === BUILD_COMMERCE.config.storeDomain);
+
+      return {
+        config,
+        variants: usesBuildStore
+          ? ACTIVE_SHOPIFY_VARIANTS
+          : EMPTY_SHOPIFY_VARIANTS,
+      };
+    },
     [hydrated, storedDomain],
   );
 

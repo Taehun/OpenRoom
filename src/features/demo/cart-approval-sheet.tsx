@@ -102,13 +102,13 @@ export function CartApprovalSheet({
     [commerceDraft],
   );
 
-  const totalMinor = isConnected
-    ? lines
-        .filter(({ productId }) => mappedProductIds.has(productId))
-        .reduce((total, line) => total + line.priceMinor, 0)
-    : draft.totalMinor;
-  const total = formatPrice(totalMinor);
   const checkoutUrl = commerceDraft?.checkoutPermalink ?? null;
+  const totalMinor = checkoutUrl === null
+    ? draft.totalMinor
+    : lines
+        .filter(({ productId }) => mappedProductIds.has(productId))
+        .reduce((total, line) => total + line.priceMinor, 0);
+  const total = formatPrice(totalMinor);
   const productLinks = commerceDraft?.productLinks ?? [];
   const titleByProductId = useMemo(
     () => new Map(lines.map(({ productId, title }) => [productId, title])),

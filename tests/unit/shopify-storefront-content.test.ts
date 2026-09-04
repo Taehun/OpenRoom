@@ -18,6 +18,7 @@ import {
   parsePageSource,
   syncPages,
 } from "../../examples/shopify/src/pages";
+import { parseThemeJson } from "../../examples/shopify/src/theme-settings";
 
 const PAGES = loadPagePlans();
 const IDS = {
@@ -358,5 +359,40 @@ describe("no invented commercial claims", () => {
       "utf8",
     );
     expect(announcement).toMatch(/demo/i);
+  });
+});
+
+describe("the committed home template", () => {
+  interface ProductListHeader {
+    blocks: { view_all: { settings: { style_class: string } } };
+  }
+
+  interface HomeTemplate {
+    sections: {
+      featured_sofa: { blocks: { "static-header": ProductListHeader } };
+      featured_lighting: { blocks: { "static-header": ProductListHeader } };
+      brand_story: { settings: { section_height: string } };
+    };
+  }
+
+  const source = readFileSync(
+    join(PAGES_DIR, "..", "..", "theme", "templates", "index.json"),
+    "utf8",
+  );
+  const home = parseThemeJson<HomeTemplate>(source);
+
+  it("uses valid Horizon link-button styles", () => {
+    expect(
+      home.sections.featured_sofa.blocks["static-header"].blocks.view_all.settings
+        .style_class,
+    ).toBe("button-unstyled");
+    expect(
+      home.sections.featured_lighting.blocks["static-header"].blocks.view_all.settings
+        .style_class,
+    ).toBe("button-unstyled");
+  });
+
+  it("uses Horizon's automatic section-height value", () => {
+    expect(home.sections.brand_story.settings.section_height).toBe("");
   });
 });

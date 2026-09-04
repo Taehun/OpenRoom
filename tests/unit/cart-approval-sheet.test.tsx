@@ -381,6 +381,9 @@ describe("CartApprovalSheet in shopify mode", () => {
         "No item in this cart is mapped to a Shopify variant yet.",
       ),
     ).toBeVisible();
+    expect(
+      screen.getByText("Catalog estimate").parentElement?.parentElement,
+    ).toHaveTextContent("$318 USD");
   });
 });
 

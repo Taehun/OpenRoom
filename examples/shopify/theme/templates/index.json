@@ -216,7 +216,7 @@
               "type": "_product-list-button",
               "settings": {
                 "label": "View all",
-                "style_class": "link"
+                "style_class": "button-unstyled"
               }
             }
           },
@@ -360,7 +360,7 @@
       "name": "Why OpenRoom",
       "settings": {
         "section_width": "page-width",
-        "section_height": "fit",
+        "section_height": "",
         "background_color": "#EFEDE8",
         "padding-block-start": 40,
         "padding-block-end": 40
@@ -395,7 +395,7 @@
               "type": "_product-list-button",
               "settings": {
                 "label": "View all",
-                "style_class": "link"
+                "style_class": "button-unstyled"
               }
             }
           },

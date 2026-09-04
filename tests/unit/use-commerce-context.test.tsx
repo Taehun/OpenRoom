@@ -3,6 +3,7 @@ import { renderToString } from "react-dom/server";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { useCommerceContext } from "../../src/features/commerce/use-commerce-context";
+import { BUILD_COMMERCE } from "../../src/features/commerce/commerce-runtime";
 import { STORE_DOMAIN_KEY } from "../../src/features/commerce/store-storage";
 
 afterEach(() => {
@@ -61,5 +62,27 @@ describe("useCommerceContext", () => {
   it("keeps the variant map from the build", () => {
     const { result } = renderHook(() => useCommerceContext());
     expect(Object.keys(result.current.commerce.variants).length).toBeGreaterThan(0);
+  });
+
+  it("drops build-store variants after switching to another store", () => {
+    const buildDomain =
+      BUILD_COMMERCE.config.status === "connected"
+        ? BUILD_COMMERCE.config.storeDomain
+        : null;
+    const switchedDomain =
+      buildDomain === "chosen.myshopify.com"
+        ? "alternate.myshopify.com"
+        : "chosen.myshopify.com";
+    const { result } = renderHook(() => useCommerceContext());
+
+    act(() => {
+      result.current.setStoreDomain(switchedDomain);
+    });
+
+    expect(result.current.commerce.config).toMatchObject({
+      status: "connected",
+      storeDomain: switchedDomain,
+    });
+    expect(result.current.commerce.variants).toEqual({});
   });
 });
