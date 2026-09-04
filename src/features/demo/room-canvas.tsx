@@ -171,6 +171,7 @@ export function RoomCanvas({
                         ? styles.objectButtonSelected
                         : styles.objectButton
                     }
+                    data-rail-object-id={object.id}
                     onClick={() => {
                       dispatch({ type: "select-object", objectId: object.id });
                       dispatch({ type: "show-inspector" });

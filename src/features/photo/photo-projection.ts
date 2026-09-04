@@ -263,6 +263,9 @@ export interface CutoutPresentation {
   view?: PhotoViewName;
   symmetry?: PhotoViewSymmetry;
   contentBox?: CutoutContentBox;
+  /** The chosen view's pixel dimensions; the drawn height follows from them. */
+  intrinsicWidth?: number;
+  intrinsicHeight?: number;
 }
 
 /**
@@ -365,6 +368,103 @@ export function objectElevationOffset(
       calibration,
     )
   );
+}
+
+/**
+ * The stage's width divided by its height. Every cutout is sized as a percentage of
+ * the stage width and keeps its picture's aspect, while `top` is a percentage of the
+ * stage height, so this ratio is what converts one into the other. The compositor's
+ * box is 16:9 by stylesheet; the measured size is used when there is one, and the
+ * declared ratio stands in before the first measurement.
+ */
+function stageAspectRatio(stage?: StageSize): number {
+  if (
+    stage &&
+    Number.isFinite(stage.width) &&
+    Number.isFinite(stage.height) &&
+    stage.width > 0 &&
+    stage.height > 0
+  ) {
+    return stage.width / stage.height;
+  }
+  return PHOTO_STAGE_WIDTH_UNITS / PHOTO_STAGE_HEIGHT_UNITS;
+}
+
+/**
+ * How far up the stage an object standing on another one is drawn, in stage-height
+ * fractions, measured from its own floor projection.
+ *
+ * `objectElevationOffset` answers the same question from the calibration alone, and
+ * for a supported object it is wrong twice over: it returns a fraction of the stage
+ * *width* where a fraction of the stage *height* is needed, and even corrected it
+ * lifts the object by the supporter's real height rather than to the top the
+ * supporter's photograph actually draws. A cutout is scaled by its width and keeps
+ * its picture's aspect, so its drawn top edge is wherever the picture puts it. The
+ * supporter's silhouette is measured instead: subtracting the height the calibration
+ * gives it leaves the vertical extent of its top surface, and the supported object
+ * rides that surface according to where its centre sits in the footprint's depth.
+ *
+ * Returns null when the supporter has no measured picture to stand on, so the caller
+ * can fall back to the calibrated elevation.
+ */
+export function supportedTopOffset(
+  object: Pick<SceneObject, "position">,
+  supporter: SceneObject,
+  supporterPresentation: CutoutPresentation,
+  room: SceneRoom,
+  stage?: StageSize,
+  calibration: PhotoCalibration = OPENROOM_PHOTO_CALIBRATION,
+): number | null {
+  const { contentBox, intrinsicWidth, intrinsicHeight } = supporterPresentation;
+  if (
+    !contentBox ||
+    !intrinsicWidth ||
+    !intrinsicHeight ||
+    intrinsicWidth <= 0 ||
+    intrinsicHeight <= 0 ||
+    !(supporter.dimensionsM.depth > 0)
+  ) {
+    return null;
+  }
+
+  const aspect = stageAspectRatio(stage);
+  const drawnImageHeight =
+    (objectVisualWidth(supporter, room, supporterPresentation, calibration) /
+      100) *
+    (intrinsicHeight / intrinsicWidth) *
+    aspect;
+  const supporterVisibleHeight =
+    drawnImageHeight * (contentBox.bottom - contentBox.top);
+  if (!Number.isFinite(supporterVisibleHeight) || supporterVisibleHeight <= 0) {
+    return null;
+  }
+
+  const supporterDrawnHeight =
+    supporter.dimensionsM.height *
+    verticalScaleAt(
+      floorDepthFraction(supporter.position[2], room),
+      room,
+      calibration,
+    ) *
+    aspect;
+  // Whatever the silhouette shows beyond the object's own height is its top
+  // surface seen from above. A picture shorter than the calibration expects has
+  // no visible top, and the object simply stands on the silhouette's crown.
+  const topDepth = clamp(
+    supporterVisibleHeight - supporterDrawnHeight,
+    0,
+    supporterVisibleHeight,
+  );
+  // 1 at the supporter's back edge, 0 at its front edge. The clamp only guards a
+  // rotated supporter, whose world-Z span is wider than its own depth.
+  const acrossTop = clamp(
+    0.5 -
+      (object.position[2] - supporter.position[2]) / supporter.dimensionsM.depth,
+    0,
+    1,
+  );
+
+  return supporterVisibleHeight - topDepth * acrossTop;
 }
 
 export function projectContactShadow(

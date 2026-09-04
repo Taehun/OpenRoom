@@ -9,15 +9,27 @@ import {
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
-import { objectVisualWidth } from "../../src/features/photo/photo-projection";
+import {
+  floorDepthFraction,
+  objectElevationOffset,
+  objectVisualWidth,
+  projectRoomPoint,
+  supportedTopOffset,
+  verticalScaleAt,
+  type CutoutPresentation,
+} from "../../src/features/photo/photo-projection";
 import { getPhotoAssetSet } from "../../src/features/photo/photo-views";
 import { selectPhotoView } from "../../src/features/photo/photo-views";
 import { createDemoScene } from "../../src/demo/demo-scene";
 import { DEMO_PRODUCTS } from "../../src/features/demo/demo-data";
 import { RoomPhotoStage } from "../../src/features/photo/room-photo-stage";
 import { SceneStoreProvider } from "../../src/features/scene/scene-context";
-import type { CommandResult } from "../../src/features/scene/scene-schema";
+import type {
+  CommandResult,
+  SceneObject,
+} from "../../src/features/scene/scene-schema";
 import { createSceneStore } from "../../src/features/scene/scene-store";
+import { supportOf } from "../../src/features/scene/support";
 
 const STAGE_RECT = {
   bottom: 676,
@@ -151,6 +163,48 @@ function objectFromStore(store: ReturnType<typeof createSceneStore>, id: string)
   return object;
 }
 
+const STAGE_SIZE = { width: STAGE_RECT.width, height: STAGE_RECT.height };
+const STAGE_ASPECT = STAGE_RECT.width / STAGE_RECT.height;
+
+/** What the compositor knows about the picture it draws for one object. */
+function presentationOf(object: SceneObject): CutoutPresentation {
+  const set = getPhotoAssetSet(object);
+  const selected = set ? selectPhotoView(object, set) : null;
+  return {
+    view: selected?.view.view,
+    symmetry: set?.symmetry,
+    contentBox: selected?.view.contentBox,
+    intrinsicWidth: selected?.view.intrinsicWidth,
+    intrinsicHeight: selected?.view.intrinsicHeight,
+  };
+}
+
+/**
+ * Where a rendered cutout's measured silhouette sits on the stage, as fractions of the
+ * stage height. jsdom lays nothing out, so the geometry is read back from the styles
+ * the compositor wrote: the frame's `top` is the object's floor anchor, its `width` is
+ * a percentage of the stage width, and the picture keeps its intrinsic aspect, so the
+ * stage's own 16:9 ratio turns that width into the drawn image's height.
+ */
+function silhouetteBounds(objectId: string, object: SceneObject) {
+  const frame = screen.getByTestId(`photo-object-frame-${objectId}`);
+  const view = selectPhotoView(object, getPhotoAssetSet(object)!);
+  const box = view.view.contentBox;
+  if (!box) throw new Error(`Missing content box for ${objectId}`);
+  const imageHeight =
+    (Number.parseFloat(frame.style.width) / 100) *
+    (view.view.intrinsicHeight / view.view.intrinsicWidth) *
+    STAGE_ASPECT;
+  const anchor = Number.parseFloat(frame.style.top) / 100;
+  const frameTop = anchor - view.view.anchorY * imageHeight;
+
+  return {
+    anchor,
+    top: frameTop + box.top * imageHeight,
+    bottom: frameTop + box.bottom * imageHeight,
+  };
+}
+
 describe("RoomPhotoStage", () => {
   test("measures and observes the 16:9 stage for projective composition", () => {
     const { stage, unmount } = renderStage();
@@ -239,16 +293,22 @@ describe("RoomPhotoStage", () => {
   test("gives a focused projected rug a fixed visible floor outline", () => {
     renderStage();
     const rug = screen.getByRole("button", { name: "Rug" });
-    const polygon = screen
+    // The halo is drawn first so it sits under the ring it backs; the ring
+    // itself is the second polygon.
+    const polygons = screen
       .getByTestId("photo-rug-selection-rug_01")
-      .querySelector("polygon");
-    if (!polygon) throw new Error("Missing rug focus polygon");
+      .querySelectorAll("polygon");
+    const [halo, outline] = polygons;
+    if (!halo || !outline) throw new Error("Missing rug focus polygons");
 
     rug.focus();
 
     expect(rug).toHaveFocus();
-    expect(polygon).toHaveAttribute("vector-effect", "non-scaling-stroke");
-    expect(polygon).toHaveAttribute("stroke-width", "3");
+    expect(outline).toHaveAttribute("vector-effect", "non-scaling-stroke");
+    expect(outline).toHaveAttribute("stroke-width", "3");
+    expect(halo).toHaveAttribute("vector-effect", "non-scaling-stroke");
+    expect(halo).toHaveAttribute("stroke-width", "11");
+    expect(halo).toHaveAttribute("points", outline.getAttribute("points"));
   });
 
   test("keeps a failed projected rug labelled and selectable", () => {
@@ -937,7 +997,13 @@ describe("RoomPhotoStage", () => {
     expect(outline.style.top).toBe(`${tableBox.top * 100}%`);
     expect(outline.style.width).toBe(`${(tableBox.right - tableBox.left) * 100}%`);
     expect(outline.style.height).toBe(`${(tableBox.bottom - tableBox.top) * 100}%`);
-    expect(screen.queryByTestId("photo-silhouette-chair_01")).toBeNull();
+    // The span is the room's only ring and is always rendered; the stylesheet
+    // colours it, so an unselected chair says so through aria-pressed instead.
+    expect(screen.getByTestId("photo-silhouette-chair_01")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Chair" })).toHaveAttribute(
+      "aria-pressed",
+      "false",
+    );
 
     act(() => store.getState().selectObject("chair_01"));
     const chair = objectFromStore(store, "chair_01");
@@ -978,9 +1044,11 @@ describe("RoomPhotoStage", () => {
     expect(expected("sofa_01")).toBeGreaterThan(24);
   });
 
-  // Spec §3: a supported object is lifted by its elevation times the vertical scale at
-  // its depth (0.72 / 6 m = 0.12 stage units per metre at mid depth), draws above the
-  // object it stands on, and leaves its contact shadow on the floor.
+  // Spec §3: a supported object is anchored to the top its supporter's photograph
+  // actually draws, draws one depth band above it, and leaves its contact shadow on
+  // the floor. The calibrated lift alone is not enough: it is a fraction of the stage
+  // width used where a fraction of the stage height is needed, and it measures the
+  // supporter's real height rather than the height of its picture.
   test("raises a stacked cutout above the floor and above its supporter", () => {
     const scene = fixtureScene();
     const table = scene.objects.find(({ id }) => id === "table_01")!;
@@ -997,10 +1065,19 @@ describe("RoomPhotoStage", () => {
     const tableFrame = screen.getByTestId("photo-object-frame-table_01");
     const lampShadow = screen.getByTestId("photo-contact-shadow-lamp_01");
 
+    const offset = supportedTopOffset(
+      lamp,
+      table,
+      presentationOf(table),
+      scene.room,
+      STAGE_SIZE,
+    );
+    if (offset === null) throw new Error("Missing supported top offset");
     expect(Number.parseFloat(lampFrame.style.top)).toBeCloseTo(
-      74 - 0.42 * (0.72 / 6) * 100,
+      74 - offset * 100,
       10,
     );
+    expect(offset).toBeGreaterThan(objectElevationOffset(lamp, scene.room));
     expect(Number.parseFloat(tableFrame.style.top)).toBeCloseTo(74, 10);
     expect(Number.parseFloat(lampShadow.style.top)).toBeCloseTo(74, 10);
     expect(Number(lampFrame.style.zIndex)).toBeGreaterThan(
@@ -1009,6 +1086,53 @@ describe("RoomPhotoStage", () => {
     expect(lampFrame).toContainElement(
       screen.getByTestId("photo-floor-anchor-lamp_01"),
     );
+  });
+
+  // Important QA regression: `move_object lamp_01 -> {x: -0.2, z: 0.4}` put the lamp
+  // on the Oak Frame Table by the inspector's reckoning while drawing it standing on
+  // the table's lower shelf. The lamp's own silhouette now bottoms out on the drawn
+  // tabletop.
+  test("stands a lamp moved onto the table on the tabletop it is drawn with", () => {
+    const store = createSceneStore(createDemoScene());
+    renderStage(store);
+    act(() => {
+      store.getState().commitTransform("lamp_01", [-0.2, 0, 0.4], 0);
+    });
+
+    const table = objectFromStore(store, "table_01");
+    const lamp = objectFromStore(store, "lamp_01");
+    expect(supportOf(store.getState().scene, lamp)?.id).toBe("table_01");
+
+    const tableSilhouette = silhouetteBounds("table_01", table);
+    const lampSilhouette = silhouetteBounds("lamp_01", lamp);
+    const tableHeight = tableSilhouette.bottom - tableSilhouette.top;
+
+    // Inside the top 40% of the table's silhouette: on the top, not on the shelf.
+    expect(lampSilhouette.bottom).toBeGreaterThanOrEqual(tableSilhouette.top);
+    expect(lampSilhouette.bottom).toBeLessThanOrEqual(
+      tableSilhouette.top + 0.4 * tableHeight,
+    );
+
+    // And never below the table's own floor projection less the visible depth of
+    // its top surface, which is the lowest point the tabletop reaches.
+    const tableFloor = projectRoomPoint(
+      { x: table.position[0], z: table.position[2] },
+      store.getState().scene.room,
+    ).top;
+    const drawnTableHeight =
+      table.dimensionsM.height *
+      verticalScaleAt(
+        floorDepthFraction(table.position[2], store.getState().scene.room),
+        store.getState().scene.room,
+      ) *
+      STAGE_ASPECT;
+    expect(lampSilhouette.bottom).toBeLessThanOrEqual(
+      tableFloor - (tableHeight - drawnTableHeight),
+    );
+
+    // The calibrated lift alone would have left the lamp below the tabletop.
+    const calibrated = tableFloor - objectElevationOffset(lamp, store.getState().scene.room);
+    expect(calibrated).toBeGreaterThan(tableSilhouette.top + 0.4 * tableHeight);
   });
 
   test("renders the chair on the right with the mirrored front-quarter view and no CSS rotation", () => {
@@ -1114,6 +1238,64 @@ describe("keyboard focus", () => {
     expect(document.activeElement).toBe(
       screen.getByRole("button", { name: "Plant" }),
     );
+  });
+
+  // Important QA regression: Escape cleared the selection but left focus on the
+  // cutout, so the room kept a ring on a piece the inspector called unselected.
+  test("selecting null moves focus out of the stage and back to the rail", () => {
+    const store = fixtureStore();
+    vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockReturnValue(
+      STAGE_RECT,
+    );
+    render(
+      <SceneStoreProvider store={store}>
+        <button data-rail-object-id="chair_01" type="button">
+          Chair rail
+        </button>
+        <RoomPhotoStage />
+      </SceneStoreProvider>,
+    );
+    const stage = screen.getByRole("region", { name: "Editable room photo" });
+    const rail = screen.getByRole("button", { name: "Chair rail" });
+
+    act(() => store.getState().selectObject("chair_01"));
+    expect(stage.contains(document.activeElement)).toBe(true);
+
+    act(() => store.getState().selectObject(null));
+
+    expect(stage.contains(document.activeElement)).toBe(false);
+    expect(document.activeElement).toBe(rail);
+  });
+
+  test("parks focus on the stage when the cleared object has no rail button", () => {
+    const { stage, store } = renderStage();
+    act(() => store.getState().selectObject("chair_01"));
+    const chair = screen.getByRole("button", { name: "Chair" });
+    expect(document.activeElement).toBe(chair);
+
+    act(() => store.getState().selectObject(null));
+
+    expect(document.activeElement).toBe(stage);
+    expect(chair).not.toHaveFocus();
+  });
+
+  test("leaves focus outside the room alone when the selection is cleared", () => {
+    const store = fixtureStore();
+    vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockReturnValue(
+      STAGE_RECT,
+    );
+    render(
+      <SceneStoreProvider store={store}>
+        <input aria-label="Ask OpenRoom" />
+        <RoomPhotoStage />
+      </SceneStoreProvider>,
+    );
+    const field = screen.getByRole("textbox", { name: "Ask OpenRoom" });
+    act(() => field.focus());
+
+    act(() => store.getState().selectObject(null));
+
+    expect(document.activeElement).toBe(field);
   });
 
   test("reaches the cutout when the move tool is picked, so arrows move it", () => {

@@ -272,6 +272,13 @@ export function PhotoRugLayer({
         style={{ zIndex: INTERACTION_LAYER }}
         viewBox="0 0 1 1"
       >
+        {/* Drawn first, so the halo sits under the ring it backs. */}
+        <polygon
+          className={styles.photoRugFocusHalo}
+          points={destinationQuad}
+          strokeWidth={11}
+          vectorEffect="non-scaling-stroke"
+        />
         <polygon
           points={destinationQuad}
           strokeWidth={3}

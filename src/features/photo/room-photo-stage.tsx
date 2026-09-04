@@ -16,6 +16,7 @@ import {
 import styles from "../demo/demo-workspace.module.css";
 import { useSceneStore, useSceneStoreApi } from "../scene/scene-context";
 import type { SceneObject, Vec3 } from "../scene/scene-schema";
+import { supportOf } from "../scene/support";
 import { getPhotoAsset, OPENROOM_ROOM_BACKGROUND } from "./photo-assets";
 import { PhotoContactShadow } from "./photo-contact-shadow";
 import { PhotoObjectLayer } from "./photo-object-layer";
@@ -29,6 +30,7 @@ import {
   projectRoomPoint,
   projectRugPlacement,
   stableLayerOrder,
+  supportedTopOffset,
   unprojectStagePoint,
 } from "./photo-projection";
 import {
@@ -194,7 +196,25 @@ export function RoomPhotoStage() {
     const changed = last.id !== selectedObjectId || last.tool !== toolMode;
     lastFocusTargetRef.current = { id: selectedObjectId, tool: toolMode };
     if (!changed) return;
-    if (!selectedObjectId) return;
+    // Deselecting (Escape, or a click on the backdrop) leaves the cutout focused,
+    // so the room still paints a focus ring on a piece the inspector calls
+    // unselected. Focus goes back where the selection came from: the rail button
+    // for that object, or the stage itself when the rail is not rendered.
+    if (!selectedObjectId) {
+      const active = document.activeElement;
+      if (
+        last.id &&
+        active instanceof HTMLElement &&
+        stageRef.current?.contains(active) &&
+        active.closest("[data-object-id]")
+      ) {
+        const rail = document.querySelector<HTMLElement>(
+          `[data-rail-object-id="${CSS.escape(last.id)}"]`,
+        );
+        (rail ?? stageRef.current)?.focus({ preventScroll: true });
+      }
+      return;
+    }
 
     const selector = `[data-object-id="${CSS.escape(selectedObjectId)}"]`;
     const active = document.activeElement;
@@ -445,6 +465,28 @@ export function RoomPhotoStage() {
     const rugObjects: SceneObject[] = [];
     const verticalObjects: SceneObject[] = [];
     const views = new Map<string, SelectedPhotoView | null>();
+    const presentations = new Map<string, CutoutPresentation>();
+
+    // The pictures come first: an object standing on another one is anchored to the
+    // supporter's *drawn* top, so the supporter's presentation has to exist before
+    // any placement is projected, whatever order the scene lists them in.
+    for (const object of visualObjects) {
+      // Rugs keep their floor homography and their own rotation; only the
+      // vertical cutouts are chosen by front vector.
+      if (object.type === "rug") continue;
+      const set = getPhotoAssetSet(object);
+      const selected = set ? selectPhotoView(object, set) : null;
+      views.set(object.id, selected);
+      presentations.set(object.id, {
+        view: selected?.view.view,
+        symmetry: set?.symmetry,
+        contentBox: selected?.view.contentBox,
+        intrinsicWidth: selected?.view.intrinsicWidth,
+        intrinsicHeight: selected?.view.intrinsicHeight,
+      });
+    }
+
+    const visualScene = { ...scene, objects: visualObjects };
 
     for (const object of visualObjects) {
       const projectedPlacement = projectRoomPoint(
@@ -455,7 +497,22 @@ export function RoomPhotoStage() {
       // one depth band above it, so it covers the thing it stands on. Its floor
       // anchor, rotation handle and selection frame ride the raised frame; its
       // contact shadow is projected from the footprint and stays on the floor.
-      const elevationOffset = objectElevationOffset(object, scene.room);
+      // The lift comes from the supporter's photographed top whenever there is one,
+      // because that is the surface the eye reads it as standing on.
+      const supporter = supportOf(visualScene, object);
+      const supporterPresentation = supporter
+        ? presentations.get(supporter.id)
+        : undefined;
+      const elevationOffset =
+        (supporter && supporterPresentation
+          ? supportedTopOffset(
+              object,
+              supporter,
+              supporterPresentation,
+              scene.room,
+              stageSize,
+            )
+          : null) ?? objectElevationOffset(object, scene.room);
       const placement = {
         ...projectedPlacement,
         y: projectedPlacement.y - elevationOffset,
@@ -480,15 +537,12 @@ export function RoomPhotoStage() {
         );
       } else {
         verticalObjects.push(object);
-        // Rugs keep their floor homography and their own rotation; only the
-        // vertical cutouts are chosen by front vector.
-        const set = getPhotoAssetSet(object);
-        views.set(object.id, set ? selectPhotoView(object, set) : null);
       }
     }
 
     return {
       previewObjectId: transformPreview?.objectId ?? null,
+      presentations,
       rugObjects,
       rugProjections,
       placements,
@@ -497,16 +551,10 @@ export function RoomPhotoStage() {
     };
   }, [scene, stageSize, transformPreview]);
 
-  // Everything the width projection needs about the picture: the chosen view,
-  // the set's symmetry, and the image's measured content box.
-  const presentationFor = (object: SceneObject): CutoutPresentation => {
-    const selected = renderModel.views.get(object.id) ?? null;
-    return {
-      view: selected?.view.view,
-      symmetry: getPhotoAssetSet(object)?.symmetry,
-      contentBox: selected?.view.contentBox,
-    };
-  };
+  // Everything the width projection needs about the picture: the chosen view, the
+  // set's symmetry, the image's measured content box and its pixel dimensions.
+  const presentationFor = (object: SceneObject): CutoutPresentation =>
+    renderModel.presentations.get(object.id) ?? {};
 
 
   return (
@@ -517,6 +565,9 @@ export function RoomPhotoStage() {
       ref={stageRef}
       role="region"
       style={{ backgroundImage: `url(${OPENROOM_ROOM_BACKGROUND})` }}
+      // Focus lands here when a deselection has nowhere better to send it. The
+      // stage is never a tab stop: -1 makes it programmatically focusable only.
+      tabIndex={-1}
     >
       {renderModel.rugObjects.map((object) => {
         const placement = renderModel.placements.get(object.id)!;
