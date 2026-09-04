@@ -1,4 +1,7 @@
-import type { CartApprovalDraft } from "../../webmcp/tool-context";
+import type {
+  CartApprovalDraft,
+  CartDraftBase,
+} from "../../webmcp/tool-context";
 import type {
   CartLineInput,
   CommerceContext,
@@ -105,11 +108,16 @@ export function buildCommerceDraft(
 
 export function enrichCartDraft(
   commerce: CommerceContext,
-  draft: CartApprovalDraft,
+  draft: CartDraftBase,
 ): CartApprovalDraft {
   const block = buildCommerceDraft(
     commerce,
     draft.items.map(({ productId, quantity }) => ({ productId, quantity })),
   );
-  return block === null ? draft : { ...draft, commerce: block };
+  // Tool handlers reject an unconfigured store before enriching. Keeping the
+  // check here makes that trust boundary explicit for every future caller.
+  if (block === null) {
+    throw new Error("Cannot enrich a cart draft without a connected store");
+  }
+  return { ...draft, commerce: block };
 }

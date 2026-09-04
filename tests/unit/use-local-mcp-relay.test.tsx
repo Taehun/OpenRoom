@@ -6,6 +6,7 @@ import { DEMO_PRODUCTS } from "../../src/features/demo/demo-data";
 import { createDemoScene } from "../../src/demo/demo-scene";
 import { createSceneStore, type SceneStore } from "../../src/features/scene/scene-store";
 import type { CommandRequest, Scene } from "../../src/features/scene/scene-schema";
+import type { CommerceContext } from "../../src/features/commerce/commerce-types";
 import type {
   CartApprovalDraft,
   ToolContext,
@@ -14,7 +15,10 @@ import {
   useLocalMcpRelay,
   type LocalMcpRelay,
 } from "../../src/local-mcp/use-local-mcp-relay";
-import { UNCONFIGURED_COMMERCE } from "../helpers/commerce-fixtures";
+import {
+  SHOPIFY_COMMERCE,
+  UNCONFIGURED_COMMERCE,
+} from "../helpers/commerce-fixtures";
 import {
   FakeRelayServer,
   RELAY_SESSION_TOKEN,
@@ -28,7 +32,10 @@ interface Harness {
   store: SceneStore;
 }
 
-function createHarnessContext(scene?: Scene): Harness {
+function createHarnessContext(
+  scene?: Scene,
+  commerce: CommerceContext = UNCONFIGURED_COMMERCE,
+): Harness {
   const store = createSceneStore(scene);
   const drafts: CartApprovalDraft[] = [];
   const commands: CommandRequest[] = [];
@@ -54,7 +61,7 @@ function createHarnessContext(scene?: Scene): Harness {
     openCartApproval: (draft) => {
       drafts.push(draft);
     },
-    commerce: UNCONFIGURED_COMMERCE,
+    commerce,
   };
 
   return { context, drafts, commands, store };
@@ -227,7 +234,7 @@ test("refuses to replace a locked object and leaves the Scene untouched", async 
 });
 
 test("opens a cart approval draft without mutating the Scene", async () => {
-  const harness = createHarnessContext();
+  const harness = createHarnessContext(undefined, SHOPIFY_COMMERCE);
   const { deliver, server, unmount } = await pairPage(harness);
 
   await deliver({

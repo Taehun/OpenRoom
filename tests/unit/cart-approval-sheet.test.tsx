@@ -6,7 +6,7 @@ import {
   CartApprovalSheet,
   openInNewTab,
 } from "../../src/features/demo/cart-approval-sheet";
-import type { CartApprovalDraft } from "../../src/webmcp/tool-context";
+import type { CartReviewDraft } from "../../src/webmcp/tool-context";
 import {
   FIXTURE_AGENT_PROFILE_URL,
   FIXTURE_VARIANTS,
@@ -26,7 +26,7 @@ afterEach(() => {
 });
 
 /** A room holding two catalog products, both mapped to Shopify variants. */
-function mappedDraft(): CartApprovalDraft {
+function mappedDraft(): CartReviewDraft {
   return {
     id: "scene-demo-rev-3",
     sceneId: "demo",
@@ -75,7 +75,7 @@ function mappedDraft(): CartApprovalDraft {
 }
 
 /** A room with nothing product-backed in it — the seed room's cart. */
-function emptyDraft(commerceBlock = false): CartApprovalDraft {
+function emptyDraft(commerceBlock = false): CartReviewDraft {
   return {
     id: "scene-demo-rev-1",
     sceneId: "demo",
@@ -99,7 +99,7 @@ function emptyDraft(commerceBlock = false): CartApprovalDraft {
   };
 }
 
-function agentDraft(): CartApprovalDraft {
+function agentDraft(): CartReviewDraft {
   return {
     id: "scene-demo-rev-4",
     sceneId: "demo",
@@ -143,7 +143,7 @@ function agentDraft(): CartApprovalDraft {
 }
 
 describe("CartApprovalSheet while unconfigured", () => {
-  it("lists the room's products and approves them without leaving the page", () => {
+  it("lists the room's products and offers to connect a store", () => {
     const dispatch = vi.fn();
     render(
       <CartApprovalSheet
@@ -157,23 +157,10 @@ describe("CartApprovalSheet while unconfigured", () => {
     expect(screen.getByText("Woven Jute Rug")).toBeVisible();
     expect(screen.getAllByText("Qty 1")).toHaveLength(2);
     expect(screen.queryByText(/Demo fixture|Scene product/)).toBeNull();
-    fireEvent.click(
-      screen.getByRole("button", { name: "Approve demo cart · $518" }),
-    );
-    expect(dispatch).toHaveBeenCalledWith({ type: "confirm-demo-cart" });
+    fireEvent.click(screen.getByRole("button", { name: "Connect a store" }));
+    expect(dispatch).toHaveBeenCalledWith({ type: "open-store-settings" });
+    expect(screen.queryByRole("button", { name: /Approve demo cart/ })).toBeNull();
     expect(screen.queryByText("Not mapped to a Shopify variant")).toBeNull();
-  });
-
-  it("names the demo total the way the header does", () => {
-    render(
-      <CartApprovalSheet
-        commerce={UNCONFIGURED_COMMERCE}
-        dispatch={vi.fn()}
-        draft={mappedDraft()}
-      />,
-    );
-    expect(screen.getByText("Room total")).toBeVisible();
-    expect(screen.getByText("Taxes and delivery calculated later")).toBeVisible();
   });
 
   it("says the room is empty and offers only Keep editing", () => {
@@ -193,10 +180,8 @@ describe("CartApprovalSheet while unconfigured", () => {
     expect(screen.queryAllByRole("listitem")).toHaveLength(0);
     // Nothing to approve, so the sheet offers no approval at all — and no $0
     // total or checkout disclosure to explain away.
-    expect(
-      screen.queryByRole("button", { name: /Approve demo cart/ }),
-    ).toBeNull();
-    expect(screen.queryByText("Room total")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Connect a store" })).toBeNull();
+    expect(screen.queryByText("Catalog estimate")).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Keep editing" }));
     expect(dispatch).toHaveBeenCalledWith({ type: "close-cart" });
   });
@@ -351,12 +336,11 @@ describe("CartApprovalSheet in shopify mode", () => {
     ).toBeNull();
   });
 
-  it("disables checkout when nothing is mapped", () => {
-    const dispatch = vi.fn();
+  it("offers product links inline when no permalink is available", () => {
     const base = agentDraft();
     const commerceBlock = base.commerce;
     if (!commerceBlock) throw new Error("Expected a commerce block");
-    const draft: CartApprovalDraft = {
+    const draft: CartReviewDraft = {
       ...base,
       commerce: {
         ...commerceBlock,
@@ -371,13 +355,27 @@ describe("CartApprovalSheet in shopify mode", () => {
     render(
       <CartApprovalSheet
         commerce={SHOPIFY_COMMERCE}
-        dispatch={dispatch}
+        dispatch={vi.fn()}
         draft={draft}
       />,
     );
-    expect(
-      screen.getByRole("button", { name: "Continue to Shopify · $0" }),
-    ).toBeDisabled();
+    const button = screen.getByRole("button", {
+      name: `Open 2 products on ${PLACEHOLDER_STORE_DOMAIN}`,
+    });
+    expect(button).toHaveAttribute("aria-expanded", "false");
+    fireEvent.click(button);
+    expect(button).toHaveAttribute("aria-expanded", "true");
+
+    const links = screen.getAllByRole("link", {
+      name: /Oak Frame Table|Rice Paper Floor Lamp/,
+    });
+    expect(links).toHaveLength(2);
+    expect(links[0]).toHaveAttribute(
+      "href",
+      `https://${PLACEHOLDER_STORE_DOMAIN}/products/oak-frame-table`,
+    );
+    expect(links[0]).toHaveAttribute("target", "_blank");
+    expect(links[0]).toHaveAttribute("rel", "noreferrer");
     expect(
       screen.getByText(
         "No item in this cart is mapped to a Shopify variant yet.",

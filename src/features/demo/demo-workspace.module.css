@@ -73,6 +73,139 @@
   height: 100%;
 }
 
+.storeChipRoot {
+  position: relative;
+  min-width: 0;
+  flex: none;
+}
+
+.storeChip {
+  max-width: clamp(120px, 16vw, 190px);
+  cursor: pointer;
+}
+
+.storeChipUnconfigured {
+  color: var(--md-sys-color-tertiary);
+}
+
+.storeChipLabel {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.storePopoverLayer {
+  position: fixed;
+  z-index: 30;
+  inset: 0;
+  display: grid;
+  place-items: start center;
+  padding-top: 72px;
+}
+
+.storePopoverScrim {
+  position: absolute;
+  inset: 0;
+  background: color-mix(
+    in srgb,
+    var(--md-sys-color-on-surface) 12%,
+    transparent
+  );
+}
+
+/* Portalled outside the inert workspace, so this is a real modal dialog while
+   a long domain can never resize the header grid behind it. */
+.storePopover {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  width: min(360px, calc(100vw - 32px));
+  padding: 18px;
+  border: 1px solid var(--md-sys-color-outline-variant);
+  border-radius: var(--md-sys-shape-corner-large);
+  background: var(--md-sys-color-surface-container-lowest);
+  color: var(--md-sys-color-on-surface);
+  box-shadow: var(--md-sys-elevation-level1);
+}
+
+.storePopoverHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 14px;
+}
+
+.storePopoverHeader h2 {
+  margin: 0;
+  font-size: var(--md-sys-typescale-title-medium-size);
+  font-weight: var(--md-sys-typescale-title-medium-weight);
+  line-height: var(--md-sys-typescale-title-medium-line-height);
+}
+
+.storePopoverClose {
+  margin: -8px -8px -8px 0;
+}
+
+.storeForm,
+.storeField {
+  display: grid;
+}
+
+.storeForm {
+  gap: 12px;
+}
+
+.storeField {
+  gap: 6px;
+  color: var(--md-sys-color-on-surface-variant);
+  font-size: var(--md-sys-typescale-label-large-size);
+  font-weight: var(--md-sys-typescale-label-large-weight);
+}
+
+.storeField input {
+  width: 100%;
+  min-height: 42px;
+  padding: 0 12px;
+  border: 1px solid var(--md-sys-color-outline);
+  border-radius: var(--md-sys-shape-corner-extra-small);
+  background: var(--md-sys-color-surface-container-lowest);
+  color: var(--md-sys-color-on-surface);
+}
+
+.storeField input[aria-invalid="true"] {
+  border-color: var(--md-sys-color-error);
+}
+
+.storeField input:disabled {
+  cursor: wait;
+  opacity: 0.62;
+}
+
+.storeError,
+.storeProbeMessage {
+  margin: 0;
+  font-size: var(--md-sys-typescale-body-small-size);
+  line-height: var(--md-sys-typescale-body-small-line-height);
+}
+
+.storeError {
+  color: var(--md-sys-color-error);
+}
+
+.storeProbeMessage {
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+.storeActions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 4px;
+}
+
 .roomTotal {
   display: grid;
   align-content: center;
@@ -1406,6 +1539,30 @@
 }
 
 .sheetNotice a {
+  text-decoration: underline;
+}
+
+.productLinks {
+  display: grid;
+  gap: 8px;
+  margin: 0 0 12px;
+  padding: 0;
+  list-style: none;
+}
+
+.productLinks a {
+  display: block;
+  padding: 10px 12px;
+  border: 1px solid var(--warm-divider);
+  border-radius: var(--md-sys-shape-corner-small);
+  color: var(--ink);
+  font-size: 0.8rem;
+  font-weight: 650;
+  text-decoration: none;
+}
+
+.productLinks a:hover {
+  background: var(--limestone);
   text-decoration: underline;
 }
 

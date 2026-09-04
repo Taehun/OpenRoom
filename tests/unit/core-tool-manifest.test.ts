@@ -112,4 +112,12 @@ describe("Core 6 manifest", () => {
       });
     }
   });
+
+  it("describes both cart handoffs and the unconfigured failure", () => {
+    const description = CORE_TOOL_MANIFEST.find(
+      ({ name }) => name === "add_scene_to_cart",
+    )?.description;
+    expect(description).toContain("productLinks");
+    expect(description).toContain("NO_STORE_CONNECTED");
+  });
 });

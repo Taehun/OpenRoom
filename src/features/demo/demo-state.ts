@@ -21,6 +21,7 @@ function quiet(text: string): DemoAnnouncement {
 const INITIAL_STATE: DemoState = {
   mode: "inspector",
   isCartOpen: false,
+  isStoreSettingsOpen: false,
   cartDraft: null,
   toast: null,
   announcement: null,
@@ -57,18 +58,21 @@ export function demoReducer(state: DemoState, action: DemoAction): DemoState {
       return {
         ...state,
         isCartOpen: true,
+        isStoreSettingsOpen: false,
         cartDraft: action.draft ?? null,
         announcement: null,
       };
     case "close-cart":
       return { ...state, isCartOpen: false, cartDraft: null };
-    case "confirm-demo-cart":
+    case "open-store-settings":
       return {
         ...state,
         isCartOpen: false,
+        isStoreSettingsOpen: true,
         cartDraft: null,
-        announcement: toast("Demo approved — nothing was ordered."),
       };
+    case "close-store-settings":
+      return { ...state, isStoreSettingsOpen: false };
     case "clear-announcement":
       return state.announcement === null
         ? state
@@ -77,6 +81,7 @@ export function demoReducer(state: DemoState, action: DemoAction): DemoState {
       return {
         ...state,
         isCartOpen: false,
+        isStoreSettingsOpen: false,
         cartDraft: null,
         announcement: toast(
           `Opened Shopify checkout in a new tab (${action.itemCount} item${action.itemCount === 1 ? "" : "s"})`,

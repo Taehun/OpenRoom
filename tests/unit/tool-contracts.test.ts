@@ -514,6 +514,7 @@ describe("WebMCP Core 6 contracts", () => {
         "stale-move-conflict",
         "cart-approval-only",
         "cart-approval-shopify-lines",
+        "cart-without-a-store",
         "face-the-sofa",
         "search-side-tables",
         "lamp-on-side-table",
@@ -521,7 +522,7 @@ describe("WebMCP Core 6 contracts", () => {
         "resolve-overlapping-move",
       ]),
     );
-    expect(journeys).toHaveLength(9);
+    expect(journeys).toHaveLength(10);
     expect(journeys.every((journey) =>
       typeof journey.prompt === "string" &&
       Array.isArray(journey.expectedTools) &&

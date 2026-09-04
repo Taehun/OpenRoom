@@ -538,6 +538,16 @@ export function createCoreTools(context: ToolContext): readonly ModelContextTool
         false,
       );
     }
+    if (context.commerce.config.status !== "connected") {
+      return toolError(
+        "add_scene_to_cart",
+        snapshot.scene.revision,
+        snapshot.stateVersion,
+        "NO_STORE_CONNECTED",
+        "No Shopify store is connected. Ask the person to connect one from the store chip in the header.",
+        true,
+      );
+    }
     const draft = enrichCartDraft(context.commerce, baseDraft);
     signal.throwIfAborted();
     context.openCartApproval(draft);

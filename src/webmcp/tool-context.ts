@@ -33,13 +33,22 @@ export interface CartApprovalItem {
   price: SceneProduct["price"];
 }
 
-export interface CartApprovalDraft {
+export interface CartDraftBase {
   id: string;
   sceneId: string;
   sceneRevision: number;
   items: readonly CartApprovalItem[];
   totalMinor: number;
+}
+
+/** A human can review the room before choosing which store will receive it. */
+export interface CartReviewDraft extends CartDraftBase {
   commerce?: CommerceDraft;
+}
+
+/** An agent only receives a draft once there is a store it can act on. */
+export interface CartApprovalDraft extends CartDraftBase {
+  commerce: CommerceDraft;
 }
 
 export interface ToolContext {

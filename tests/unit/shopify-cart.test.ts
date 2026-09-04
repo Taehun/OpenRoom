@@ -7,7 +7,7 @@ import {
   enrichCartDraft,
   resolveShopifyLines,
 } from "../../src/features/commerce/shopify-cart";
-import type { CartApprovalDraft } from "../../src/webmcp/tool-context";
+import type { CartDraftBase } from "../../src/webmcp/tool-context";
 import {
   FIXTURE_AGENT_PROFILE_URL,
   FIXTURE_VARIANTS,
@@ -18,7 +18,7 @@ import {
   fixtureGid,
 } from "../helpers/commerce-fixtures";
 
-const DRAFT: CartApprovalDraft = {
+const DRAFT: CartDraftBase = {
   id: "scene-demo-rev-3",
   sceneId: "demo",
   sceneRevision: 3,
@@ -212,15 +212,16 @@ describe("buildCommerceDraft", () => {
 });
 
 describe("enrichCartDraft", () => {
-  it("returns the same draft object when no store is configured", () => {
-    expect(enrichCartDraft(UNCONFIGURED_COMMERCE, DRAFT)).toBe(DRAFT);
-    expect("commerce" in DRAFT).toBe(false);
+  it("rejects enrichment when no store is configured", () => {
+    expect(() => enrichCartDraft(UNCONFIGURED_COMMERCE, DRAFT)).toThrow(
+      "Cannot enrich a cart draft without a connected store",
+    );
   });
 
   it("adds a commerce block without mutating the input in shopify mode", () => {
     const enriched = enrichCartDraft(SHOPIFY_COMMERCE, DRAFT);
     expect(enriched).not.toBe(DRAFT);
-    expect(DRAFT.commerce).toBeUndefined();
+    expect("commerce" in DRAFT).toBe(false);
     expect(enriched.items).toBe(DRAFT.items);
     expect(enriched.commerce).toEqual({
       provider: "shopify",

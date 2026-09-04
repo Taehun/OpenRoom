@@ -387,7 +387,11 @@ describe("WebMCP Core 6 handlers", () => {
 
   test("aborts cart execution before opening approval", async () => {
     const store = createSceneStore();
-    const { context, drafts } = createContext(store);
+    const { context, drafts } = createContext(
+      store,
+      DEMO_PRODUCTS,
+      SHOPIFY_COMMERCE,
+    );
     const controller = new AbortController();
     controller.abort();
     const tool = createCoreTools(context).find(({ name }) => name === "add_scene_to_cart");
@@ -525,7 +529,11 @@ describe("WebMCP Core 6 handlers", () => {
 
   test("builds an approval-only cart draft from explicit product-backed IDs", async () => {
     const store = createSceneStore();
-    const { context, drafts } = createContext(store);
+    const { context, drafts } = createContext(
+      store,
+      DEMO_PRODUCTS,
+      SHOPIFY_COMMERCE,
+    );
     const tools = createCoreTools(context);
     const fetchSpy = vi.spyOn(globalThis, "fetch");
 
@@ -653,7 +661,7 @@ describe("WebMCP Core 6 handlers", () => {
 });
 
 describe("add_scene_to_cart commerce block", () => {
-  test("omits commerce when no store is configured", async () => {
+  test("refuses to open a draft when no store is connected", async () => {
     const store = createSceneStore();
     const { context, drafts } = createContext(
       store,
@@ -661,6 +669,7 @@ describe("add_scene_to_cart commerce block", () => {
       UNCONFIGURED_COMMERCE,
     );
     const tools = createCoreTools(context);
+    const fetchSpy = vi.spyOn(globalThis, "fetch");
 
     await execute(tools, "replace_object", {
       productId: "oak-frame-table",
@@ -672,12 +681,14 @@ describe("add_scene_to_cart commerce block", () => {
       expectedStateVersion: store.getState().stateVersion,
     });
 
-    expect(result.structuredContent.ok).toBe(true);
-    if (!result.structuredContent.ok) return;
-    const { draft } = result.structuredContent.data as { draft: CartApprovalDraft };
-    expect("commerce" in draft).toBe(false);
-    expect(drafts).toHaveLength(1);
-    expect("commerce" in drafts[0]!).toBe(false);
+    expect(result.structuredContent.ok).toBe(false);
+    expect(errorCode(result)).toBe("NO_STORE_CONNECTED");
+    if (result.structuredContent.ok) return;
+    expect(result.structuredContent.error.retryable).toBe(true);
+    expect(result.structuredContent.error.message).toContain("connect one");
+    expect(drafts).toHaveLength(0);
+    expect(fetchSpy).not.toHaveBeenCalled();
+    fetchSpy.mockRestore();
   });
 
   test("returns public Shopify lines, skipped products, and the MCP endpoint in shopify mode", async () => {
@@ -726,7 +737,11 @@ describe("add_scene_to_cart commerce block", () => {
 describe("execution options normalization", () => {
   function coreTool(name: string) {
     const store = createSceneStore();
-    const { context, drafts } = createContext(store);
+    const { context, drafts } = createContext(
+      store,
+      DEMO_PRODUCTS,
+      SHOPIFY_COMMERCE,
+    );
     const tool = createCoreTools(context).find(
       (candidate) => candidate.name === name,
     );
@@ -782,7 +797,11 @@ describe("execution options normalization", () => {
 
   test("opens cart approval when the host omits the options argument", async () => {
     const store = createSceneStore();
-    const { context, drafts } = createContext(store);
+    const { context, drafts } = createContext(
+      store,
+      DEMO_PRODUCTS,
+      SHOPIFY_COMMERCE,
+    );
     const tools = createCoreTools(context);
     await execute(tools, "replace_object", {
       objectId: "table_01",
