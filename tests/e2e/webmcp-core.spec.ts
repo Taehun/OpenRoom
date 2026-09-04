@@ -277,9 +277,7 @@ test("completes WebMCP Core 6 against the shared demo Scene", async ({
   await expect(dialog.getByText("Travertine Plinth Table")).toBeVisible();
   await expect(dialog.getByText("$249 USD")).toBeVisible();
   await expect(
-    dialog.getByText(
-      "Approving opens Shopify checkout in a new tab. OpenRoom sends nothing itself.",
-    ),
+    dialog.getByText(/from your room (is|are) ready for approval/),
   ).toBeVisible();
   expect(await page.evaluate(() => window.__webMcpFetchCount)).toBe(0);
   trackCartRequests = false;

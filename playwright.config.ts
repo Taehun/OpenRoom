@@ -22,6 +22,16 @@ export default defineConfig({
         command: "pnpm exec next dev --hostname 127.0.0.1 --port 3000",
         url: "http://127.0.0.1:3000",
         reuseExistingServer: false,
+        // Pinned, not merely left unset: `next dev` reads .env.local, so a
+        // developer pointing their own checkout at a real store would flip
+        // these journeys into shopify mode and change what the approval sheet
+        // says. CI has no .env.local and would then disagree with them.
+        env: {
+          NEXT_PUBLIC_COMMERCE_PROVIDER: "demo",
+          NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN: "",
+          NEXT_PUBLIC_SHOPIFY_VARIANTS: "",
+          NEXT_PUBLIC_SITE_ORIGIN: "",
+        },
       },
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
 });
