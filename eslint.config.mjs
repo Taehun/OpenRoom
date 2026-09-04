@@ -16,6 +16,9 @@ const eslintConfig = defineConfig([
     ".claude/worktrees/**",
     ".wrangler/**",
     "next-env.d.ts",
+    // Shopify's own Horizon theme, pulled by pnpm shop:theme:pull. Vendored
+    // code: this repo only edits its JSON, never its assets or Liquid.
+    "examples/shopify/theme/**",
   ]),
 ]);
 

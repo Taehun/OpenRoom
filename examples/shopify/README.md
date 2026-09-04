@@ -221,6 +221,78 @@ until you archive it by hand.
 against the live catalog, so a catalog change that is not re-exported fails
 `pnpm test`.
 
+## Making it look like a shop
+
+Seeding fills the store with products, but a seeded store still reads as a
+product dump: no theme of its own, bare collections, no menus, no pages. The
+rest of this folder closes that gap.
+
+```bash
+pnpm shop:theme:pull      # pull the live theme into examples/shopify/theme
+pnpm shop:theme:check     # schema and Liquid lint — run before every push
+pnpm shop:theme:dev       # local preview against the store
+pnpm shop:theme:create    # first push: creates the unpublished "OpenRoom (dev)" theme
+pnpm shop:theme:push      # every push after that
+pnpm shop:collections     # copy, cover image, and sort order on the 8 collections
+```
+
+The theme scripts run the Shopify CLI through `pnpm dlx`, so nothing heavy
+joins the lockfile. They use the CLI's own browser session and never see
+`SHOPIFY_ADMIN_ACCESS_TOKEN`; the first command opens a login page.
+
+**Nothing here pushes to the live theme.** `shop:theme:push` targets an
+unpublished theme named `OpenRoom (dev)`, and publishing is a decision you make
+in the admin after looking at the preview.
+
+### What is in `theme/`
+
+The store's Horizon theme, pulled and committed so the storefront is
+reproducible from this repository. Only two kinds of file are edited — no
+Liquid is touched, which keeps the theme upgradable and every change one file
+away from being reverted:
+
+| File | Change |
+| --- | --- |
+| `config/settings_data.json` | The palette from `app/material-tokens.css` — cream `#FBF9F4` page, ink `#1B1C19` text, moss `#4B6543` on every call to action — plus softer corners and quieter display type. |
+| `templates/index.json` | The homepage: hero, category grid, sofas, the OpenRoom story, lighting, three promises. |
+| `sections/header-group.json` | The announcement bar's text. |
+| `sections/footer-group.json` | Two menu columns beside the email signup. |
+
+`templates/collection.json` and `templates/product.json` are left alone: they
+already render `{{ closest.collection.description }}` and the product's own
+description, so the copy written by `pnpm shop:collections` and by the seeder
+shows up without any template work.
+
+The homepage uses no uploaded image. Shopify's Files API needs `write_files`,
+which the app does not have, so the hero is a typographic band on the brand's
+moss green and the page's imagery comes from the collection covers instead —
+those are set from public product URLs, which `write_products` does allow.
+
+### `pnpm shop:collections`
+
+Per category, in catalog order: looks the collection up by handle, then
+`collectionUpdate`s it with a one-sentence description, a cover image taken
+from the category's dearest product, and `sortOrder: PRICE_ASC`. The copy lives
+in `CATEGORY_COPY` in `src/collections.ts`; a category with no sentence written
+for it is an error, not a silently bare collection.
+
+It never creates a collection — that is the seeder's job. A collection it
+cannot find is reported and skipped, which is what a store that was never
+seeded looks like. `--dry-run` prints the plan and sends nothing.
+
+### Menus and pages
+
+These need two scopes the app does not have — `write_online_store_navigation`
+and `write_online_store_pages` — so they ship as source files to enter by hand:
+
+- `content/menus.md` — the main and footer menus, with the collection handles
+  the seeder created.
+- `content/pages/` — About, Shipping, Returns, and Privacy, as HTML bodies to
+  paste into **Online Store → Pages**.
+
+Add those two scopes to the Dev Dashboard app and these become script input
+rather than copy-paste; nothing about the content changes.
+
 ## Troubleshooting
 
 | Symptom | Cause and fix |
@@ -233,6 +305,9 @@ against the live catalog, so a catalog change that is not re-exported fails
 | Products have no image | Shopify could not fetch `Image Src`. Check the URL in `products.json` opens in a browser, and set `OPENROOM_IMAGE_BASE` to a host your store can reach. |
 | `missing SHOPIFY_STORE_DOMAIN, …` (exit code 2) | The keys are not in the environment or in `.env.local` at the repository root. |
 | `<handle> is not in the store — run pnpm shop:seed` | `pnpm shop:variants` found no product at that handle. Seed first, or import the CSV. |
+| `Theme Check` reports `JSONMissingBlock` | A block type in a template JSON is not allowed by its parent block's schema. Read the parent's `{% schema %}` in `theme/blocks/` — static blocks are keyed by their own name and stay out of `block_order`. |
+| A setting silently reverts in the theme editor | Its value is not one of the options in `theme/config/settings_schema.json`. Theme Check does not validate setting values; compare against the schema before pushing. |
+| `pnpm shop:collections` says a collection is missing | The store was never seeded, or the category is new. Run `pnpm shop:seed` first — this script never creates collections. |
 
 ## Safety
 
