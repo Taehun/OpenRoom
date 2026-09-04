@@ -64,7 +64,7 @@
 .roomIdentity span,
 .roomTotal small {
   color: var(--muted-text);
-  font-size: 0.68rem;
+  font-size: var(--md-sys-typescale-body-small-size);
   line-height: 1.2;
 }
 
@@ -196,7 +196,7 @@
   border-radius: var(--md-sys-shape-corner-small);
   background: transparent;
   color: var(--muted-text);
-  font-size: 0.57rem;
+  font-size: var(--md-sys-typescale-label-medium-size);
 }
 
 .toolButton:hover,
@@ -895,7 +895,7 @@
   display: block;
   margin-bottom: 7px;
   color: var(--moss);
-  font-size: 0.63rem;
+  font-size: var(--md-sys-typescale-body-small-size);
   font-weight: 500;
   letter-spacing: 0.13em;
   text-transform: uppercase;
@@ -942,6 +942,22 @@
   font-weight: 500;
 }
 
+/* The stage shows the nearest photographed view; the qualifier rides the row. */
+.objectSummary dd small {
+  color: var(--muted-text);
+  font-size: var(--md-sys-typescale-body-small-size);
+  font-weight: 400;
+  line-height: var(--md-sys-typescale-body-small-line-height);
+}
+
+/* How the selected piece is edited, said once where the piece is described. */
+.editHint {
+  margin: 8px 0 0;
+  color: var(--md-sys-color-on-surface-variant);
+  font-size: var(--md-sys-typescale-body-small-size);
+  line-height: var(--md-sys-typescale-body-small-line-height);
+}
+
 /*
  * The panel has one callout idiom: an `.md-card--outlined`. Only layout and
  * spacing stay here, so the card owns the border, ground and padding.
@@ -984,12 +1000,13 @@
   height: 46px;
 }
 
+/* "Back" is a primary way out of the products panel: it gets a real target. */
 .textButton {
-  min-height: 32px;
-  padding: 0;
+  min-height: 40px;
+  padding: 0 8px;
   background: transparent;
   color: var(--moss);
-  font-size: 0.68rem;
+  font-size: var(--md-sys-typescale-label-medium-size);
   font-weight: 500;
   text-decoration: underline;
   text-underline-offset: 3px;
@@ -1117,23 +1134,25 @@
   overflow: hidden;
   margin: 5px 0 7px;
   color: var(--muted-text);
-  font-size: 0.61rem;
+  font-size: var(--md-sys-typescale-body-small-size);
   line-height: 1.35;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
 }
 
+/* "Place in room" is the panel's whole point; 28px was neither readable nor
+   reliably hittable. The card below reserves the extra height. */
 .previewButton,
 .previewButtonActive {
   align-self: flex-start;
-  min-height: 28px;
+  min-height: 36px;
   margin-top: auto;
-  padding: 0 9px;
+  padding: 0 12px;
   border: 1px solid var(--warm-divider);
   border-radius: var(--md-sys-shape-corner-extra-small);
   background: var(--paper);
   color: var(--ink);
-  font-size: 0.61rem;
+  font-size: var(--md-sys-typescale-label-medium-size);
   font-weight: 700;
 }
 
@@ -1344,7 +1363,7 @@
 
 .cartTotal small {
   color: var(--muted-text);
-  font-size: 0.59rem;
+  font-size: var(--md-sys-typescale-body-small-size);
 }
 
 .sheetDisclosure {
@@ -1372,7 +1391,7 @@
 
 .sheetDisclosure p {
   margin: 0;
-  font-size: 0.62rem;
+  font-size: var(--md-sys-typescale-body-small-size);
   line-height: 1.4;
 }
 

@@ -1,7 +1,22 @@
-import type { DemoAction, DemoState } from "./demo-types";
+import type { DemoAction, DemoAnnouncement, DemoState } from "./demo-types";
 
-export type { DemoAction, DemoProduct, DemoState } from "./demo-types";
+export type {
+  DemoAction,
+  DemoAnnouncement,
+  DemoProduct,
+  DemoState,
+} from "./demo-types";
 export { DEMO_PRODUCTS } from "./demo-data";
+
+/** Seen on screen and read out; used for the outcome of an approval. */
+function toast(text: string): DemoAnnouncement {
+  return { text, nonce: Date.now(), tone: "toast" };
+}
+
+/** Read out only: confirms an edit without putting anything over the room. */
+function quiet(text: string): DemoAnnouncement {
+  return { text, nonce: Date.now(), tone: "quiet" };
+}
 
 const INITIAL_STATE: DemoState = {
   mode: "inspector",
@@ -24,11 +39,27 @@ export function demoReducer(state: DemoState, action: DemoAction): DemoState {
     case "show-activity":
       return { ...state, mode: "activity", toast: null };
     case "select-object":
-      return { ...state, mode: "inspector", toast: null };
+      // Deselecting removes the inspector, so nothing on screen says it
+      // happened; every other selection speaks for itself.
+      return {
+        ...state,
+        mode: "inspector",
+        toast: null,
+        ...(action.objectId === null
+          ? { announcement: quiet("Selection cleared") }
+          : {}),
+      };
     case "preview-product":
       return { ...state, mode: "products", toast: null };
     case "open-cart":
-      return { ...state, isCartOpen: true, cartDraft: action.draft ?? null };
+      // The sheet is the next thing to read; a leftover toast would sit on top
+      // of "Keep editing".
+      return {
+        ...state,
+        isCartOpen: true,
+        cartDraft: action.draft ?? null,
+        announcement: null,
+      };
     case "close-cart":
       return { ...state, isCartOpen: false, cartDraft: null };
     case "confirm-demo-cart":
@@ -36,7 +67,7 @@ export function demoReducer(state: DemoState, action: DemoAction): DemoState {
         ...state,
         isCartOpen: false,
         cartDraft: null,
-        announcement: "Demo approved — nothing was ordered.",
+        announcement: toast("Demo approved — nothing was ordered."),
       };
     case "clear-announcement":
       return state.announcement === null
@@ -47,11 +78,21 @@ export function demoReducer(state: DemoState, action: DemoAction): DemoState {
         ...state,
         isCartOpen: false,
         cartDraft: null,
-        announcement: `Opened Shopify checkout in a new tab (${action.itemCount} item${action.itemCount === 1 ? "" : "s"})`,
+        announcement: toast(
+          `Opened Shopify checkout in a new tab (${action.itemCount} item${action.itemCount === 1 ? "" : "s"})`,
+        ),
       };
     case "undo":
-      return { ...state, mode: "inspector", toast: null };
+      return {
+        ...state,
+        mode: "inspector",
+        toast: null,
+        announcement: quiet("Undo: last change reverted"),
+      };
     case "reset":
-      return createInitialDemoState();
+      return {
+        ...createInitialDemoState(),
+        announcement: quiet("Room reset to the original furniture"),
+      };
   }
 }

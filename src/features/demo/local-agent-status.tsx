@@ -1,6 +1,9 @@
 import { useId, useRef, useState } from "react";
 
-import type { LocalMcpStatus } from "../../local-mcp/page-relay-client";
+import type {
+  LocalMcpStatus,
+  PageRelayErrorCode,
+} from "../../local-mcp/page-relay-client";
 import type { LocalMcpRelay } from "../../local-mcp/use-local-mcp-relay";
 import styles from "./demo-workspace.module.css";
 
@@ -27,10 +30,22 @@ const STATUS_LABELS: Record<LocalMcpStatus, string> = {
 
 const PAIR_CODE_PATTERN = /^[0-9]{6}$/;
 
-const PAIR_ERROR_NOTES = {
-  INSECURE_CONTEXT: "Pairing needs HTTPS or localhost.",
-  PAIR_REJECTED: "Pairing was rejected. Check the code and try again.",
-} as const;
+/**
+ * What went wrong, and what to do next. Only `PAIR_REJECTED` is about the
+ * code: nothing listening on the port is a companion that was never started,
+ * and saying "check the code" there sends the operator to a log that has
+ * nothing new in it.
+ */
+function pairErrorNote(code: PageRelayErrorCode, port: number): string {
+  switch (code) {
+    case "COMPANION_UNREACHABLE":
+      return `Nothing answered on port ${port}. Start a chat in your AI app so it launches the companion, then try again.`;
+    case "PAIR_REJECTED":
+      return "That code didn't match. Copy the newest six digits from ~/openroom-mcp.log and try again.";
+    case "INSECURE_CONTEXT":
+      return "Pairing needs HTTPS or localhost.";
+  }
+}
 
 /*
  * The MCP client launches the companion and keeps its stderr, so the code is
@@ -53,13 +68,15 @@ export function LocalAgentStatus({ relay }: { relay: LocalMcpRelay }) {
    */
   const [noteDismissed, setNoteDismissed] = useState(false);
   const dialogRef = useRef<HTMLDialogElement | null>(null);
+  const inputRef = useRef<HTMLInputElement | null>(null);
   const hintId = useId();
+  const noteId = useId();
   const titleId = useId();
-  const canConnect =
-    PAIR_CODE_PATTERN.test(code) && relay.status !== "pairing";
+  const pairing = relay.status === "pairing";
+  const canConnect = PAIR_CODE_PATTERN.test(code) && !pairing;
   const note =
     relay.pairError && !noteDismissed
-      ? PAIR_ERROR_NOTES[relay.pairError]
+      ? pairErrorNote(relay.pairError, relay.relayPort)
       : null;
 
   async function connect() {
@@ -71,7 +88,10 @@ export function LocalAgentStatus({ relay }: { relay: LocalMcpRelay }) {
       dialogRef.current?.close();
     } catch {
       // The reason is already reflected in `relay.pairError`, which the dialog
-      // shows; it stays open so the operator can retype the code.
+      // shows; it stays open so the operator can retype the code, and the
+      // field takes the keyboard back with the wrong code selected.
+      inputRef.current?.focus();
+      inputRef.current?.select();
     }
   }
 
@@ -128,14 +148,24 @@ export function LocalAgentStatus({ relay }: { relay: LocalMcpRelay }) {
         <label className={styles.localAgentField}>
           <span>Pairing code</span>
           <input
-            aria-describedby={hintId}
+            aria-describedby={note ? `${hintId} ${noteId}` : hintId}
+            aria-invalid={note !== null}
             autoComplete="off"
             inputMode="numeric"
             maxLength={6}
             onChange={(event) =>
               setCode(event.target.value.replace(/[^0-9]/g, "").slice(0, 6))
             }
+            // Six digits and a Connect button one Tab away: Enter is what
+            // anyone typing a code presses, so it submits.
+            onKeyDown={(event) => {
+              if (event.key === "Enter") {
+                event.preventDefault();
+                void connect();
+              }
+            }}
             pattern="[0-9]{6}"
+            ref={inputRef}
             type="text"
             value={code}
           />
@@ -157,7 +187,11 @@ export function LocalAgentStatus({ relay }: { relay: LocalMcpRelay }) {
           </label>
         </details>
 
-        {note ? <p className={styles.pairNote}>{note}</p> : null}
+        {note ? (
+          <p className={styles.pairNote} id={noteId} role="alert">
+            {note}
+          </p>
+        ) : null}
 
         <div className="md-dialog-actions">
           <button
@@ -167,9 +201,16 @@ export function LocalAgentStatus({ relay }: { relay: LocalMcpRelay }) {
           >
             Cancel
           </button>
+          {/*
+            Only the code shape disables this: going disabled mid-attempt
+            would take the button out from under the pointer and drop focus on
+            <body>. While the relay is pairing it says so and `connect` returns
+            early instead.
+          */}
           <button
+            aria-busy={pairing}
             className="md-button md-button--filled"
-            disabled={!canConnect}
+            disabled={!PAIR_CODE_PATTERN.test(code)}
             onClick={() => void connect()}
             type="button"
           >

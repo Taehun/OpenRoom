@@ -49,7 +49,9 @@
   transition: opacity 120ms ease;
 }
 
-.md-button:hover:not(:disabled)::before {
+/* The focus layer is deliberately not excluded for `aria-disabled`: the button
+   is still reachable, so it still has to show where the keyboard is. */
+.md-button:hover:not(:disabled):not([aria-disabled="true"])::before {
   opacity: var(--md-sys-state-hover-opacity);
 }
 
@@ -57,11 +59,17 @@
   opacity: var(--md-sys-state-focus-opacity);
 }
 
-.md-button:active:not(:disabled)::before {
+.md-button:active:not(:disabled):not([aria-disabled="true"])::before {
   opacity: var(--md-sys-state-pressed-opacity);
 }
 
-.md-button:disabled {
+/*
+ * `aria-disabled` reads as disabled and looks disabled, but stays focusable —
+ * for a control that turns itself off under the pointer, such as the last
+ * Undo, so the keyboard is never dropped on <body>.
+ */
+.md-button:disabled,
+.md-button[aria-disabled="true"] {
   cursor: not-allowed;
   opacity: 0.38;
 }
@@ -84,10 +92,26 @@
   padding-inline: 16px;
 }
 
-/* Dense: for bars with a fixed height budget, such as the composer. */
+/*
+ * Dense: for bars with a fixed height budget, such as the composer. It keeps
+ * the 32px look and buys back the 40px pointer target with a transparent
+ * overlay, so the row's height budget is unchanged and the control is still
+ * comfortably hittable.
+ */
 .md-button--dense {
+  position: relative;
   height: 32px;
   padding-inline: 16px;
+  /* `.md-button` clips to the pill so the state layer stays inside it; the
+     target overlay has to reach past that edge, and the state layer is already
+     inset with an inherited radius, so nothing else needs the clip. */
+  overflow: visible;
+}
+
+.md-button--dense::after {
+  position: absolute;
+  content: "";
+  inset: -4px 0;
 }
 
 /*

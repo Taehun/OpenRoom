@@ -69,11 +69,17 @@ export function WorkspaceHeader({
             <span>Guide</span>
           </Link>
         ) : null}
+        {/*
+          `aria-disabled`, not `disabled`: the last undo would otherwise
+          disable the button under the pointer and drop focus to <body>, so the
+          keyboard loses its place at exactly the moment there is nothing left
+          to undo. The button stays focusable and simply does nothing.
+        */}
         <button
+          aria-disabled={!canUndo}
           aria-keyshortcuts="Meta+Z Control+Z"
           className={`md-button md-button--text ${styles.quietButton}`}
-          disabled={!canUndo}
-          onClick={() => dispatch({ type: "undo" })}
+          onClick={() => canUndo && dispatch({ type: "undo" })}
           title="Undo the last change (⌘Z / Ctrl+Z)"
           type="button"
         >

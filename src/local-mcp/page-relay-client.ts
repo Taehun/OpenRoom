@@ -25,6 +25,7 @@ export type LocalMcpStatus =
   | "connection-lost";
 
 export const PAGE_RELAY_ERROR_CODES = [
+  "COMPANION_UNREACHABLE",
   "INSECURE_CONTEXT",
   "PAIR_REJECTED",
 ] as const;
@@ -32,8 +33,13 @@ export type PageRelayErrorCode = (typeof PAGE_RELAY_ERROR_CODES)[number];
 
 /**
  * Pairing failures the page can surface. Like `RelayError`, the message is
- * exactly the code so a rejected code, an expired code, a disallowed origin,
- * and a manifest mismatch stay indistinguishable from one another.
+ * exactly the code, and every server-side reason stays one code:
+ * `PAIR_REJECTED` covers a rejected code, an expired code, a disallowed origin
+ * and a manifest mismatch alike, so a failed attempt tells an attacker nothing
+ * about which of them it was. `COMPANION_UNREACHABLE` is not one of those: the
+ * request never reached a relay at all, which the browser can see without any
+ * help from the companion, and blaming the typed code for it would send the
+ * operator back to a log that has nothing to say.
  */
 export class PageRelayError extends Error {
   readonly code: PageRelayErrorCode;
@@ -182,7 +188,9 @@ export class PageRelayClient {
         cache: "no-store",
       });
     } catch {
-      return this.#rejectPairing();
+      // Nothing answered on the loopback port: no relay is listening, or the
+      // browser refused the request outright. Never the code's fault.
+      return this.#rejectPairing("COMPANION_UNREACHABLE");
     }
 
     if (!response.ok) return this.#rejectPairing();
@@ -224,11 +232,11 @@ export class PageRelayClient {
     }
   }
 
-  #rejectPairing(): never {
+  #rejectPairing(code: PageRelayErrorCode = "PAIR_REJECTED"): never {
     this.#token = null;
     this.#closed = true;
     this.#onStatus("not-connected");
-    throw new PageRelayError("PAIR_REJECTED");
+    throw new PageRelayError(code);
   }
 
   async #poll(): Promise<void> {

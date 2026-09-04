@@ -8,9 +8,13 @@ import {
   within,
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { StrictMode } from "react";
 import { afterEach, expect, test, vi } from "vitest";
 import { createDemoScene } from "../../src/demo/demo-scene";
-import { ContextPanel } from "../../src/features/demo/context-panel";
+import {
+  ContextPanel,
+  describeFacing,
+} from "../../src/features/demo/context-panel";
 import { DemoWorkspace } from "../../src/features/demo/demo-workspace";
 import type { ModelContextTool } from "../../src/webmcp/tool-handlers";
 import {
@@ -95,7 +99,7 @@ test("connects the Core 6 journey to the shared Scene and approval UI", async ()
     );
   });
   expect(
-    screen.getByRole("status", { name: "Scene diagnostics" }),
+    screen.getByTestId("scene-diagnostics"),
   ).toHaveTextContent(
     "Revision 2 · table_01 · travertine-plinth-table",
   );
@@ -144,7 +148,7 @@ test("moves from object inspection to product preview", async () => {
   expect(screen.getByText("Revision 2")).toBeVisible();
   expect(screen.getAllByText("$169")).not.toHaveLength(0);
   expect(
-    screen.getByRole("status", { name: "Scene diagnostics" }),
+    screen.getByTestId("scene-diagnostics"),
   ).toHaveTextContent("Revision 2 · table_01 · oak-frame-table");
 });
 
@@ -221,7 +225,7 @@ test("uses Scene selection without incrementing revision", async () => {
   expect(screen.getByRole("heading", { name: "Chair" })).toBeVisible();
   expect(screen.getByText("Revision 1")).toBeVisible();
   expect(
-    screen.getByRole("status", { name: "Scene diagnostics" }),
+    screen.getByTestId("scene-diagnostics"),
   ).toHaveTextContent("Revision 1 · chair_01 · placeholder");
 });
 
@@ -283,6 +287,154 @@ test("dismisses the approval announcement after four seconds", () => {
   } finally {
     vi.useRealTimers();
   }
+});
+
+// The announcement used to be a bare string, so a second identical approval
+// left the live region untouched and its four seconds ran from the first one.
+test("two approvals produce two live-region updates", () => {
+  vi.useFakeTimers();
+  try {
+    render(<DemoWorkspace />);
+    fireEvent.click(screen.getByRole("button", { name: "Find alternatives" }));
+    fireEvent.click(
+      screen.getByRole("button", { name: "Place Oak Frame Table in room" }),
+    );
+
+    const toast = () => screen.getByTestId("announcement-toast");
+    const approve = () => {
+      fireEvent.click(screen.getByRole("button", { name: /^View cart/ }));
+      fireEvent.click(
+        within(
+          screen.getByRole("dialog", { name: "Review your room" }),
+        ).getByRole("button", { name: "Approve demo cart · $169" }),
+      );
+    };
+    const announcement = "Demo approved — nothing was ordered.";
+
+    approve();
+    expect(toast()).toHaveTextContent(announcement);
+
+    act(() => {
+      vi.advanceTimersByTime(2000);
+    });
+    // Opening the sheet takes the toast down so it cannot cover "Keep editing".
+    fireEvent.click(screen.getByRole("button", { name: /^View cart/ }));
+    expect(toast()).toBeEmptyDOMElement();
+    fireEvent.click(
+      within(screen.getByRole("dialog", { name: "Review your room" })).getByRole(
+        "button",
+        { name: "Approve demo cart · $169" },
+      ),
+    );
+
+    // The second announcement runs its own four seconds, not the tail of the
+    // first one's.
+    expect(toast()).toHaveTextContent(announcement);
+    act(() => {
+      vi.advanceTimersByTime(3999);
+    });
+    expect(toast()).toHaveTextContent(announcement);
+    act(() => {
+      vi.advanceTimersByTime(1);
+    });
+    expect(toast()).toBeEmptyDOMElement();
+  } finally {
+    vi.useRealTimers();
+  }
+});
+
+// An edit, an undo, a reset and a cleared selection change the room silently;
+// they are said to the screen reader without covering it.
+test("announces silent edits without putting a toast over the room", async () => {
+  const user = userEvent.setup();
+  render(<DemoWorkspace />);
+
+  await user.click(screen.getByRole("button", { name: "Find alternatives" }));
+  await user.click(
+    screen.getByRole("button", { name: "Place Oak Frame Table in room" }),
+  );
+  await user.click(screen.getByRole("button", { name: "Undo" }));
+
+  expect(screen.getByTestId("announcement-quiet")).toHaveTextContent(
+    "Undo: last change reverted",
+  );
+  expect(screen.getByTestId("announcement-toast")).toBeEmptyDOMElement();
+
+  await user.click(screen.getByRole("button", { name: "Reset demo" }));
+  expect(screen.getByTestId("announcement-quiet")).toHaveTextContent(
+    "Room reset to the original furniture",
+  );
+
+  fireEvent.keyDown(window, { key: "Escape" });
+  expect(screen.getByTestId("announcement-quiet")).toHaveTextContent(
+    "Selection cleared",
+  );
+  expect(screen.getByRole("heading", { name: "Nothing selected" })).toBeVisible();
+});
+
+// The last undo used to disable the button under the pointer, which drops the
+// keyboard on <body> at the moment there is nothing left to undo.
+test("keeps Undo focusable when there is nothing left to undo", async () => {
+  const user = userEvent.setup();
+  render(<DemoWorkspace />);
+
+  const undo = screen.getByRole("button", { name: "Undo" });
+  expect(undo).toHaveAttribute("aria-disabled", "true");
+  expect(undo).toBeEnabled();
+
+  await user.click(screen.getByRole("button", { name: "Find alternatives" }));
+  await user.click(
+    screen.getByRole("button", { name: "Place Oak Frame Table in room" }),
+  );
+  expect(undo).toHaveAttribute("aria-disabled", "false");
+
+  await user.click(undo);
+  expect(undo).toHaveAttribute("aria-disabled", "true");
+  expect(undo).toHaveFocus();
+  expect(screen.getByTestId("scene-diagnostics")).toHaveTextContent(
+    "Revision 1 · table_01 · placeholder",
+  );
+
+  // A second press on the spent button does nothing at all.
+  await user.click(undo);
+  expect(screen.getByTestId("scene-diagnostics")).toHaveTextContent(
+    "Revision 1 · table_01 · placeholder",
+  );
+  expect(undo).toHaveFocus();
+});
+
+// Escape and ⌘Z belong to the room, but only while the room has the keyboard.
+test("Escape in the pairing dialog keeps the selection", async () => {
+  const user = userEvent.setup();
+  render(<DemoWorkspace />);
+
+  await user.click(openPairingDialog());
+  expect(
+    screen.getByRole("dialog", { name: "Connect an AI app" }),
+  ).toBeVisible();
+
+  fireEvent.keyDown(window, { key: "Escape" });
+
+  expect(screen.getByRole("heading", { name: "Coffee table" })).toBeVisible();
+  expect(screen.queryByRole("heading", { name: "Nothing selected" })).toBeNull();
+});
+
+test("Cmd+Z in the pairing code field does not undo the room", async () => {
+  const user = userEvent.setup();
+  render(<DemoWorkspace />);
+
+  await user.click(screen.getByRole("button", { name: "Find alternatives" }));
+  await user.click(
+    screen.getByRole("button", { name: "Place Oak Frame Table in room" }),
+  );
+  await user.click(openPairingDialog());
+
+  const code = screen.getByRole("textbox", { name: "Pairing code" });
+  fireEvent.keyDown(code, { key: "z", metaKey: true });
+
+  expect(screen.getByTestId("scene-diagnostics")).toHaveTextContent(
+    "Revision 2 · table_01 · oak-frame-table",
+  );
 });
 
 test("counts the room's products in the badge and approves them without an external cart request", async () => {
@@ -545,7 +697,7 @@ test("Reset demo restores the canonical inspector state", async () => {
   expect(screen.getByText("Revision 1")).toBeVisible();
   expect(screen.getByText("$0")).toBeVisible();
   expect(
-    screen.getByRole("status", { name: "Scene diagnostics" }),
+    screen.getByTestId("scene-diagnostics"),
   ).toHaveTextContent("Revision 1 · table_01 · placeholder");
   expect(
     within(screen.getByRole("main", { name: "Room canvas" })).queryByText(
@@ -714,7 +866,7 @@ test("keeps a rejected pairing inside the dialog", async () => {
   await waitFor(() =>
     expect(
       within(dialog).getByText(
-        "Pairing was rejected. Check the code and try again.",
+        "That code didn't match. Copy the newest six digits from ~/openroom-mcp.log and try again.",
       ),
     ).toBeVisible(),
   );
@@ -723,6 +875,59 @@ test("keeps a rejected pairing inside the dialog", async () => {
     screen.getByRole("status", { name: "Desktop AI app status" })
       .textContent,
   ).toBe("Desktop AI app: Not connected");
+});
+
+// Nothing was listening, so the code was never read: telling the operator to
+// check it sends them back to a log with nothing new in it.
+test("blames the missing companion rather than the code when nothing answers", async () => {
+  vi.spyOn(globalThis, "fetch").mockRejectedValue(
+    new TypeError("Failed to fetch"),
+  );
+  const user = userEvent.setup();
+  render(<DemoWorkspace />);
+
+  await user.click(openPairingDialog());
+  const dialog = screen.getByRole("dialog", { name: "Connect an AI app" });
+  const code = within(dialog).getByRole("textbox", { name: "Pairing code" });
+  await user.type(code, "123456");
+  await user.click(within(dialog).getByRole("button", { name: "Connect" }));
+
+  const note = await within(dialog).findByRole("alert");
+  expect(note).toHaveTextContent(
+    "Nothing answered on port 43110. Start a chat in your AI app so it launches the companion, then try again.",
+  );
+  expect(code).toHaveAttribute("aria-invalid", "true");
+  expect(code).toHaveAccessibleDescription(
+    "Type the six-digit code the companion wrote to ~/openroom-mcp.log. Nothing answered on port 43110. Start a chat in your AI app so it launches the companion, then try again.",
+  );
+  // The field takes the keyboard back with the code selected, and Connect is
+  // still there to press again.
+  expect(code).toHaveFocus();
+  expect(within(dialog).getByRole("button", { name: "Connect" })).toBeEnabled();
+});
+
+test("Enter submits the code", async () => {
+  const server = new FakeRelayServer();
+  vi.spyOn(globalThis, "fetch").mockImplementation(server.fetch);
+  const user = userEvent.setup();
+  render(<DemoWorkspace />);
+
+  await user.click(openPairingDialog());
+  await user.type(
+    within(
+      screen.getByRole("dialog", { name: "Connect an AI app" }),
+    ).getByRole("textbox", { name: "Pairing code" }),
+    "123456{Enter}",
+  );
+
+  await waitFor(() =>
+    expect(
+      screen.getByRole("status", { name: "Desktop AI app status" }).textContent,
+    ).toBe("Desktop AI app: Connected"),
+  );
+  expect(
+    screen.queryByRole("dialog", { name: "Connect an AI app" }),
+  ).not.toBeInTheDocument();
 });
 
 test("clears a stale failure and the code when the dialog is reopened", async () => {
@@ -742,7 +947,7 @@ test("clears a stale failure and the code when the dialog is reopened", async ()
   await waitFor(() =>
     expect(
       within(dialog).getByText(
-        "Pairing was rejected. Check the code and try again.",
+        "That code didn't match. Copy the newest six digits from ~/openroom-mcp.log and try again.",
       ),
     ).toBeVisible(),
   );
@@ -753,7 +958,7 @@ test("clears a stale failure and the code when the dialog is reopened", async ()
   const reopened = screen.getByRole("dialog", { name: "Connect an AI app" });
   expect(
     within(reopened).queryByText(
-      "Pairing was rejected. Check the code and try again.",
+      "That code didn't match. Copy the newest six digits from ~/openroom-mcp.log and try again.",
     ),
   ).not.toBeInTheDocument();
   expect(
@@ -849,4 +1054,100 @@ test("shows an On row only while the selected object is supported", () => {
   expect(screen.getByText("Standing on").nextElementSibling).toHaveTextContent(
     "Coffee table",
   );
+});
+
+const INSPECTOR_STATE = {
+  mode: "inspector" as const,
+  isCartOpen: false,
+  cartDraft: null,
+  toast: null,
+  announcement: null,
+};
+
+// A 5° nudge is a deliberate press of Rotate; only rounding noise still reads
+// as "Toward the camera".
+test("reads the first rotate press as a turn, not as facing the camera", () => {
+  const degrees = (value: number) => (value * Math.PI) / 180;
+
+  expect(describeFacing(0)).toBe("Toward the camera");
+  expect(describeFacing(degrees(2))).toBe("Toward the camera");
+  expect(describeFacing(degrees(5))).toBe("Turned 5° to the left");
+  expect(describeFacing(degrees(-5))).toBe("Turned 5° to the right");
+  expect(describeFacing(degrees(180))).toBe("Away from the camera");
+});
+
+// One photo serves a lamp from every side, so a Faces row could only ever say
+// "Toward the camera" — it says nothing instead.
+test("hides the Faces row for a piece with no photographed front", () => {
+  const scene = createDemoScene();
+  scene.selectedObjectId = "lamp_01";
+
+  const { unmount } = render(
+    <ContextPanel dispatch={() => {}} scene={scene} state={INSPECTOR_STATE} />,
+  );
+  expect(screen.queryByText("Faces")).toBeNull();
+  unmount();
+
+  const sofaScene = createDemoScene();
+  sofaScene.selectedObjectId = "sofa_01";
+  render(
+    <ContextPanel
+      dispatch={() => {}}
+      scene={sofaScene}
+      state={INSPECTOR_STATE}
+    />,
+  );
+  expect(screen.getByText("Faces")).toBeVisible();
+});
+
+test("tells people how to edit the selected piece", () => {
+  render(<DemoWorkspace />);
+
+  expect(
+    screen.getByText(
+      "Drag to move, or nudge with the arrow keys. Rotate turns it; hold Shift for bigger steps.",
+    ),
+  ).toBeVisible();
+});
+
+test("Find alternatives moves focus to the products heading", async () => {
+  const user = userEvent.setup();
+  render(<DemoWorkspace />);
+
+  await user.click(screen.getByRole("button", { name: "Find alternatives" }));
+
+  expect(
+    screen.getByRole("heading", { name: "Coffee tables for your room" }),
+  ).toHaveFocus();
+});
+
+test("Back moves focus to the inspector title", async () => {
+  const user = userEvent.setup();
+  render(<DemoWorkspace />);
+
+  await user.click(screen.getByRole("button", { name: "Find alternatives" }));
+  await user.click(screen.getByRole("button", { name: "Back" }));
+
+  expect(screen.getByRole("heading", { name: "Coffee table" })).toHaveFocus();
+});
+
+// The heading only catches focus a pressed control dropped: a click on the
+// photo keeps it on the cutout, and the first render never steals it — not
+// even under Strict Mode, which runs the effect twice on the same mount.
+test("leaves focus alone when the selection changes from the photo", async () => {
+  const user = userEvent.setup();
+  render(
+    <StrictMode>
+      <DemoWorkspace />
+    </StrictMode>,
+  );
+
+  expect(document.body).toHaveFocus();
+
+  const stage = screen.getByRole("region", { name: "Editable room photo" });
+  const sofa = within(stage).getByRole("button", { name: "Sofa" });
+  await user.click(screen.getByRole("button", { name: "Find alternatives" }));
+  await user.click(sofa);
+
+  expect(sofa).toHaveFocus();
 });

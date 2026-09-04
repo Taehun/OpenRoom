@@ -67,8 +67,10 @@ function DemoWorkspaceContent({
     createInitialDemoState,
   );
 
-  // The approval announcement is a toast, not a banner: it reads once through
-  // the live region and leaves before it can cover the next action.
+  // An announcement is a toast, not a banner: it reads once through the live
+  // region and leaves before it can cover the next action. Each one carries a
+  // nonce, so a second approval is a new object here and restarts the timer
+  // rather than expiring on the first one's clock.
   useEffect(() => {
     if (state.announcement === null) return;
     const timer = window.setTimeout(
@@ -210,6 +212,20 @@ function DemoWorkspaceContent({
 
   useEffect(() => {
     function handleWorkspaceKeyDown(event: KeyboardEvent) {
+      // The room shortcuts are the room's. A modal dialog, a text field, or a
+      // handler that already acted owns the key first: Escape inside the
+      // pairing dialog closes the dialog, not the selection, and ⌘Z there
+      // undoes typing, not the last placement.
+      if (
+        event.defaultPrevented ||
+        document.querySelector("dialog[open]") ||
+        (event.target instanceof HTMLElement &&
+          (/^(INPUT|TEXTAREA|SELECT)$/.test(event.target.tagName) ||
+            event.target.isContentEditable))
+      ) {
+        return;
+      }
+
       if (event.key === "Escape") {
         routeAction(
           state.isCartOpen
@@ -258,14 +274,34 @@ function DemoWorkspaceContent({
           aria-atomic="true"
           aria-live="polite"
           className={styles.liveRegion}
+          data-testid="announcement-toast"
           role="status"
         >
-          {state.announcement}
+          {state.announcement?.tone === "toast" ? state.announcement.text : null}
         </div>
 
-        <output
-          aria-label="Scene diagnostics"
+        {/* Edits, undo, reset and deselection are obvious on screen and
+            invisible to a screen reader; they are said here instead of over
+            the room. */}
+        <div
+          aria-atomic="true"
+          aria-live="polite"
           className={styles.visuallyHidden}
+          data-testid="announcement-quiet"
+          role="status"
+        >
+          {state.announcement?.tone === "quiet" ? state.announcement.text : null}
+        </div>
+
+        {/*
+          A test and debugging surface, not a status message: it repeats ids the
+          UI already says in words, so it is hidden from assistive technology
+          and located by its test id.
+        */}
+        <output
+          aria-hidden="true"
+          className={styles.visuallyHidden}
+          data-testid="scene-diagnostics"
         >
           Revision {scene.revision} · {scene.selectedObjectId ?? "none"} ·{" "}
           {selectedObject?.product?.id ?? "placeholder"}

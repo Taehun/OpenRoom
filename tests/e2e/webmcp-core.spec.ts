@@ -183,7 +183,7 @@ test("completes WebMCP Core 6 against the shared demo Scene", async ({
     sceneRevision: 2,
     stateVersion: 2,
   });
-  const diagnostics = page.getByRole("status", { name: "Scene diagnostics" });
+  const diagnostics = page.getByTestId("scene-diagnostics");
   await expect(diagnostics).toContainText(
     "Revision 2 · table_01 · travertine-plinth-table",
   );

@@ -148,15 +148,15 @@ test("completes the deterministic spatial commerce UI journey", async ({
     page.getByRole("button", { name: "Copy redesign prompt" }),
   ).toBeVisible();
   await expect(
-    page.getByRole("status", { name: "Scene diagnostics" }),
+    page.getByTestId("scene-diagnostics"),
   ).toContainText("Revision 2");
   await page.keyboard.press("Control+z");
   await expect(
-    page.getByRole("status", { name: "Scene diagnostics" }),
+    page.getByTestId("scene-diagnostics"),
   ).toContainText("Revision 1 · table_01 · placeholder");
   await page.getByRole("button", { name: "Reset demo" }).click();
   await expect(
-    page.getByRole("status", { name: "Scene diagnostics" }),
+    page.getByTestId("scene-diagnostics"),
   ).toContainText("Revision 1 · table_01 · placeholder");
   // The cart is the room. The reset seed room holds placeholders only, so the
   // header carries no badge and the sheet says so instead of inventing lines.
@@ -198,7 +198,7 @@ test("keeps the room across a soft navigation to the home page and back", async 
   await page.setViewportSize({ width: 1280, height: 800 });
   await page.goto("/demo");
 
-  const diagnostics = page.getByRole("status", { name: "Scene diagnostics" });
+  const diagnostics = page.getByTestId("scene-diagnostics");
   const roomCanvas = page.getByRole("main", { name: "Room canvas" });
   const viewCart = page.getByRole("button", { name: /^View cart/ });
   await expect(roomCanvas).toBeVisible();
