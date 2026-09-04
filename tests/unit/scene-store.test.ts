@@ -15,8 +15,13 @@ import type {
 import { supportOf } from "../../src/features/scene/support";
 import { completedProductScene } from "../helpers/natural-placement-fixtures";
 
-function sceneProductFor(type: Scene["objects"][number]["type"]): SceneProduct {
-  const product = DEMO_PRODUCTS.find(({ category }) => category === type);
+function sceneProductFor(
+  type: Scene["objects"][number]["type"],
+  productId?: string,
+): SceneProduct {
+  const product = DEMO_PRODUCTS.find(({ id, category }) =>
+    productId === undefined ? category === type : id === productId
+  );
   if (!product) throw new Error(`Missing demo product for ${type}`);
   return {
     id: product.id,
@@ -35,6 +40,7 @@ function replaceDemoObject(
   store: SceneStore,
   objectId: string,
   actor: CommandActor = "agent",
+  productId?: string,
 ): CommandResult {
   const object = store.getState().scene.objects.find(({ id }) => id === objectId);
   if (!object) throw new Error(`Missing demo object ${objectId}`);
@@ -44,7 +50,7 @@ function replaceDemoObject(
     command: {
       type: "replace",
       objectId,
-      product: sceneProductFor(object.type),
+      product: sceneProductFor(object.type, productId),
     },
   });
 }
@@ -242,9 +248,9 @@ describe("createSceneStore", () => {
     expect(store.getState().stateVersion).toBe(3);
   });
 
-  // The solver is an unwired library: a completed agent redesign is one plain
-  // replace commit, so every object keeps the placement it had.
-  test("completes an agent redesign without moving anything", () => {
+  // Each replacement is one command commit. These products already fit their
+  // current floor positions, so the command-level collision resolver leaves X/Z alone.
+  test("completes a collision-free agent redesign without moving anything", () => {
     const events: SceneCommitEvent[] = [];
     const store = createSceneStore(undefined, {
       onCommit: (event) => events.push(event),
@@ -258,7 +264,12 @@ describe("createSceneStore", () => {
     }
 
     const beforeFinal = structuredClone(store.getState().scene);
-    const result = replaceDemoObject(store, objectIds.at(-1)!);
+    const result = replaceDemoObject(
+      store,
+      objectIds.at(-1)!,
+      "agent",
+      "stoneware-snake-plant",
+    );
 
     expect(result).toMatchObject({
       ok: true,

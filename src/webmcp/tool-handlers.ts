@@ -132,6 +132,8 @@ function commandFailure(
     OBJECT_NOT_FOUND: "The requested Scene object was not found.",
     OBJECT_LOCKED: "The requested Scene object is locked.",
     CATEGORY_MISMATCH: "The product category does not match the Scene object.",
+    NO_VALID_PLACEMENT:
+      "The object has no collision-free position that fits on the floor.",
     SCENE_REVISION_CONFLICT: "The Scene changed; retry with the latest state.",
   };
   return toolError(

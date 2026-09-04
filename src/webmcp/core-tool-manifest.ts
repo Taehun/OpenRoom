@@ -52,14 +52,15 @@ export const CORE_TOOL_MANIFEST = deepFreeze([
   },
   {
     name: "replace_object",
-    description: "Replace an explicit or selected Scene object with a catalog product.",
+    description:
+      "Replace an explicit or selected Scene object with a catalog product. If the new footprint overlaps furniture or leaves the usable floor, it moves to the nearest open floor position; replacement fails with NO_VALID_PLACEMENT when none exists.",
     inputSchema: REPLACE_OBJECT_JSON_SCHEMA,
     annotations: { readOnlyHint: false, untrustedContentHint: true },
   },
   {
     name: "move_object",
     description:
-      "Move an explicit or selected Scene object; orient it with rotationYDegrees or a facing vector {x, z}. The position is clamped so the whole footprint stays on the floor, and a lamp moved onto a table is supported by it: it rises onto the table and comes back reported with supportedBy set to that table's id.",
+      "Move an explicit or selected Scene object; orient it with rotationYDegrees or a facing vector {x, z}. The whole footprint stays on the usable floor and moves to the nearest open position instead of overlapping another non-rug object. A lamp moved onto a table is intentionally supported by it: it rises onto the table and comes back reported with supportedBy set to that table's id.",
     inputSchema: MOVE_OBJECT_JSON_SCHEMA,
     annotations: { readOnlyHint: false, untrustedContentHint: true },
   },

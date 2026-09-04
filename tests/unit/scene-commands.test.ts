@@ -5,6 +5,7 @@ import { hasCirculationPath } from "../../src/features/placement/circulation";
 import {
   footprintCorners,
   footprintInsideRoom,
+  footprintsOverlap,
   objectFootprint,
   openingClearanceZones,
 } from "../../src/features/placement/footprint-geometry";
@@ -215,9 +216,144 @@ describe("applySceneCommand", () => {
     expect(result.scene.revision).toBe(2);
   });
 
+  test("moves an overlapping piece to the nearest open floor position", () => {
+    const seed = createDemoScene();
+    seed.objects = seed.objects.filter(({ id }) =>
+      id === "sofa_01" || id === "chair_01"
+    );
+    seed.selectedObjectId = "chair_01";
+    const scene = SceneSchema.parse(seed);
+    const sofa = scene.objects.find(({ id }) => id === "sofa_01")!;
+
+    const result = applySceneCommand(scene, {
+      expectedRevision: scene.revision,
+      actor: "human",
+      command: {
+        type: "move",
+        objectId: "chair_01",
+        position: { x: sofa.position[0], z: sofa.position[2] },
+      },
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const chair = result.scene.objects.find(({ id }) => id === "chair_01")!;
+    expect(result.adjustedToFit).toBe(true);
+    expect(
+      footprintInsideRoom(objectFootprint(chair), result.scene.room, 0.1),
+    ).toBe(true);
+    expect(
+      footprintsOverlap(objectFootprint(chair), objectFootprint(sofa)),
+    ).toBe(false);
+    // The side exits are blocked by the room boundary, so the nearest legal
+    // resolution is directly in front of the sofa rather than through it.
+    expect(chair.position[0]).toBeCloseTo(sofa.position[0], 9);
+    expect(chair.position[2]).toBeGreaterThan(sofa.position[2]);
+  });
+
+  test("finds an open floor pocket when several pieces block the direct exits", () => {
+    const scene = createDemoScene();
+    const sofa = scene.objects.find(({ id }) => id === "sofa_01")!;
+
+    const result = applySceneCommand(scene, {
+      expectedRevision: scene.revision,
+      actor: "human",
+      command: {
+        type: "move",
+        objectId: "chair_01",
+        position: { x: sofa.position[0], z: sofa.position[2] },
+      },
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const chair = result.scene.objects.find(({ id }) => id === "chair_01")!;
+    expect(result.adjustedToFit).toBe(true);
+    expect(
+      footprintInsideRoom(objectFootprint(chair), result.scene.room, 0.1),
+    ).toBe(true);
+    for (const blocker of result.scene.objects) {
+      if (blocker.id === chair.id || blocker.type === "rug") continue;
+      expect(
+        footprintsOverlap(objectFootprint(chair), objectFootprint(blocker)),
+        `chair overlaps ${blocker.id}`,
+      ).toBe(false);
+    }
+  });
+
+  test("repositions a larger replacement inside the floor without overlap", () => {
+    const seed = createDemoScene();
+    seed.objects = seed.objects.filter(({ id }) =>
+      id === "sofa_01" || id === "table_01"
+    );
+    seed.selectedObjectId = "table_01";
+    const scene = SceneSchema.parse(seed);
+    const originalTable = scene.objects.find(({ id }) => id === "table_01")!;
+    const product: SceneProduct = {
+      ...LIGHT_OAK_TABLE,
+      id: "deep-oak-table",
+      variantId: "demo-variant-deep-oak-table",
+      title: "Deep Oak Table",
+      dimensionsCm: { width: 120, height: 40, depth: 130 },
+    };
+
+    const result = applySceneCommand(scene, {
+      expectedRevision: scene.revision,
+      actor: "agent",
+      command: {
+        type: "replace",
+        objectId: "table_01",
+        product,
+      },
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const table = result.scene.objects.find(({ id }) => id === "table_01")!;
+    const sofa = result.scene.objects.find(({ id }) => id === "sofa_01")!;
+    expect(result.adjustedToFit).toBe(true);
+    expect(table.position[2]).toBeGreaterThan(originalTable.position[2]);
+    expect(
+      footprintInsideRoom(objectFootprint(table), result.scene.room, 0.1),
+    ).toBe(true);
+    expect(
+      footprintsOverlap(objectFootprint(table), objectFootprint(sofa)),
+    ).toBe(false);
+  });
+
+  test("rejects a replacement whose footprint cannot fit on the floor", () => {
+    const scene = createDemoScene();
+    const product: SceneProduct = {
+      ...LIGHT_OAK_TABLE,
+      id: "oversized-table",
+      variantId: "demo-variant-oversized-table",
+      title: "Oversized Table",
+      dimensionsCm: { width: 400, height: 40, depth: 180 },
+    };
+
+    const result = applySceneCommand(scene, {
+      expectedRevision: scene.revision,
+      actor: "agent",
+      command: {
+        type: "replace",
+        objectId: "table_01",
+        product,
+      },
+    });
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.error.code).toBe("NO_VALID_PLACEMENT");
+    expect(result.scene).toBe(scene);
+    expect(result.scene.revision).toBe(1);
+  });
+
   test("keeps every corner of a rotated footprint inside the room", () => {
     const seed = createDemoScene();
-    const rotated = applySceneCommand(seed, {
+    seed.objects = seed.objects.filter(({ id }) => id === "sofa_01");
+    seed.selectedObjectId = "sofa_01";
+    const scene = SceneSchema.parse(seed);
+    const rotated = applySceneCommand(scene, {
       expectedRevision: 1,
       actor: "human",
       command: {
@@ -294,10 +430,13 @@ describe("applySceneCommand", () => {
 
   test("slides a turn by exactly the corner overshoot, not by re-centring", () => {
     const seed = createDemoScene();
-    const sofa = seed.objects.find(({ id }) => id === "sofa_01")!;
+    seed.objects = seed.objects.filter(({ id }) => id === "sofa_01");
+    seed.selectedObjectId = "sofa_01";
+    const scene = SceneSchema.parse(seed);
+    const sofa = scene.objects[0]!;
     expect(sofa.position[2]).toBeCloseTo(-0.55, 12);
 
-    const turned = applySceneCommand(seed, {
+    const turned = applySceneCommand(scene, {
       expectedRevision: 1,
       actor: "human",
       command: {
@@ -311,19 +450,18 @@ describe("applySceneCommand", () => {
     expect(turned.ok).toBe(true);
     if (!turned.ok) return;
     const after = turned.scene.objects.find(({ id }) => id === "sofa_01")!;
-    // The 2 x 0.9 m sofa turned 30° reaches 0.08 m through the back wall, so it
-    // steps forward by that much and no more: its back corner now rests on the
-    // wall. The old centre clamp pushed it 0.18 m, to the room inset instead.
+    // The 2 x 0.9 m sofa steps forward by exactly the corner overshoot, so its
+    // back corner rests on the usable floor inset without re-centring the box.
     const radians = (30 * Math.PI) / 180;
     const halfExtentZ =
       Math.abs(Math.sin(radians)) * (after.dimensionsM.width / 2) +
       Math.abs(Math.cos(radians)) * (after.dimensionsM.depth / 2);
     expect(after.position[0]).toBe(sofa.position[0]);
     expect(after.position[2]).toBeCloseTo(
-      -turned.scene.room.depth / 2 + halfExtentZ,
+      -turned.scene.room.depth / 2 + 0.1 + halfExtentZ,
       12,
     );
-    expect(after.position[2] - sofa.position[2]).toBeLessThan(0.1);
+    expect(after.position[2] - sofa.position[2]).toBeLessThan(0.2);
     expect(turned.adjustedToFit).toBe(true);
   });
 
@@ -367,7 +505,7 @@ describe("applySceneCommand", () => {
     );
   });
 
-  test("centres a footprint wider than the room instead of rejecting the move", () => {
+  test("rejects a move when the footprint is wider than the floor", () => {
     const seed = createDemoScene();
     const wide = structuredClone(seed);
     wide.objects.find(({ id }) => id === "sofa_01")!.dimensionsM = {
@@ -375,16 +513,17 @@ describe("applySceneCommand", () => {
       height: 0.85,
       depth: 0.9,
     };
-    const result = applySceneCommand(SceneSchema.parse(wide), {
+    const scene = SceneSchema.parse(wide);
+    const result = applySceneCommand(scene, {
       expectedRevision: 1,
       actor: "human",
       command: { type: "move", objectId: "sofa_01", position: { x: 2, z: 0 } },
     });
 
-    expect(result.ok).toBe(true);
-    if (!result.ok) return;
-    const sofa = result.scene.objects.find(({ id }) => id === "sofa_01")!;
-    expect(sofa.position[0]).toBeCloseTo(0, 9);
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.error.code).toBe("NO_VALID_PLACEMENT");
+    expect(result.scene).toBe(scene);
   });
 
   test("raises a lamp onto the table it is moved over and drops it back off", () => {
@@ -451,6 +590,7 @@ describe("applySceneCommand", () => {
     if (!replaced.ok) return;
     const lamp = replaced.scene.objects.find(({ id }) => id === "lamp_01")!;
     expect(lamp.position[1]).toBeCloseTo(0.42 + 0.46 / 2, 9);
+    expect(replaced.appliedPosition).toEqual(lamp.position);
   });
 
   test("sets style intent and toggles preserve through successful commands", () => {

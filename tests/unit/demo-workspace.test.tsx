@@ -16,6 +16,7 @@ import {
   describeFacing,
 } from "../../src/features/demo/context-panel";
 import { DemoWorkspace } from "../../src/features/demo/demo-workspace";
+import { createSceneStore } from "../../src/features/scene/scene-store";
 import type { ModelContextTool } from "../../src/webmcp/tool-handlers";
 import {
   FakeRelayServer,
@@ -1004,10 +1005,13 @@ test("explains an insecure context instead of pairing", async () => {
 // The inspector says where a piece faces in words, never as a vector.
 test("describes the selected object's facing in plain words", async () => {
   const user = userEvent.setup();
-  render(<DemoWorkspace />);
+  const seed = createDemoScene();
+  seed.objects = seed.objects.filter(({ id }) => id === "sofa_01");
+  seed.selectedObjectId = "sofa_01";
+  render(<DemoWorkspace store={createSceneStore(seed)} />);
 
   const inspector = screen
-    .getByRole("heading", { name: "Coffee table" })
+    .getByRole("heading", { name: "Sofa" })
     .closest("section");
   if (!inspector) throw new Error("Missing inspector section");
   expect(within(inspector).getByText("Faces").nextElementSibling)

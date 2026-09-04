@@ -1,8 +1,13 @@
 import { objectDisplayName } from "../demo/object-labels";
 import {
+  footprintBounds,
   footprintCorners,
+  footprintInsideRoom,
+  footprintProjection,
+  footprintsOverlap,
   objectFootprint,
 } from "../placement/footprint-geometry";
+import type { Footprint2D, PointXZ } from "../placement/placement-types";
 import {
   SceneSchema,
   type CommandRequest,
@@ -12,13 +17,20 @@ import {
   type SceneObject,
   type Vec3,
 } from "./scene-schema";
-import { settleElevations } from "./support";
+import { settleElevations, supportRelations } from "./support";
 
 const ROOM_INSET_M = 0.1;
 /** A corner this far outside the room is floating-point noise, not an overhang. */
 const CORNER_EPSILON = 1e-9;
 /** A requested XZ this close to the current one is the same floor spot. */
 const POSITION_EPSILON_M = 1e-9;
+/** A visible hairline between resolved footprints also absorbs floating-point noise. */
+const COLLISION_GAP_M = 1e-6;
+/** Six demo objects need fewer than 20 points; this keeps malformed scenes bounded. */
+const PLACEMENT_SEARCH_LIMIT = 512;
+/** Coarse coverage plus a local refinement catches open pockets between several pieces. */
+const FALLBACK_GRID_M = 0.05;
+const FALLBACK_REFINEMENT_M = 0.005;
 
 function failure(
   scene: Scene,
@@ -65,7 +77,8 @@ function slideSpanInside(
  * Spec §4: an accepted position keeps the whole oriented footprint on the floor. The
  * centre clamp handles the axis-aligned case, then any corner still outside the room
  * (a rotated object reaches further than its half-extents) slides the centre along the
- * offending axis. A move is never rejected for it — it lands on the nearest floor spot.
+ * offending axis. Commands reject only when the footprint cannot fit on the usable
+ * floor at all; otherwise this supplies the nearest in-room starting point.
  */
 export function clampPositionToRoom(
   scene: Scene,
@@ -76,8 +89,8 @@ export function clampPositionToRoom(
     scene.room.width / 2 - ROOM_INSET_M - object.dimensionsM.width / 2;
   const zLimit =
     scene.room.depth / 2 - ROOM_INSET_M - object.dimensionsM.depth / 2;
-  let x = clamp(requested.x, -xLimit, xLimit);
-  let z = clamp(requested.z, -zLimit, zLimit);
+  let x = xLimit < 0 ? 0 : clamp(requested.x, -xLimit, xLimit);
+  let z = zLimit < 0 ? 0 : clamp(requested.z, -zLimit, zLimit);
 
   const floorX = -scene.room.width / 2 + ROOM_INSET_M;
   const ceilingX = scene.room.width / 2 - ROOM_INSET_M;
@@ -110,6 +123,288 @@ export function clampPositionToRoom(
     position: [x, object.position[1], z],
     adjustedToFit: x !== requested.x || z !== requested.z,
   };
+}
+
+interface PlacementResolution {
+  position: Vec3;
+  adjustedToFit: boolean;
+  collisionAdjusted: boolean;
+}
+
+interface PlacementCandidate {
+  point: PointXZ;
+  distanceSquared: number;
+  preference: number;
+  sequence: number;
+}
+
+function candidateSceneAt(
+  scene: Scene,
+  object: SceneObject,
+  point: PointXZ,
+): { scene: Scene; footprint: Footprint2D } {
+  const candidateObject: SceneObject = {
+    ...object,
+    position: [point.x, object.position[1], point.z],
+  };
+  const candidateScene: Scene = {
+    ...scene,
+    objects: scene.objects.map((current) =>
+      current.id === object.id ? candidateObject : current
+    ),
+  };
+  return {
+    scene: candidateScene,
+    footprint: objectFootprint(candidateObject),
+  };
+}
+
+/** Rugs may lie under furniture, and a supported lamp intentionally overlaps its table. */
+function collidersAt(
+  scene: Scene,
+  object: SceneObject,
+  point: PointXZ,
+): readonly SceneObject[] {
+  if (object.type === "rug") return [];
+
+  const candidate = candidateSceneAt(scene, object, point);
+  const supporters = supportRelations(candidate.scene);
+  return candidate.scene.objects.filter((other) => {
+    if (other.id === object.id || other.type === "rug") return false;
+    if (
+      supporters.get(object.id) === other.id ||
+      supporters.get(other.id) === object.id
+    ) {
+      return false;
+    }
+    return footprintsOverlap(candidate.footprint, objectFootprint(other));
+  });
+}
+
+function placementAxes(
+  moving: Footprint2D,
+  blocker: Footprint2D,
+): readonly PointXZ[] {
+  const raw: PointXZ[] = [
+    // World-side moves win exact ties, followed by moving toward the camera.
+    { x: 1, z: 0 },
+    { x: 0, z: 1 },
+    { x: Math.cos(moving.rotationY), z: Math.sin(moving.rotationY) },
+    { x: -Math.sin(moving.rotationY), z: Math.cos(moving.rotationY) },
+    { x: Math.cos(blocker.rotationY), z: Math.sin(blocker.rotationY) },
+    { x: -Math.sin(blocker.rotationY), z: Math.cos(blocker.rotationY) },
+  ];
+  const unique = new Map<string, PointXZ>();
+  for (const axis of raw) {
+    const canonical =
+      axis.x < -POSITION_EPSILON_M ||
+      (Math.abs(axis.x) <= POSITION_EPSILON_M && axis.z < 0)
+        ? { x: -axis.x, z: -axis.z }
+        : axis;
+    const key = `${Math.round(canonical.x * 1e9)}:${Math.round(canonical.z * 1e9)}`;
+    if (!unique.has(key)) unique.set(key, canonical);
+  }
+  return [...unique.values()];
+}
+
+/** Candidate centres that put the two oriented rectangles just beyond a separating axis. */
+function separatedCandidates(
+  moving: Footprint2D,
+  blocker: Footprint2D,
+): readonly { point: PointXZ; preference: number }[] {
+  return placementAxes(moving, blocker).flatMap((axis, axisIndex) => {
+    const movingSpan = footprintProjection(moving, axis.x, axis.z);
+    const blockerSpan = footprintProjection(blocker, axis.x, axis.z);
+    const forward = blockerSpan.maximum - movingSpan.minimum + COLLISION_GAP_M;
+    const backward = blockerSpan.minimum - movingSpan.maximum - COLLISION_GAP_M;
+    return [
+      {
+        point: {
+          x: moving.center.x + axis.x * forward,
+          z: moving.center.z + axis.z * forward,
+        },
+        preference: axisIndex * 2,
+      },
+      {
+        point: {
+          x: moving.center.x + axis.x * backward,
+          z: moving.center.z + axis.z * backward,
+        },
+        preference: axisIndex * 2 + 1,
+      },
+    ];
+  });
+}
+
+function isLegalFloorPoint(
+  scene: Scene,
+  object: SceneObject,
+  point: PointXZ,
+): boolean {
+  const candidate = candidateSceneAt(scene, object, point);
+  return (
+    footprintInsideRoom(
+      candidate.footprint,
+      candidate.scene.room,
+      ROOM_INSET_M,
+    ) && collidersAt(scene, object, point).length === 0
+  );
+}
+
+function nearestGridPosition(
+  scene: Scene,
+  object: SceneObject,
+  origin: PointXZ,
+): PointXZ | null {
+  const bounds = footprintBounds(objectFootprint(object));
+  const minimumX = -scene.room.width / 2 + ROOM_INSET_M + bounds.x;
+  const maximumX = scene.room.width / 2 - ROOM_INSET_M - bounds.x;
+  const minimumZ = -scene.room.depth / 2 + ROOM_INSET_M + bounds.z;
+  const maximumZ = scene.room.depth / 2 - ROOM_INSET_M - bounds.z;
+  if (minimumX > maximumX || minimumZ > maximumZ) return null;
+
+  type GridCandidate = {
+    point: PointXZ;
+    distanceSquared: number;
+    preference: number;
+  };
+  let best: GridCandidate | null = null;
+  const nearer = (
+    current: GridCandidate | null,
+    point: PointXZ,
+  ): GridCandidate | null => {
+    if (!isLegalFloorPoint(scene, object, point)) return current;
+    const deltaX = point.x - origin.x;
+    const deltaZ = point.z - origin.z;
+    const distanceSquared = deltaX * deltaX + deltaZ * deltaZ;
+    const preference =
+      Math.abs(deltaX) > Math.abs(deltaZ) ? 0 : deltaZ >= 0 ? 1 : 2;
+    if (
+      current === null ||
+      distanceSquared < current.distanceSquared - POSITION_EPSILON_M ||
+      (Math.abs(distanceSquared - current.distanceSquared) <= POSITION_EPSILON_M &&
+        preference < current.preference)
+    ) {
+      return { point, distanceSquared, preference };
+    }
+    return current;
+  };
+
+  // The incumbent is an exact and useful fallback for moves, while a replacement
+  // is accepted here only when its new dimensions still make that point legal.
+  best = nearer(best, { x: object.position[0], z: object.position[2] });
+  for (let x = minimumX; x <= maximumX + CORNER_EPSILON; x += FALLBACK_GRID_M) {
+    for (let z = minimumZ; z <= maximumZ + CORNER_EPSILON; z += FALLBACK_GRID_M) {
+      best = nearer(best, { x, z });
+    }
+  }
+  if (best === null) return null;
+
+  const coarse = best.point;
+  const refinementRadius = FALLBACK_GRID_M;
+  for (
+    let x = Math.max(minimumX, coarse.x - refinementRadius);
+    x <= Math.min(maximumX, coarse.x + refinementRadius) + CORNER_EPSILON;
+    x += FALLBACK_REFINEMENT_M
+  ) {
+    for (
+      let z = Math.max(minimumZ, coarse.z - refinementRadius);
+      z <= Math.min(maximumZ, coarse.z + refinementRadius) + CORNER_EPSILON;
+      z += FALLBACK_REFINEMENT_M
+    ) {
+      best = nearer(best, { x, z });
+    }
+  }
+
+  if (best === null) return null;
+  return best.point;
+}
+
+/**
+ * Finds the closest legal floor position to a requested point. Search edges are exact
+ * separating-axis translations, so the result touches a blocker instead of hopping on
+ * an arbitrary grid. A best-first queue also handles a push that meets a second piece.
+ */
+function resolveFloorPlacement(
+  scene: Scene,
+  object: SceneObject,
+  requested: PointXZ,
+): PlacementResolution | null {
+  const clamped = clampPositionToRoom(scene, object, requested).position;
+  const origin = { x: clamped[0], z: clamped[2] };
+  const initialColliders = collidersAt(scene, object, origin);
+  let sequence = 0;
+  const queue: PlacementCandidate[] = [
+    { point: origin, distanceSquared: 0, preference: -1, sequence: sequence++ },
+  ];
+  const seen = new Set<string>();
+
+  for (
+    let checked = 0;
+    checked < PLACEMENT_SEARCH_LIMIT && queue.length > 0;
+    checked += 1
+  ) {
+    queue.sort(
+      (left, right) =>
+        left.distanceSquared - right.distanceSquared ||
+        left.preference - right.preference ||
+        left.sequence - right.sequence,
+    );
+    const current = queue.shift()!;
+    const key = `${Math.round(current.point.x * 1e8)}:${Math.round(current.point.z * 1e8)}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+
+    const candidate = candidateSceneAt(scene, object, current.point);
+    if (
+      !footprintInsideRoom(
+        candidate.footprint,
+        candidate.scene.room,
+        ROOM_INSET_M,
+      )
+    ) {
+      continue;
+    }
+    const colliders = collidersAt(scene, object, current.point);
+    if (colliders.length === 0) {
+      return {
+        position: [current.point.x, object.position[1], current.point.z],
+        adjustedToFit:
+          Math.abs(current.point.x - requested.x) > POSITION_EPSILON_M ||
+          Math.abs(current.point.z - requested.z) > POSITION_EPSILON_M,
+        collisionAdjusted: initialColliders.length > 0,
+      };
+    }
+
+    for (const blocker of colliders) {
+      for (const next of separatedCandidates(
+        candidate.footprint,
+        objectFootprint(blocker),
+      )) {
+        const bounded = clampPositionToRoom(scene, object, next.point).position;
+        const point = { x: bounded[0], z: bounded[2] };
+        const deltaX = point.x - origin.x;
+        const deltaZ = point.z - origin.z;
+        queue.push({
+          point,
+          distanceSquared: deltaX * deltaX + deltaZ * deltaZ,
+          preference: next.preference,
+          sequence: sequence++,
+        });
+      }
+    }
+  }
+
+  const fallback = nearestGridPosition(scene, object, origin);
+  return fallback
+    ? {
+        position: [fallback.x, object.position[1], fallback.z],
+        adjustedToFit:
+          Math.abs(fallback.x - requested.x) > POSITION_EPSILON_M ||
+          Math.abs(fallback.z - requested.z) > POSITION_EPSILON_M,
+        collisionAdjusted: initialColliders.length > 0,
+      }
+    : null;
 }
 
 /** Yaw in degrees, folded into (-180, 180] and rounded for a human to read. */
@@ -157,15 +452,17 @@ export function clampTurnInPlace(
   const maximumX = Math.max(...xs);
   const minimumZ = Math.min(...zs);
   const maximumZ = Math.max(...zs);
+  const usableWidth = scene.room.width - ROOM_INSET_M * 2;
+  const usableDepth = scene.room.depth - ROOM_INSET_M * 2;
   if (
-    maximumX - minimumX > scene.room.width + CORNER_EPSILON ||
-    maximumZ - minimumZ > scene.room.depth + CORNER_EPSILON
+    maximumX - minimumX > usableWidth + CORNER_EPSILON ||
+    maximumZ - minimumZ > usableDepth + CORNER_EPSILON
   ) {
     return null;
   }
 
-  const halfWidth = scene.room.width / 2;
-  const halfDepth = scene.room.depth / 2;
+  const halfWidth = scene.room.width / 2 - ROOM_INSET_M;
+  const halfDepth = scene.room.depth / 2 - ROOM_INSET_M;
   let x = object.position[0];
   let z = object.position[2];
   if (minimumX < -halfWidth - CORNER_EPSILON) x += -halfWidth - minimumX;
@@ -270,12 +567,32 @@ export function applySceneCommand(
     object.scale = [1, 1, 1];
     object.styleTags = [...request.command.product.styleTags];
     object.addedBy = request.actor;
+    const placement = resolveFloorPlacement(nextScene, object, {
+      x: object.position[0],
+      z: object.position[2],
+    });
+    if (!placement) {
+      return failure(
+        scene,
+        "NO_VALID_PLACEMENT",
+        `${request.command.product.title} does not fit in an open floor position.`,
+      );
+    }
+    object.position = placement.position;
     nextScene.revision += 1;
 
+    const settledScene = settleElevations(nextScene);
+    const settledObject = findObject(settledScene, request.command.objectId);
     return success(
       scene,
-      settleElevations(nextScene),
-      `${request.command.product.title} now previews in the room.`,
+      settledScene,
+      placement.adjustedToFit
+        ? `${request.command.product.title} now previews at the nearest open floor position.`
+        : `${request.command.product.title} now previews in the room.`,
+      {
+        adjustedToFit: placement.adjustedToFit,
+        appliedPosition: settledObject?.position ?? placement.position,
+      },
     );
   }
 
@@ -301,9 +618,7 @@ export function applySceneCommand(
   let message = `${object.id} moved.`;
   if (requestedPosition === undefined) {
     const held = clampTurnInPlace(nextScene, object);
-    if (held) {
-      ({ position, adjustedToFit } = held);
-    } else {
+    if (!held) {
       // Nowhere on this floor holds the turned footprint, so the turn is
       // refused outright rather than half-applied against a wall.
       const requestedDegrees = readableDegrees(
@@ -321,13 +636,37 @@ export function applySceneCommand(
         previousRotationY,
         true,
       )}°: it does not fit the room at ${requestedDegrees}°.`;
+    } else {
+      const placement = resolveFloorPlacement(nextScene, object, {
+        x: held.position[0],
+        z: held.position[2],
+      });
+      if (!placement) {
+        return failure(
+          scene,
+          "NO_VALID_PLACEMENT",
+          `${objectDisplayName(object)} has no open floor position at this angle.`,
+        );
+      }
+      position = placement.position;
+      adjustedToFit = held.adjustedToFit || placement.adjustedToFit;
+      if (placement.collisionAdjusted) {
+        message = `${object.id} turned at the nearest open floor position.`;
+      }
     }
   } else {
-    ({ position, adjustedToFit } = clampPositionToRoom(
-      nextScene,
-      object,
-      requestedPosition,
-    ));
+    const placement = resolveFloorPlacement(nextScene, object, requestedPosition);
+    if (!placement) {
+      return failure(
+        scene,
+        "NO_VALID_PLACEMENT",
+        `${objectDisplayName(object)} has no open floor position near the requested point.`,
+      );
+    }
+    ({ position, adjustedToFit } = placement);
+    if (placement.collisionAdjusted) {
+      message = `${object.id} moved to the nearest open floor position.`;
+    }
   }
   object.position = position;
   object.addedBy = request.actor;

@@ -80,5 +80,16 @@
       "The rug keeps the rotation and the position it had, adjustedToFit is true, and the message reads \"Rug kept at 0°: it does not fit the room at 45°.\"",
       "A turn the room can hold keeps its floor spot, and slides by exactly the corner overshoot when one leaves the floor"
     ]
+  },
+  {
+    "id": "resolve-overlapping-move",
+    "prompt": "Move the chair onto the sofa's floor position",
+    "expectedTools": ["get_scene", "move_object"],
+    "assertions": [
+      "move_object is called with the chair objectId and the sofa's XZ centre",
+      "The command returns adjustedToFit true and an appliedPosition different from the requested overlapping point",
+      "The returned chair footprint is entirely inside the usable floor and does not overlap the sofa or another non-rug object",
+      "Rugs may still lie under furniture, and a lamp whose centre is on a table remains intentionally supported rather than collision-resolved"
+    ]
   }
 ]

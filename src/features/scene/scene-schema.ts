@@ -158,6 +158,7 @@ export type SceneCommandErrorCode =
   | "OBJECT_NOT_FOUND"
   | "OBJECT_LOCKED"
   | "CATEGORY_MISMATCH"
+  | "NO_VALID_PLACEMENT"
   | "SCENE_REVISION_CONFLICT";
 
 export type CommandResult =

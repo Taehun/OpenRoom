@@ -518,9 +518,10 @@ describe("WebMCP Core 6 contracts", () => {
         "search-side-tables",
         "lamp-on-side-table",
         "turn-the-rug-flat",
+        "resolve-overlapping-move",
       ]),
     );
-    expect(journeys).toHaveLength(8);
+    expect(journeys).toHaveLength(9);
     expect(journeys.every((journey) =>
       typeof journey.prompt === "string" &&
       Array.isArray(journey.expectedTools) &&

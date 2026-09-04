@@ -446,6 +446,42 @@ describe("WebMCP Core 6 handlers", () => {
     expect(errorCode(mismatch)).toBe("CATEGORY_MISMATCH");
   });
 
+  test("returns NO_VALID_PLACEMENT without committing an oversized replacement", async () => {
+    const table = DEMO_PRODUCTS.find(
+      ({ category }) => category === "coffee_table",
+    )!;
+    const oversized: CatalogProduct = {
+      ...table,
+      id: "oversized-table",
+      variantId: "demo-variant-oversized-table",
+      title: "Oversized Table",
+      dimensionsCm: { width: 400, height: 40, depth: 180 },
+    };
+    const store = createSceneStore();
+    const tools = createCoreTools(createContext(store, [oversized]).context);
+
+    const result = await execute(tools, "replace_object", {
+      objectId: "table_01",
+      productId: oversized.id,
+      expectedRevision: 1,
+      expectedStateVersion: 1,
+    });
+
+    expect(result.isError).toBe(true);
+    expect(result.structuredContent).toMatchObject({
+      ok: false,
+      sceneRevision: 1,
+      stateVersion: 1,
+      error: {
+        code: "NO_VALID_PLACEMENT",
+        message: "The object has no collision-free position that fits on the floor.",
+        retryable: false,
+      },
+    });
+    expect(store.getState().scene.revision).toBe(1);
+    expect(store.getState().stateVersion).toBe(1);
+  });
+
   test("returns the validated Scene and selected object in success envelopes", async () => {
     const store = createSceneStore();
     const tools = createCoreTools(createContext(store).context);
