@@ -323,6 +323,9 @@ Setup:
 3. Run `pnpm run test:e2e:commerce` to exercise the Shopify-mode journey against
    a placeholder store; it stubs the store domain and makes no real request.
 
+To try this against a real store, seed a development store with the catalog: see
+[`examples/shopify-furniture-store/README.md`](examples/shopify-furniture-store/README.md).
+
 Demo mode remains the default and is byte-for-byte unchanged.
 
 ## CI and deployment

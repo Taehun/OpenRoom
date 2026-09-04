@@ -15,6 +15,11 @@
 > or the Scene store calls it; a `replace_object` now only swaps the product and
 > never moves anything. Re-wiring it means adding a caller back, not restoring
 > deleted solver code.
+>
+> **2026-09-04 — Shopify seed kit.** `examples/shopify-furniture-store/` seeds a
+> development store with all 43 catalog products (`pnpm shop:export`,
+> `pnpm shop:seed`, `pnpm shop:variants`); developer tooling only, nothing under
+> `src/` or `app/` changed.
 
 Snapshot: 2026-09-03 KST. This is the **final natural-placement verification
 record**. It replaces the interim handoff that was written before Task 7.
