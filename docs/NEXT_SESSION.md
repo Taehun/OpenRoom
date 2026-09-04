@@ -595,8 +595,9 @@ raised, 16 verified. Everything in Wave 1 and Wave 2 of its plan has landed:
 `openroom` Worker has been deleted, CI no longer deploys anything, and the
 owner wires the Pages Git integration up by hand. `app/manifest.ts` needs
 `export const dynamic = "force-static"` for the export; any new metadata route
-does too. The older `openroom` Pages project (openroom-y20.pages.dev) is still
-Git-connected and can be deleted once the new project is wired up.
+does too. The older `openroom` Pages project (openroom-y20.pages.dev) and the
+`openroom` Worker are both deleted, so Cloudflare now holds exactly one
+OpenRoom project.
 
 Open: the QA plan's Wave 3 (docs sweep, stage composition polish, agent-facing
 strings, radii/rhythm) in `output/qa/findings-2.md`; the Shopify seed kit has
