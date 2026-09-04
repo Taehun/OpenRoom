@@ -20,7 +20,12 @@ export const PUBLICATIONS_QUERY = `query Publications {
 
 export const PRODUCT_BY_HANDLE_QUERY = `query ProductByHandle($q: String!) {
   products(first: 1, query: $q) {
-    nodes { id handle variants(first: 1) { nodes { id } } }
+    nodes {
+      id
+      handle
+      variants(first: 1) { nodes { id } }
+      media(first: 1) { nodes { id } }
+    }
   }
 }`;
 
@@ -69,6 +74,8 @@ interface ProductNode {
   id: string;
   handle: string;
   variants: { nodes: { id: string }[] };
+  /** Present on look-ups only; `productSet` responses omit it. */
+  media?: { nodes: { id: string }[] };
 }
 
 interface ProductByHandleData {
@@ -134,6 +141,15 @@ export function collectionHandle(productType: string): string {
     .replace(/^-+|-+$/g, "");
 }
 
+export interface ProductSetOptions {
+  /**
+   * Leave the product's media alone. `productSet` treats `files` as the full
+   * media set, so re-sending the cutout on every run would re-upload it; an
+   * existing product that already has an image keeps it.
+   */
+  keepMedia?: boolean;
+}
+
 /**
  * The `productSet` call for one product. With `existingId` it updates that
  * product by id; without one it creates a product at the catalog handle.
@@ -141,6 +157,7 @@ export function collectionHandle(productType: string): string {
 export function planProductSet(
   product: ShopProduct,
   existingId: string | null,
+  options: ProductSetOptions = {},
 ): GraphQLPlan {
   const input = {
     title: product.title,
@@ -159,14 +176,18 @@ export function planProductSet(
         inventoryPolicy: "CONTINUE",
       },
     ],
-    files: [
-      {
-        originalSource: product.imageUrl,
-        alt: product.imageAlt,
-        filename: `${product.handle}.webp`,
-        contentType: "IMAGE",
-      },
-    ],
+    ...(options.keepMedia === true
+      ? {}
+      : {
+          files: [
+            {
+              originalSource: product.imageUrl,
+              alt: product.imageAlt,
+              filename: `${product.handle}.webp`,
+              contentType: "IMAGE",
+            },
+          ],
+        }),
   };
 
   return existingId === null
@@ -289,7 +310,9 @@ export async function seedStore(
 
   for (const product of catalog) {
     const existing = await findProductByHandle(client, product.handle);
-    const plan = planProductSet(product, existing?.id ?? null);
+    const plan = planProductSet(product, existing?.id ?? null, {
+      keepMedia: (existing?.media?.nodes.length ?? 0) > 0,
+    });
     const result = await client.query<ProductSetData>(plan.query, plan.variables);
     failOnUserErrors(`productSet ${product.handle}`, result.productSet.userErrors);
     const node = result.productSet.product;

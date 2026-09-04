@@ -50,8 +50,8 @@ cat examples/shopify-furniture-store/.env.example >> .env.local
 
 ## Quick start
 
-Three commands. The first needs no credentials; the other two read them from
-`.env.local`.
+Three commands. `shop:export` and `shop:seed --dry-run` need no credentials;
+the real seed and `shop:variants` read them from `.env.local`.
 
 ```bash
 pnpm shop:export                # refresh products.json and products.csv from the catalog
@@ -146,7 +146,8 @@ retries, up to five times.
 
 ## Idempotency
 
-Re-running `pnpm shop:seed` is the supported way to push a catalog change. Every
+Re-running `pnpm shop:seed` is the supported way to push a catalog change. A
+product that already carries an image keeps it (no duplicate upload). Every
 product is matched by handle and updated in place, so ids, variants, and any
 orders against them survive. Collections are created only when missing. Nothing
 is ever deleted: a product you remove from `DEMO_PRODUCTS` stays in the store

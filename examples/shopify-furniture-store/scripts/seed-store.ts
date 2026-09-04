@@ -22,11 +22,16 @@ const dryRun = process.argv.slice(2).includes("--dry-run");
 const env = loadScriptEnv();
 const { missing, values } = requireEnv(env, REQUIRED);
 
-if (missing.length > 0) {
+if (missing.length > 0 && !dryRun) {
   console.error(
     `[seed] missing ${missing.join(", ")} — copy examples/shopify-furniture-store/.env.example into .env.local at the repo root and fill it in`,
   );
   process.exit(2);
+}
+if (missing.length > 0) {
+  // A dry run sends nothing, so it needs no credentials: plan against a
+  // placeholder store and say so.
+  console.log(`[seed] dry run without ${missing.join(", ")} — planning against a placeholder store`);
 }
 
 const imageBase = env.OPENROOM_IMAGE_BASE?.trim() || DEFAULT_IMAGE_BASE;
@@ -34,8 +39,8 @@ const apiVersion = env.SHOPIFY_API_VERSION?.trim() || DEFAULT_API_VERSION;
 const catalog = buildShopCatalog(DEMO_PRODUCTS, PHOTO_ASSETS, imageBase);
 
 const client = createAdminClient({
-  storeDomain: values.SHOPIFY_STORE_DOMAIN!,
-  accessToken: values.SHOPIFY_ADMIN_ACCESS_TOKEN!,
+  storeDomain: values.SHOPIFY_STORE_DOMAIN ?? "your-store.myshopify.com",
+  accessToken: values.SHOPIFY_ADMIN_ACCESS_TOKEN ?? "dry-run",
   apiVersion,
 });
 

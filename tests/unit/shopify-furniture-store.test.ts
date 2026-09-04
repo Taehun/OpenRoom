@@ -56,6 +56,8 @@ function productNode(handle: string) {
     id: `gid://shopify/Product/${handle}`,
     handle,
     variants: { nodes: [{ id: `gid://shopify/ProductVariant/${handle}` }] },
+    // An existing product already carries its cutout.
+    media: { nodes: [{ id: `gid://shopify/MediaImage/${handle}` }] },
   };
 }
 
@@ -258,6 +260,13 @@ describe("planProductSet", () => {
     expect(plan.variables.identifier).toEqual({ id: "gid://shopify/Product/42" });
     expect((plan.variables.input as Record<string, unknown>).handle).toBe(product.handle);
   });
+
+  it("leaves existing media alone when asked, and sends the cutout otherwise", () => {
+    const kept = planProductSet(product, "gid://shopify/Product/42", { keepMedia: true });
+    expect((kept.variables.input as Record<string, unknown>).files).toBeUndefined();
+    const fresh = planProductSet(product, "gid://shopify/Product/42");
+    expect((fresh.variables.input as Record<string, unknown>).files).toHaveLength(1);
+  });
 });
 
 describe("planCollections", () => {
@@ -334,6 +343,9 @@ describe("seedStore", () => {
     expect(updates[0]!.variables.identifier).toEqual({
       id: "gid://shopify/Product/boucle-curve-sofa",
     });
+    // The existing product already has media, so the update re-sends no file.
+    expect((updates[0]!.variables.input as Record<string, unknown>).files).toBeUndefined();
+    expect((creates[0]!.variables.input as Record<string, unknown>).files).toHaveLength(1);
 
     const collectionCreates = calls.filter((call) =>
       call.document.includes("mutation CollectionCreate"),
