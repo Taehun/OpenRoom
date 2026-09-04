@@ -14,7 +14,7 @@
         "eyebrow": {
           "type": "text",
           "settings": {
-            "text": "<p>Furniture for calm rooms</p>",
+            "text": "<p>A WebMCP demonstration store</p>",
             "type_preset": "h6",
             "width": "fit-content",
             "max_width": "normal",
@@ -26,7 +26,7 @@
         "heading": {
           "type": "text",
           "settings": {
-            "text": "<h1>Design the room.<br/>Then buy it.</h1>",
+            "text": "<h1>A shop an AI<br/>assistant can use.</h1>",
             "type_preset": "h1",
             "width": "fit-content",
             "max_width": "narrow",
@@ -38,7 +38,7 @@
         "sub": {
           "type": "text",
           "settings": {
-            "text": "<p>Forty-three pieces measured to the centimetre, so what you arrange on screen is what fits at home.</p>",
+            "text": "<p>Arrange a room with an assistant, then send the whole arrangement to the cart. Forty-three pieces, each listed at its measured size.</p>",
             "type_preset": "rte",
             "width": "fit-content",
             "max_width": "narrow",
@@ -50,7 +50,7 @@
         "cta": {
           "type": "button",
           "settings": {
-            "label": "Shop all furniture",
+            "label": "Browse the catalog",
             "link": "shopify://collections/all",
             "style_class": "button-custom",
             "custom_button_background": "#FBF9F4",
@@ -317,7 +317,7 @@
             "heading": {
               "type": "text",
               "settings": {
-                "text": "<h2>Arrange the room before you buy it.</h2>",
+                "text": "<h2>What this store is for</h2>",
                 "type_preset": "h3",
                 "width": "fit-content",
                 "max_width": "narrow",
@@ -328,7 +328,7 @@
             "body": {
               "type": "text",
               "settings": {
-                "text": "<p>OpenRoom is a room planner an AI assistant can drive. Describe the room you want, watch the furniture land where it fits, then send the whole arrangement to this cart in one step.</p><p>Every piece here is listed at its real measured size, so a sofa that clears the walkway on screen clears it at home too.</p>",
+                "text": "<p>OpenRoom is a room planner an AI assistant can drive. Describe the room you want, watch the furniture land where it fits, then send the finished arrangement here as a cart — the whole room, not one product at a time.</p><p>The catalog is a demonstration one. The dimensions are real, because the planner needs honest sizes to place anything; the prices, the stock, and the checkout are not. Nothing ordered here is fulfilled.</p>",
                 "type_preset": "rte",
                 "width": "fit-content",
                 "max_width": "narrow",
@@ -460,162 +460,6 @@
         "padding-block-start": 56,
         "padding-block-end": 56
       }
-    },
-    "trust_row": {
-      "type": "section",
-      "blocks": {
-        "row": {
-          "type": "group",
-          "settings": {
-            "content_direction": "row",
-            "vertical_on_mobile": true,
-            "horizontal_alignment": "space-between",
-            "vertical_alignment": "flex-start",
-            "gap": 32,
-            "width": "fill",
-            "height": "fit",
-            "border": "none"
-          },
-          "blocks": {
-            "measured": {
-              "type": "group",
-              "settings": {
-                "content_direction": "column",
-                "horizontal_alignment_flex_direction_column": "flex-start",
-                "gap": 6,
-                "width": "fill",
-                "height": "fit",
-                "border": "none"
-              },
-              "blocks": {
-                "t": {
-                  "type": "text",
-                  "settings": {
-                    "text": "<h3>Measured, not estimated</h3>",
-                    "type_preset": "h6",
-                    "width": "fit-content",
-                    "max_width": "normal",
-                    "alignment": "left",
-                    "wrap": "pretty"
-                  }
-                },
-                "b": {
-                  "type": "text",
-                  "settings": {
-                    "text": "<p>Every listing carries its real width, depth, and height in centimetres.</p>",
-                    "type_preset": "rte",
-                    "width": "fit-content",
-                    "max_width": "normal",
-                    "alignment": "left",
-                    "wrap": "pretty",
-                    "text_color": "#43483F"
-                  }
-                }
-              },
-              "block_order": [
-                "t",
-                "b"
-              ]
-            },
-            "shipping": {
-              "type": "group",
-              "settings": {
-                "content_direction": "column",
-                "horizontal_alignment_flex_direction_column": "flex-start",
-                "gap": 6,
-                "width": "fill",
-                "height": "fit",
-                "border": "none"
-              },
-              "blocks": {
-                "t": {
-                  "type": "text",
-                  "settings": {
-                    "text": "<h3>Free shipping over $200</h3>",
-                    "type_preset": "h6",
-                    "width": "fit-content",
-                    "max_width": "normal",
-                    "alignment": "left",
-                    "wrap": "pretty"
-                  }
-                },
-                "b": {
-                  "type": "text",
-                  "settings": {
-                    "text": "<p>Flat $19 below that. Delivered in seven to ten working days.</p>",
-                    "type_preset": "rte",
-                    "width": "fit-content",
-                    "max_width": "normal",
-                    "alignment": "left",
-                    "wrap": "pretty",
-                    "text_color": "#43483F"
-                  }
-                }
-              },
-              "block_order": [
-                "t",
-                "b"
-              ]
-            },
-            "returns": {
-              "type": "group",
-              "settings": {
-                "content_direction": "column",
-                "horizontal_alignment_flex_direction_column": "flex-start",
-                "gap": 6,
-                "width": "fill",
-                "height": "fit",
-                "border": "none"
-              },
-              "blocks": {
-                "t": {
-                  "type": "text",
-                  "settings": {
-                    "text": "<h3>Thirty-day returns</h3>",
-                    "type_preset": "h6",
-                    "width": "fit-content",
-                    "max_width": "normal",
-                    "alignment": "left",
-                    "wrap": "pretty"
-                  }
-                },
-                "b": {
-                  "type": "text",
-                  "settings": {
-                    "text": "<p>Unused and in its packaging, returned for a full refund.</p>",
-                    "type_preset": "rte",
-                    "width": "fit-content",
-                    "max_width": "normal",
-                    "alignment": "left",
-                    "wrap": "pretty",
-                    "text_color": "#43483F"
-                  }
-                }
-              },
-              "block_order": [
-                "t",
-                "b"
-              ]
-            }
-          },
-          "block_order": [
-            "measured",
-            "shipping",
-            "returns"
-          ]
-        }
-      },
-      "block_order": [
-        "row"
-      ],
-      "name": "Promises",
-      "settings": {
-        "section_width": "page-width",
-        "section_height": "fit",
-        "background_color": "#FBF9F4",
-        "padding-block-start": 56,
-        "padding-block-end": 72
-      }
     }
   },
   "order": [
@@ -623,7 +467,6 @@
     "categories",
     "featured_sofa",
     "brand_story",
-    "featured_lighting",
-    "trust_row"
+    "featured_lighting"
   ]
 }

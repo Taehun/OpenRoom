@@ -311,3 +311,52 @@ describe("content/menus.md", () => {
     }
   });
 });
+
+/**
+ * OpenRoom's store is a demonstration one: nothing ships, nothing is charged.
+ * Copy that promises delivery windows, shipping fees, returns periods, or
+ * discounts would be an invention the store cannot honour, so it is banned
+ * from both the page files and the theme's own JSON.
+ */
+const INVENTED_CLAIMS: readonly [RegExp, string][] = [
+  [/free shipping/i, "a shipping offer"],
+  [/\$\s?\d+(\.\d+)?\s*(flat|shipping|delivery)/i, "a shipping fee"],
+  [/\b(thirty|30|14|fourteen|7|seven)[-\s]day\b/i, "a returns or delivery window"],
+  [/\bworking days\b/i, "a delivery estimate"],
+  [/\bfull refund\b/i, "a refund promise"],
+  [/\bexclusive (deals|access)\b/i, "a marketing offer"],
+  [/\b(sale|discount|% off)\b/i, "a discount"],
+];
+
+describe("no invented commercial claims", () => {
+  it("keeps them out of the page copy", () => {
+    for (const page of PAGES) {
+      for (const [pattern, what] of INVENTED_CLAIMS) {
+        expect(page.bodyHtml, `${page.handle}.md must not promise ${what}`).not.toMatch(pattern);
+      }
+    }
+  });
+
+  it("keeps them out of the theme's JSON", () => {
+    const themeDir = join(PAGES_DIR, "..", "..", "theme");
+    const files = [
+      join(themeDir, "templates", "index.json"),
+      join(themeDir, "sections", "header-group.json"),
+      join(themeDir, "sections", "footer-group.json"),
+    ];
+    for (const file of files) {
+      const source = readFileSync(file, "utf8");
+      for (const [pattern, what] of INVENTED_CLAIMS) {
+        expect(source, `${file} must not promise ${what}`).not.toMatch(pattern);
+      }
+    }
+  });
+
+  it("says plainly that the store is a demonstration", () => {
+    const announcement = readFileSync(
+      join(PAGES_DIR, "..", "..", "theme", "sections", "header-group.json"),
+      "utf8",
+    );
+    expect(announcement).toMatch(/demo/i);
+  });
+});

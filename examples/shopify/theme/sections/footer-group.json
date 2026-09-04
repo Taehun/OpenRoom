@@ -76,7 +76,7 @@
             "text_f9CFLH": {
               "type": "text",
               "settings": {
-                "text": "<p>Furniture measured to the centimetre, for rooms you plan before you buy.</p>",
+                "text": "<p>A demonstration storefront for WebMCP. Not a real shop.</p>",
                 "width": "100%",
                 "max_width": "normal",
                 "alignment": "left",
@@ -125,39 +125,12 @@
             "link_preset": "paragraph",
             "text_color": "#43483F"
           }
-        },
-        "email_signup_crihX7": {
-          "type": "email-signup",
-          "settings": {
-            "width": "fill",
-            "custom_width": 100,
-            "heading_preset": "h3",
-            "border_style": "all",
-            "input_style": "custom",
-            "border_width": 1,
-            "border_radius": 100,
-            "input_background_color": "{{ settings.color_palette.background }}",
-            "input_text_color": "{{ settings.color_palette.color1 }}",
-            "input_border_color": "{{ settings.color_palette.color2 }}",
-            "input_type_preset": "paragraph",
-            "style_class": "button-unstyled",
-            "display_type": "arrow",
-            "label": "Sign up",
-            "integrated_button": true,
-            "button_type_preset": "paragraph",
-            "padding-block-start": 0,
-            "padding-block-end": 0,
-            "padding-inline-start": 0,
-            "padding-inline-end": 0
-          },
-          "blocks": {}
         }
       },
       "block_order": [
         "group_H6VpwJ",
         "menu_shop",
-        "menu_help",
-        "email_signup_crihX7"
+        "menu_help"
       ],
       "name": "t:names.footer",
       "settings": {

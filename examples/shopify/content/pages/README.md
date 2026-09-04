@@ -9,6 +9,7 @@ Without that scope, enter them by hand in **Online Store → Pages**: create a
 page titled by the file's first heading, switch the editor to `</>` (HTML), and
 paste the body below it.
 
-Every page here describes the OpenRoom demo store honestly. The shipping and
-returns figures match the promises on the homepage
-(`templates/index.json`, section `trust_row`) — change them together.
+Every page here describes the OpenRoom demo store honestly. This is a
+demonstration shop, so no page invents a delivery window, a shipping fee, a
+returns period, or any other commercial promise the store cannot keep — it says
+plainly that nothing ships and nothing is charged. Keep it that way.

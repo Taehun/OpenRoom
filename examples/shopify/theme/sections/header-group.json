@@ -17,7 +17,7 @@
         "announcement_BxgCk9": {
           "type": "_announcement",
           "settings": {
-            "text": "Free shipping over $200 · Every piece listed at its real measured size",
+            "text": "Demo store — OpenRoom is a WebMCP demonstration. Orders are not fulfilled.",
             "font": "var(--font-subheading--family)",
             "font_size": "0.75rem",
             "letter_spacing": "normal",
