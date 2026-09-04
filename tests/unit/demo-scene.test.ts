@@ -62,11 +62,11 @@ describe("calibrated demo scene", () => {
 
     expect(placements).toEqual({
       sofa_01: [-0.2, -0.55, 0],
-      table_01: [-0.45, 0.5, 0],
-      rug_01: [-0.2, 0.38, 0],
-      lamp_01: [-1.42, 0.15, 0],
-      chair_01: [0.85, 0.66, Math.PI / 4],
-      plant_01: [1.32, -0.3, 0],
+      table_01: [-0.225, 0.6, 0],
+      rug_01: [0, 0.38, 0],
+      lamp_01: [-1.425, -0.1, 0],
+      chair_01: [1.03, 0.55, Math.PI / 4],
+      plant_01: [1.2, -0.3, 0],
     });
     expect(scene.objects.map(({ assetId }) => assetId)).toEqual([
       "seed-dated-sofa",

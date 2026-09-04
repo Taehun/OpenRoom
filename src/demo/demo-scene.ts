@@ -32,25 +32,24 @@ interface SeedPlacement {
  * front-quarter cutout; the chair at +45 degrees faces the table and picks the
  * mirrored cutout exactly.
  *
- * The arrangement is judged on the composited photo, not on the plan: the lamp stands
- * at the sofa's front-left corner where its whole stem and foot read against bare
- * floor (a lamp beside the sofa's arm at the same depth looks embedded in it, and one
- * behind the chair loses its base — `expectLampVisibleBeyondChair` in
- * tests/e2e/photo-compositor.spec.ts holds that line), and the table keeps a 0.3 m
- * walkway from the sofa's front edge so the two do not merge into one silhouette. Its
- * front edge stays behind z = 0.85, the depth the compositor's tie test parks a lamp
- * at, so that lamp lands on the floor instead of on the table. The
- * plant holds the back-right corner: the room is 2.72 m deep and the sofa owns the
- * back band, so the only floor left for it is behind the chair, where its foliage
- * clears the chair's back while the pot does not.
+ * The arrangement is judged on the composited photo, not on the plan. It was
+ * cross-checked against the model-generated reference at
+ * `scripts/openroom-assets/references/seed-layout-imagegen-reference.png`, then
+ * constrained to the real 3.4 x 2.72 m footprint. The table and rug move toward the
+ * visual centre, the chair sits to their right, and the lamp reads beside the sofa
+ * instead of through it (`expectLampVisibleBeyondChair` in
+ * tests/e2e/photo-compositor.spec.ts holds that line). The table's slight forward gap
+ * also leaves room for the sofa's rotation handle to settle a turn. The plant stays on
+ * the window's right flank: pulling it as far left as the generated image would block
+ * the opening or intersect the sofa.
  */
 const CALIBRATED_SEED: Readonly<Record<string, SeedPlacement>> = {
   sofa_01: { x: -0.2, z: -0.55, rotationDeg: 0 },
-  table_01: { x: -0.45, z: 0.5, rotationDeg: 0 },
-  rug_01: { x: -0.2, z: 0.38, rotationDeg: 0 },
-  lamp_01: { x: -1.42, z: 0.15, rotationDeg: 0 },
-  chair_01: { x: 0.85, z: 0.66, rotationDeg: 45 },
-  plant_01: { x: 1.32, z: -0.3, rotationDeg: 0 },
+  table_01: { x: -0.225, z: 0.6, rotationDeg: 0 },
+  rug_01: { x: 0, z: 0.38, rotationDeg: 0 },
+  lamp_01: { x: -1.425, z: -0.1, rotationDeg: 0 },
+  chair_01: { x: 1.03, z: 0.55, rotationDeg: 45 },
+  plant_01: { x: 1.2, z: -0.3, rotationDeg: 0 },
 };
 export interface DemoSceneOptions {
   /**

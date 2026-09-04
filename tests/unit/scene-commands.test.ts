@@ -287,6 +287,10 @@ describe("applySceneCommand", () => {
       id === "sofa_01" || id === "table_01"
     );
     seed.selectedObjectId = "table_01";
+    seed.objects.find(({ id }) => id === "sofa_01")!.position[2] = -0.55;
+    const seedTable = seed.objects.find(({ id }) => id === "table_01")!;
+    seedTable.position[0] = -0.45;
+    seedTable.position[2] = 0.5;
     const scene = SceneSchema.parse(seed);
     const originalTable = scene.objects.find(({ id }) => id === "table_01")!;
     const product: SceneProduct = {
@@ -476,7 +480,7 @@ describe("applySceneCommand", () => {
       command: {
         type: "move",
         objectId: "rug_01",
-        position: { x: -0.2, z: 0.38 },
+        position: { x: 0, z: 0.38 },
         rotationYDegrees: 15,
       },
     });
