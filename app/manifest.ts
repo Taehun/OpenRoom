@@ -1,5 +1,11 @@
 import type { MetadataRoute } from "next";
 
+/**
+ * The Pages build exports the site statically (`NEXT_OUTPUT=export`), and a
+ * metadata route has to opt in to that or the export fails.
+ */
+export const dynamic = "force-static";
+
 export default function manifest(): MetadataRoute.Manifest {
   return {
     id: "/",
