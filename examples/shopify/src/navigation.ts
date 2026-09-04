@@ -111,8 +111,15 @@ export interface MenuInput {
   items: MenuItemInput[];
 }
 
-export const MENU_BY_HANDLE_QUERY = `query MenuByHandle($handle: String!) {
-  menus(first: 1, query: $handle) { nodes { id handle } }
+/**
+ * Every menu, matched by handle in code. The `menus` connection accepts a
+ * `query` argument but ignores a `handle:` filter — it answers with the whole
+ * list, `main-menu` first — so filtering server-side silently returns the
+ * wrong menu, and rewriting it fails with "Handle can't be changed in a
+ * default list". A store has a handful of menus; read them all and be sure.
+ */
+export const MENUS_QUERY = `query Menus {
+  menus(first: 50) { nodes { id handle } }
 }`;
 
 export const MENU_CREATE_MUTATION = `mutation MenuCreate($title: String!, $handle: String!, $items: [MenuItemCreateInput!]!) {
@@ -234,12 +241,14 @@ export async function syncMenus(
     return { menus: inputs.map((input) => ({ handle: input.handle, menuId: null, created: false })) };
   }
 
+  const existing = await client.query<{ menus: { nodes: { id: string; handle: string }[] } }>(
+    MENUS_QUERY,
+  );
+  const idByHandle = new Map(existing.menus.nodes.map((node) => [node.handle, node.id]));
+
   const menus: SyncedMenu[] = [];
   for (const input of inputs) {
-    const found = await client.query<{ menus: { nodes: { id: string }[] } }>(MENU_BY_HANDLE_QUERY, {
-      handle: `handle:${input.handle}`,
-    });
-    const existingId = found.menus.nodes[0]?.id ?? null;
+    const existingId = idByHandle.get(input.handle) ?? null;
 
     if (existingId === null) {
       const result = await client.query<{

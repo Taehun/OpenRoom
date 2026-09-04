@@ -187,10 +187,14 @@ function fakeClient(options: { existingMenus?: string[]; existingPages?: string[
       if (document.includes("mutation PageUpdate")) {
         return { pageUpdate: { page: { id: String(variables.id) }, userErrors: [] } } as T;
       }
-      if (document.includes("query MenuByHandle")) {
-        const handle = queried;
+      if (document.includes("query Menus")) {
+        // The real `menus` connection ignores a `handle:` filter and answers
+        // with every menu, main-menu first. Reproduce that exactly.
+        const all = ["main-menu", "footer", "customer-account-main-menu"].filter((h) =>
+          menus.has(h),
+        );
         return {
-          menus: { nodes: menus.has(handle) ? [{ id: `gid://shopify/Menu/${handle}`, handle }] : [] },
+          menus: { nodes: all.map((handle) => ({ id: `gid://shopify/Menu/${handle}`, handle })) },
         } as T;
       }
       if (document.includes("mutation MenuCreate")) {
@@ -258,11 +262,32 @@ describe("syncMenus", () => {
     expect(calls.some((c) => c.document.includes("mutation MenuCreate"))).toBe(true);
   });
 
+  it("matches the handle exactly instead of trusting the query filter", async () => {
+    // Regression: `menus(query: "handle:footer")` returns main-menu first, so
+    // taking node[0] rewrote the wrong menu and Shopify answered
+    // "Handle can't be changed in a default list".
+    const { client, calls } = fakeClient({ existingMenus: ["main-menu", "footer"] });
+    await syncMenus(client, MENU_PLANS, IDS);
+
+    const updates = calls.filter((c) => c.document.includes("mutation MenuUpdate"));
+    expect(updates.map((c) => [c.variables.handle, c.variables.id])).toEqual([
+      ["main-menu", "gid://shopify/Menu/main-menu"],
+      ["footer", "gid://shopify/Menu/footer"],
+    ]);
+  });
+
+  it("reads the menu list once, not once per menu", async () => {
+    const { client, calls } = fakeClient({ existingMenus: ["main-menu", "footer"] });
+    await syncMenus(client, MENU_PLANS, IDS);
+
+    expect(calls.filter((c) => c.document.includes("query Menus"))).toHaveLength(1);
+  });
+
   it("fails loudly on a userErrors response", async () => {
     const client: AdminClient = {
       endpoint: "https://fake-store.myshopify.com/admin/api/2026-01/graphql.json",
       async query<T>(document: string): Promise<T> {
-        if (document.includes("query MenuByHandle")) {
+        if (document.includes("query Menus")) {
           return { menus: { nodes: [{ id: "gid://shopify/Menu/1", handle: "main-menu" }] } } as T;
         }
         return {
