@@ -8,5 +8,7 @@ export const metadata: Metadata = {
 };
 
 export default function DemoPage() {
-  return <DemoWorkspace />;
+  // `/` hosts the guide, and the Scene store sits in the root layout, so the
+  // round trip is a soft navigation that keeps the room.
+  return <DemoWorkspace guideHref="/?view=guide" />;
 }
