@@ -1,6 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 
 import {
+  FIXTURE_AGENT_PROFILE_URL,
   FIXTURE_VARIANT_IDS,
   PLACEHOLDER_STORE_DOMAIN,
   fixtureGid,
@@ -246,7 +247,8 @@ test("returns Shopify lines and the store MCP endpoint from add_scene_to_cart", 
   expect(draft.commerce).toEqual({
     provider: "shopify",
     storeDomain: STORE,
-    mcpEndpoint: `https://${STORE}/api/mcp`,
+    mcpEndpoint: `https://${STORE}/api/ucp/mcp`,
+    agentProfileUrl: FIXTURE_AGENT_PROFILE_URL,
     lines: [
       {
         productId: "oak-frame-table",
