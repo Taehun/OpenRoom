@@ -57,8 +57,8 @@ jobs:
       - name: Build (Next)
         run: pnpm run build:next
 
-      - name: Build (vinext for Cloudflare Workers)
-        run: pnpm run build
+      - name: Build (static export for Cloudflare Pages)
+        run: pnpm run build:pages
 
       - name: Upload Playwright traces on failure
         if: failure()
@@ -91,7 +91,7 @@ jobs:
           fi
 
   deploy:
-    name: Deploy to Cloudflare Workers
+    name: Deploy to Cloudflare Pages
     needs: [ci, check-deploy-secrets]
     if: needs.check-deploy-secrets.outputs.configured == 'true'
     runs-on: ubuntu-latest
@@ -125,19 +125,19 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Build (vinext for Cloudflare Workers)
-        run: pnpm run build
+      - name: Build (static export for Cloudflare Pages)
+        run: pnpm run build:pages
 
-      - name: Verify the store domain was inlined into the client bundle
+      - name: Verify the store domain was inlined into the exported bundle
         run: |
           if [ -z "$NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN" ]; then
             echo "::notice::NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN is not set; deploying in demo mode."
             exit 0
           fi
-          if grep -rqF "$NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN" dist/client; then
-            echo "Store domain inlined into dist/client."
+          if grep -rqF "$NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN" out; then
+            echo "Store domain inlined into out."
           else
-            echo "::error::build did not inline the store domain (${NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN}) into dist/client; the deployed site would silently stay in demo mode. Check the NEXT_PUBLIC_* repository variables on the deploy job."
+            echo "::error::build did not inline the store domain (${NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN}) into out; the deployed site would silently stay in demo mode. Check the NEXT_PUBLIC_* repository variables on the deploy job."
             exit 1
           fi
 
@@ -145,7 +145,7 @@ jobs:
         id: deploy
         run: |
           set -o pipefail
-          pnpm run deploy:vinext 2>&1 | tee deploy.log
-          url="$(grep -Eo 'https://[a-z0-9.-]+\.workers\.dev' deploy.log | tail -1 || true)"
+          pnpm run deploy:pages 2>&1 | tee deploy.log
+          url="$(grep -Eo 'https://[a-z0-9.-]+\.pages\.dev' deploy.log | tail -1 || true)"
           echo "url=${url}" >> "$GITHUB_OUTPUT"
           echo "Deployed to: ${url:-<see log>}"

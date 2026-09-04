@@ -1,5 +1,5 @@
 {
-  "imageBase": "https://openroom-y20.pages.dev",
+  "imageBase": "https://openroom-webmcp.pages.dev",
   "count": 43,
   "products": [
     {
@@ -18,7 +18,7 @@
       ],
       "priceUsd": "1899.00",
       "sku": "hinoki-low-sofa",
-      "imageUrl": "https://openroom-y20.pages.dev/demo/photo/products/hinoki-low-sofa.webp",
+      "imageUrl": "https://openroom-webmcp.pages.dev/demo/photo/products/hinoki-low-sofa.webp",
       "imageAlt": "Hinoki Low Sofa",
       "dimensionsCm": {
         "width": 210,
@@ -41,7 +41,7 @@
       ],
       "priceUsd": "2299.00",
       "sku": "boucle-curve-sofa",
-      "imageUrl": "https://openroom-y20.pages.dev/demo/photo/products/boucle-curve-sofa.webp",
+      "imageUrl": "https://openroom-webmcp.pages.dev/demo/photo/products/boucle-curve-sofa.webp",
       "imageAlt": "Boucle Curve Sofa",
       "dimensionsCm": {
         "width": 224,
@@ -65,7 +65,7 @@
       ],
       "priceUsd": "2099.00",
       "sku": "walnut-frame-sofa",
-      "imageUrl": "https://openroom-y20.pages.dev/demo/photo/products/walnut-frame-sofa.webp",
+      "imageUrl": "https://openroom-webmcp.pages.dev/demo/photo/products/walnut-frame-sofa.webp",
       "imageAlt": "Walnut Frame Sofa",
       "dimensionsCm": {
         "width": 205,
@@ -89,7 +89,7 @@
       ],
       "priceUsd": "1749.00",
       "sku": "oat-linen-slipcover-sofa",
-      "imageUrl": "https://openroom-y20.pages.dev/demo/photo/products/oat-linen-slipcover-sofa.webp",
+      "imageUrl": "https://openroom-webmcp.pages.dev/demo/photo/products/oat-linen-slipcover-sofa.webp",
       "imageAlt": "Oat Linen Slipcover Sofa",
       "dimensionsCm": {
         "width": 198,
@@ -113,7 +113,7 @@
       ],
       "priceUsd": "1999.00",
       "sku": "cane-back-teak-sofa",
-      "imageUrl": "https://openroom-y20.pages.dev/demo/photo/products/cane-back-teak-sofa.webp",
+      "imageUrl": "https://openroom-webmcp.pages.dev/demo/photo/products/cane-back-teak-sofa.webp",
       "imageAlt": "Cane Back Teak Sofa",
       "dimensionsCm": {
         "width": 192,
@@ -135,7 +135,7 @@
       ],
       "priceUsd": "169.00",
       "sku": "oak-frame-table",
-      "imageUrl": "https://openroom-y20.pages.dev/demo/photo/products/oak-frame-table.webp",
+      "imageUrl": "https://openroom-webmcp.pages.dev/demo/photo/products/oak-frame-table.webp",
       "imageAlt": "Oak Frame Table",
       "dimensionsCm": {
         "width": 105,
@@ -159,7 +159,7 @@
       ],
       "priceUsd": "249.00",
       "sku": "travertine-plinth-table",
-      "imageUrl": "https://openroom-y20.pages.dev/demo/photo/products/travertine-plinth-table.webp",
+      "imageUrl": "https://openroom-webmcp.pages.dev/demo/photo/products/travertine-plinth-table.webp",
       "imageAlt": "Travertine Plinth Table",
       "dimensionsCm": {
         "width": 110,
@@ -181,7 +181,7 @@
       ],
       "priceUsd": "219.00",
       "sku": "walnut-nesting-table",
-      "imageUrl": "https://openroom-y20.pages.dev/demo/photo/products/walnut-nesting-table.webp",
+      "imageUrl": "https://openroom-webmcp.pages.dev/demo/photo/products/walnut-nesting-table.webp",
       "imageAlt": "Walnut Nesting Table",
       "dimensionsCm": {
         "width": 95,
@@ -204,7 +204,7 @@
       ],
       "priceUsd": "189.00",
       "sku": "ash-plinth-table",
-      "imageUrl": "https://openroom-y20.pages.dev/demo/photo/products/ash-plinth-table.webp",
+      "imageUrl": "https://openroom-webmcp.pages.dev/demo/photo/products/ash-plinth-table.webp",
       "imageAlt": "Ash Plinth Table",
       "dimensionsCm": {
         "width": 100,
@@ -226,7 +226,7 @@
       ],
       "priceUsd": "239.00",
       "sku": "teak-oval-table",
-      "imageUrl": "https://openroom-y20.pages.dev/demo/photo/products/teak-oval-table.webp",
+      "imageUrl": "https://openroom-webmcp.pages.dev/demo/photo/products/teak-oval-table.webp",
       "imageAlt": "Teak Oval Table",
       "dimensionsCm": {
         "width": 118,
@@ -250,7 +250,7 @@
       ],
       "priceUsd": "349.00",
       "sku": "woven-jute-rug",
-      "imageUrl": "https://openroom-y20.pages.dev/demo/photo/products/woven-jute-rug.webp",
+      "imageUrl": "https://openroom-webmcp.pages.dev/demo/photo/products/woven-jute-rug.webp",
       "imageAlt": "Woven Jute Rug",
       "dimensionsCm": {
         "width": 240,
@@ -274,7 +274,7 @@
       ],
       "priceUsd": "529.00",
       "sku": "wool-pebble-rug",
-      "imageUrl": "https://openroom-y20.pages.dev/demo/photo/products/wool-pebble-rug.webp",
+      "imageUrl": "https://openroom-webmcp.pages.dev/demo/photo/products/wool-pebble-rug.webp",
       "imageAlt": "Wool Pebble Rug",
       "dimensionsCm": {
         "width": 230,
@@ -298,7 +298,7 @@
       ],
       "priceUsd": "429.00",
       "sku": "geometric-flatweave-rug",
-      "imageUrl": "https://openroom-y20.pages.dev/demo/photo/products/geometric-flatweave-rug.webp",
+      "imageUrl": "https://openroom-webmcp.pages.dev/demo/photo/products/geometric-flatweave-rug.webp",
       "imageAlt": "Geometric Flatweave Rug",
       "dimensionsCm": {
         "width": 240,
@@ -322,7 +322,7 @@
       ],
       "priceUsd": "589.00",
       "sku": "undyed-wool-shag-rug",
-      "imageUrl": "https://openroom-y20.pages.dev/demo/photo/products/undyed-wool-shag-rug.webp",
+      "imageUrl": "https://openroom-webmcp.pages.dev/demo/photo/products/undyed-wool-shag-rug.webp",
       "imageAlt": "Undyed Wool Shag Rug",
       "dimensionsCm": {
         "width": 250,
@@ -346,7 +346,7 @@
       ],
       "priceUsd": "469.00",
       "sku": "charcoal-border-rug",
-      "imageUrl": "https://openroom-y20.pages.dev/demo/photo/products/charcoal-border-rug.webp",
+      "imageUrl": "https://openroom-webmcp.pages.dev/demo/photo/products/charcoal-border-rug.webp",
       "imageAlt": "Charcoal Border Rug",
       "dimensionsCm": {
         "width": 240,
@@ -370,7 +370,7 @@
       ],
       "priceUsd": "289.00",
       "sku": "rice-paper-floor-lamp",
-      "imageUrl": "https://openroom-y20.pages.dev/demo/photo/products/rice-paper-floor-lamp.webp",
+      "imageUrl": "https://openroom-webmcp.pages.dev/demo/photo/products/rice-paper-floor-lamp.webp",
       "imageAlt": "Rice Paper Floor Lamp",
       "dimensionsCm": {
         "width": 36,
@@ -394,7 +394,7 @@
       ],
       "priceUsd": "349.00",
       "sku": "linen-dome-lamp",
-      "imageUrl": "https://openroom-y20.pages.dev/demo/photo/products/linen-dome-lamp.webp",
+      "imageUrl": "https://openroom-webmcp.pages.dev/demo/photo/products/linen-dome-lamp.webp",
       "imageAlt": "Linen Dome Lamp",
       "dimensionsCm": {
         "width": 58,
@@ -418,7 +418,7 @@
       ],
       "priceUsd": "319.00",
       "sku": "brass-globe-lamp",
-      "imageUrl": "https://openroom-y20.pages.dev/demo/photo/products/brass-globe-lamp.webp",
+      "imageUrl": "https://openroom-webmcp.pages.dev/demo/photo/products/brass-globe-lamp.webp",
       "imageAlt": "Brass Globe Lamp",
       "dimensionsCm": {
         "width": 34,
@@ -441,7 +441,7 @@
       ],
       "priceUsd": "269.00",
       "sku": "oak-tripod-lamp",
-      "imageUrl": "https://openroom-y20.pages.dev/demo/photo/products/oak-tripod-lamp.webp",
+      "imageUrl": "https://openroom-webmcp.pages.dev/demo/photo/products/oak-tripod-lamp.webp",
       "imageAlt": "Oak Tripod Lamp",
       "dimensionsCm": {
         "width": 46,
@@ -465,7 +465,7 @@
       ],
       "priceUsd": "329.00",
       "sku": "ceramic-column-lamp",
-      "imageUrl": "https://openroom-y20.pages.dev/demo/photo/products/ceramic-column-lamp.webp",
+      "imageUrl": "https://openroom-webmcp.pages.dev/demo/photo/products/ceramic-column-lamp.webp",
       "imageAlt": "Ceramic Column Lamp",
       "dimensionsCm": {
         "width": 40,
@@ -489,7 +489,7 @@
       ],
       "priceUsd": "89.00",
       "sku": "linen-drum-table-lamp",
-      "imageUrl": "https://openroom-y20.pages.dev/demo/photo/products/linen-drum-table-lamp.webp",
+      "imageUrl": "https://openroom-webmcp.pages.dev/demo/photo/products/linen-drum-table-lamp.webp",
       "imageAlt": "Linen Drum Table Lamp",
       "dimensionsCm": {
         "width": 28,
@@ -513,7 +513,7 @@
       ],
       "priceUsd": "149.00",
       "sku": "ceramic-gourd-table-lamp",
-      "imageUrl": "https://openroom-y20.pages.dev/demo/photo/products/ceramic-gourd-table-lamp.webp",
+      "imageUrl": "https://openroom-webmcp.pages.dev/demo/photo/products/ceramic-gourd-table-lamp.webp",
       "imageAlt": "Ceramic Gourd Table Lamp",
       "dimensionsCm": {
         "width": 34,
@@ -537,7 +537,7 @@
       ],
       "priceUsd": "189.00",
       "sku": "brass-stem-table-lamp",
-      "imageUrl": "https://openroom-y20.pages.dev/demo/photo/products/brass-stem-table-lamp.webp",
+      "imageUrl": "https://openroom-webmcp.pages.dev/demo/photo/products/brass-stem-table-lamp.webp",
       "imageAlt": "Brass Stem Table Lamp",
       "dimensionsCm": {
         "width": 30,
@@ -561,7 +561,7 @@
       ],
       "priceUsd": "799.00",
       "sku": "ash-lounge-chair",
-      "imageUrl": "https://openroom-y20.pages.dev/demo/photo/products/ash-lounge-chair.webp",
+      "imageUrl": "https://openroom-webmcp.pages.dev/demo/photo/products/ash-lounge-chair.webp",
       "imageAlt": "Ash Lounge Chair",
       "dimensionsCm": {
         "width": 74,
@@ -584,7 +584,7 @@
       ],
       "priceUsd": "899.00",
       "sku": "boucle-barrel-chair",
-      "imageUrl": "https://openroom-y20.pages.dev/demo/photo/products/boucle-barrel-chair.webp",
+      "imageUrl": "https://openroom-webmcp.pages.dev/demo/photo/products/boucle-barrel-chair.webp",
       "imageAlt": "Boucle Barrel Chair",
       "dimensionsCm": {
         "width": 82,
@@ -608,7 +608,7 @@
       ],
       "priceUsd": "949.00",
       "sku": "cognac-sling-chair",
-      "imageUrl": "https://openroom-y20.pages.dev/demo/photo/products/cognac-sling-chair.webp",
+      "imageUrl": "https://openroom-webmcp.pages.dev/demo/photo/products/cognac-sling-chair.webp",
       "imageAlt": "Cognac Sling Chair",
       "dimensionsCm": {
         "width": 72,
@@ -632,7 +632,7 @@
       ],
       "priceUsd": "649.00",
       "sku": "oak-paper-cord-chair",
-      "imageUrl": "https://openroom-y20.pages.dev/demo/photo/products/oak-paper-cord-chair.webp",
+      "imageUrl": "https://openroom-webmcp.pages.dev/demo/photo/products/oak-paper-cord-chair.webp",
       "imageAlt": "Oak Paper Cord Chair",
       "dimensionsCm": {
         "width": 62,
@@ -656,7 +656,7 @@
       ],
       "priceUsd": "999.00",
       "sku": "shearling-swivel-chair",
-      "imageUrl": "https://openroom-y20.pages.dev/demo/photo/products/shearling-swivel-chair.webp",
+      "imageUrl": "https://openroom-webmcp.pages.dev/demo/photo/products/shearling-swivel-chair.webp",
       "imageAlt": "Shearling Swivel Chair",
       "dimensionsCm": {
         "width": 86,
@@ -680,7 +680,7 @@
       ],
       "priceUsd": "189.00",
       "sku": "ceramic-olive-tree",
-      "imageUrl": "https://openroom-y20.pages.dev/demo/photo/products/ceramic-olive-tree.webp",
+      "imageUrl": "https://openroom-webmcp.pages.dev/demo/photo/products/ceramic-olive-tree.webp",
       "imageAlt": "Ceramic Olive Tree",
       "dimensionsCm": {
         "width": 88,
@@ -704,7 +704,7 @@
       ],
       "priceUsd": "229.00",
       "sku": "stone-planter-ficus",
-      "imageUrl": "https://openroom-y20.pages.dev/demo/photo/products/stone-planter-ficus.webp",
+      "imageUrl": "https://openroom-webmcp.pages.dev/demo/photo/products/stone-planter-ficus.webp",
       "imageAlt": "Stone Planter Ficus",
       "dimensionsCm": {
         "width": 100,
@@ -728,7 +728,7 @@
       ],
       "priceUsd": "209.00",
       "sku": "teak-planter-palm",
-      "imageUrl": "https://openroom-y20.pages.dev/demo/photo/products/teak-planter-palm.webp",
+      "imageUrl": "https://openroom-webmcp.pages.dev/demo/photo/products/teak-planter-palm.webp",
       "imageAlt": "Teak Planter Palm",
       "dimensionsCm": {
         "width": 110,
@@ -752,7 +752,7 @@
       ],
       "priceUsd": "129.00",
       "sku": "stoneware-snake-plant",
-      "imageUrl": "https://openroom-y20.pages.dev/demo/photo/products/stoneware-snake-plant.webp",
+      "imageUrl": "https://openroom-webmcp.pages.dev/demo/photo/products/stoneware-snake-plant.webp",
       "imageAlt": "Stoneware Snake Plant",
       "dimensionsCm": {
         "width": 46,
@@ -776,7 +776,7 @@
       ],
       "priceUsd": "149.00",
       "sku": "rattan-basket-fern",
-      "imageUrl": "https://openroom-y20.pages.dev/demo/photo/products/rattan-basket-fern.webp",
+      "imageUrl": "https://openroom-webmcp.pages.dev/demo/photo/products/rattan-basket-fern.webp",
       "imageAlt": "Rattan Basket Fern",
       "dimensionsCm": {
         "width": 70,
@@ -799,7 +799,7 @@
       ],
       "priceUsd": "279.00",
       "sku": "oak-drum-side-table",
-      "imageUrl": "https://openroom-y20.pages.dev/demo/photo/products/oak-drum-side-table.webp",
+      "imageUrl": "https://openroom-webmcp.pages.dev/demo/photo/products/oak-drum-side-table.webp",
       "imageAlt": "Oak Drum Side Table",
       "dimensionsCm": {
         "width": 45,
@@ -823,7 +823,7 @@
       ],
       "priceUsd": "399.00",
       "sku": "travertine-cube-side-table",
-      "imageUrl": "https://openroom-y20.pages.dev/demo/photo/products/travertine-cube-side-table.webp",
+      "imageUrl": "https://openroom-webmcp.pages.dev/demo/photo/products/travertine-cube-side-table.webp",
       "imageAlt": "Travertine Cube Side Table",
       "dimensionsCm": {
         "width": 40,
@@ -847,7 +847,7 @@
       ],
       "priceUsd": "219.00",
       "sku": "black-steel-tray-table",
-      "imageUrl": "https://openroom-y20.pages.dev/demo/photo/products/black-steel-tray-table.webp",
+      "imageUrl": "https://openroom-webmcp.pages.dev/demo/photo/products/black-steel-tray-table.webp",
       "imageAlt": "Black Steel Tray Table",
       "dimensionsCm": {
         "width": 42,
@@ -869,7 +869,7 @@
       ],
       "priceUsd": "329.00",
       "sku": "walnut-pedestal-side-table",
-      "imageUrl": "https://openroom-y20.pages.dev/demo/photo/products/walnut-pedestal-side-table.webp",
+      "imageUrl": "https://openroom-webmcp.pages.dev/demo/photo/products/walnut-pedestal-side-table.webp",
       "imageAlt": "Walnut Pedestal Side Table",
       "dimensionsCm": {
         "width": 38,
@@ -893,7 +893,7 @@
       ],
       "priceUsd": "249.00",
       "sku": "rattan-nesting-side-table",
-      "imageUrl": "https://openroom-y20.pages.dev/demo/photo/products/rattan-nesting-side-table.webp",
+      "imageUrl": "https://openroom-webmcp.pages.dev/demo/photo/products/rattan-nesting-side-table.webp",
       "imageAlt": "Rattan Nesting Side Table",
       "dimensionsCm": {
         "width": 50,
@@ -916,7 +916,7 @@
       ],
       "priceUsd": "449.00",
       "sku": "oak-ladder-shelf",
-      "imageUrl": "https://openroom-y20.pages.dev/demo/photo/products/oak-ladder-shelf.webp",
+      "imageUrl": "https://openroom-webmcp.pages.dev/demo/photo/products/oak-ladder-shelf.webp",
       "imageAlt": "Oak Ladder Shelf",
       "dimensionsCm": {
         "width": 60,
@@ -938,7 +938,7 @@
       ],
       "priceUsd": "899.00",
       "sku": "walnut-low-shelf",
-      "imageUrl": "https://openroom-y20.pages.dev/demo/photo/products/walnut-low-shelf.webp",
+      "imageUrl": "https://openroom-webmcp.pages.dev/demo/photo/products/walnut-low-shelf.webp",
       "imageAlt": "Walnut Low Shelf",
       "dimensionsCm": {
         "width": 120,
@@ -961,7 +961,7 @@
       ],
       "priceUsd": "699.00",
       "sku": "white-oak-cube-storage",
-      "imageUrl": "https://openroom-y20.pages.dev/demo/photo/products/white-oak-cube-storage.webp",
+      "imageUrl": "https://openroom-webmcp.pages.dev/demo/photo/products/white-oak-cube-storage.webp",
       "imageAlt": "White Oak Cube Storage",
       "dimensionsCm": {
         "width": 90,
@@ -985,7 +985,7 @@
       ],
       "priceUsd": "799.00",
       "sku": "steel-and-ash-etagere",
-      "imageUrl": "https://openroom-y20.pages.dev/demo/photo/products/steel-and-ash-etagere.webp",
+      "imageUrl": "https://openroom-webmcp.pages.dev/demo/photo/products/steel-and-ash-etagere.webp",
       "imageAlt": "Steel and Ash Etagere",
       "dimensionsCm": {
         "width": 84,
@@ -1008,7 +1008,7 @@
       ],
       "priceUsd": "949.00",
       "sku": "hinoki-open-bookcase",
-      "imageUrl": "https://openroom-y20.pages.dev/demo/photo/products/hinoki-open-bookcase.webp",
+      "imageUrl": "https://openroom-webmcp.pages.dev/demo/photo/products/hinoki-open-bookcase.webp",
       "imageAlt": "Hinoki Open Bookcase",
       "dimensionsCm": {
         "width": 96,

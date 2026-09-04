@@ -46,7 +46,7 @@ cat examples/shopify-furniture-store/.env.example >> .env.local
 | `SHOPIFY_STORE_DOMAIN` | yes | `your-store.myshopify.com`, no scheme. |
 | `SHOPIFY_ADMIN_ACCESS_TOKEN` | yes | The custom app's Admin API token. Never commit it. |
 | `SHOPIFY_API_VERSION` | no | Admin GraphQL version; defaults to `2026-01`. |
-| `OPENROOM_IMAGE_BASE` | no | Host the cutouts are fetched from; defaults to `https://openroom-y20.pages.dev`. |
+| `OPENROOM_IMAGE_BASE` | no | Host the cutouts are fetched from; defaults to `https://openroom-webmcp.pages.dev`. |
 
 ## Quick start
 
@@ -83,7 +83,7 @@ Shopify import file (it is checked in, so no command is needed to obtain it).
 1. In the store admin go to **Products → Import**.
 2. Upload `examples/shopify-furniture-store/products.csv` and confirm.
 3. Shopify fetches each `Image Src` from the public URL, so the store needs
-   outbound access to `https://openroom-y20.pages.dev`.
+   outbound access to `https://openroom-webmcp.pages.dev`.
 4. The rows are already `Published=TRUE` and `Status=active`, so they land on
    the Online Store. Smart collections are **not** part of a CSV import; create
    them by hand or run `pnpm shop:seed` afterwards.

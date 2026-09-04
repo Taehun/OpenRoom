@@ -11,7 +11,7 @@ import { OBJECT_LABELS, humanizeSlug } from "../../../src/features/demo/object-l
 import type { PhotoAsset } from "../../../src/features/photo/photo-assets";
 
 /** Where the deployed cutouts live when nothing overrides `OPENROOM_IMAGE_BASE`. */
-export const DEFAULT_IMAGE_BASE = "https://openroom-y20.pages.dev";
+export const DEFAULT_IMAGE_BASE = "https://openroom-webmcp.pages.dev";
 
 export const SHOP_VENDOR = "OpenRoom";
 
