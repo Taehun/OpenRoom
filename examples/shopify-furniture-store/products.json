@@ -1,0 +1,1020 @@
+{
+  "imageBase": "https://openroom-y20.pages.dev",
+  "count": 43,
+  "products": [
+    {
+      "handle": "hinoki-low-sofa",
+      "title": "Hinoki Low Sofa",
+      "productType": "Sofa",
+      "descriptionHtml": "<p>A low hinoki frame with calm linen cushions and soft edges.</p><p>W 210 × D 92 × H 72 cm</p>",
+      "vendor": "OpenRoom",
+      "tags": [
+        "Sofa",
+        "Hinoki and linen",
+        "Natural cream",
+        "Japandi",
+        "Light wood",
+        "Low profile"
+      ],
+      "priceUsd": "1899.00",
+      "sku": "hinoki-low-sofa",
+      "imageUrl": "https://openroom-y20.pages.dev/demo/photo/products/hinoki-low-sofa.webp",
+      "imageAlt": "Hinoki Low Sofa",
+      "dimensionsCm": {
+        "width": 210,
+        "height": 72,
+        "depth": 92
+      }
+    },
+    {
+      "handle": "boucle-curve-sofa",
+      "title": "Boucle Curve Sofa",
+      "productType": "Sofa",
+      "descriptionHtml": "<p>A softly curved sofa upholstered in tactile ivory boucle.</p><p>W 224 × D 98 × H 78 cm</p>",
+      "vendor": "OpenRoom",
+      "tags": [
+        "Sofa",
+        "Boucle",
+        "Ivory",
+        "Modern organic",
+        "Sculptural"
+      ],
+      "priceUsd": "2299.00",
+      "sku": "boucle-curve-sofa",
+      "imageUrl": "https://openroom-y20.pages.dev/demo/photo/products/boucle-curve-sofa.webp",
+      "imageAlt": "Boucle Curve Sofa",
+      "dimensionsCm": {
+        "width": 224,
+        "height": 78,
+        "depth": 98
+      }
+    },
+    {
+      "handle": "walnut-frame-sofa",
+      "title": "Walnut Frame Sofa",
+      "productType": "Sofa",
+      "descriptionHtml": "<p>Tailored cushions sit within an exposed walnut frame.</p><p>W 205 × D 88 × H 80 cm</p>",
+      "vendor": "OpenRoom",
+      "tags": [
+        "Sofa",
+        "Walnut and wool",
+        "Oatmeal",
+        "Mid century",
+        "Walnut",
+        "Tailored"
+      ],
+      "priceUsd": "2099.00",
+      "sku": "walnut-frame-sofa",
+      "imageUrl": "https://openroom-y20.pages.dev/demo/photo/products/walnut-frame-sofa.webp",
+      "imageAlt": "Walnut Frame Sofa",
+      "dimensionsCm": {
+        "width": 205,
+        "height": 80,
+        "depth": 88
+      }
+    },
+    {
+      "handle": "oat-linen-slipcover-sofa",
+      "title": "Oat Linen Slipcover Sofa",
+      "productType": "Sofa",
+      "descriptionHtml": "<p>Washed linen slipcovers fall loosely over a deep, feather-topped seat.</p><p>W 198 × D 94 × H 76 cm</p>",
+      "vendor": "OpenRoom",
+      "tags": [
+        "Sofa",
+        "Linen and poplar",
+        "Oat",
+        "Modern organic",
+        "Linen",
+        "Slipcovered"
+      ],
+      "priceUsd": "1749.00",
+      "sku": "oat-linen-slipcover-sofa",
+      "imageUrl": "https://openroom-y20.pages.dev/demo/photo/products/oat-linen-slipcover-sofa.webp",
+      "imageAlt": "Oat Linen Slipcover Sofa",
+      "dimensionsCm": {
+        "width": 198,
+        "height": 76,
+        "depth": 94
+      }
+    },
+    {
+      "handle": "cane-back-teak-sofa",
+      "title": "Cane Back Teak Sofa",
+      "productType": "Sofa",
+      "descriptionHtml": "<p>A woven cane back lightens a slim teak frame on tapered legs.</p><p>W 192 × D 86 × H 78 cm</p>",
+      "vendor": "OpenRoom",
+      "tags": [
+        "Sofa",
+        "Teak and cane",
+        "Clay",
+        "Mid century",
+        "Teak",
+        "Cane"
+      ],
+      "priceUsd": "1999.00",
+      "sku": "cane-back-teak-sofa",
+      "imageUrl": "https://openroom-y20.pages.dev/demo/photo/products/cane-back-teak-sofa.webp",
+      "imageAlt": "Cane Back Teak Sofa",
+      "dimensionsCm": {
+        "width": 192,
+        "height": 78,
+        "depth": 86
+      }
+    },
+    {
+      "handle": "oak-frame-table",
+      "title": "Oak Frame Table",
+      "productType": "Coffee table",
+      "descriptionHtml": "<p>A low oak table with a softened architectural frame.</p><p>W 105 × D 55 × H 40 cm</p>",
+      "vendor": "OpenRoom",
+      "tags": [
+        "Coffee table",
+        "Oak",
+        "Light oak",
+        "Japandi"
+      ],
+      "priceUsd": "169.00",
+      "sku": "oak-frame-table",
+      "imageUrl": "https://openroom-y20.pages.dev/demo/photo/products/oak-frame-table.webp",
+      "imageAlt": "Oak Frame Table",
+      "dimensionsCm": {
+        "width": 105,
+        "height": 40,
+        "depth": 55
+      }
+    },
+    {
+      "handle": "travertine-plinth-table",
+      "title": "Travertine Plinth Table",
+      "productType": "Coffee table",
+      "descriptionHtml": "<p>A quiet stone-led alternative for the centre of the room.</p><p>W 110 × D 60 × H 38 cm</p>",
+      "vendor": "OpenRoom",
+      "tags": [
+        "Coffee table",
+        "Travertine",
+        "Ivory",
+        "Modern organic",
+        "Warm minimal",
+        "Stone"
+      ],
+      "priceUsd": "249.00",
+      "sku": "travertine-plinth-table",
+      "imageUrl": "https://openroom-y20.pages.dev/demo/photo/products/travertine-plinth-table.webp",
+      "imageAlt": "Travertine Plinth Table",
+      "dimensionsCm": {
+        "width": 110,
+        "height": 38,
+        "depth": 60
+      }
+    },
+    {
+      "handle": "walnut-nesting-table",
+      "title": "Walnut Nesting Table",
+      "productType": "Coffee table",
+      "descriptionHtml": "<p>Two compact surfaces in a rich, warm timber finish.</p><p>W 95 × D 55 × H 42 cm</p>",
+      "vendor": "OpenRoom",
+      "tags": [
+        "Coffee table",
+        "Walnut",
+        "Mid century",
+        "Warm walnut"
+      ],
+      "priceUsd": "219.00",
+      "sku": "walnut-nesting-table",
+      "imageUrl": "https://openroom-y20.pages.dev/demo/photo/products/walnut-nesting-table.webp",
+      "imageAlt": "Walnut Nesting Table",
+      "dimensionsCm": {
+        "width": 95,
+        "height": 42,
+        "depth": 55
+      }
+    },
+    {
+      "handle": "ash-plinth-table",
+      "title": "Ash Plinth Table",
+      "productType": "Coffee table",
+      "descriptionHtml": "<p>A pale ash slab rests on two chamfered plinths, low and quiet.</p><p>W 100 × D 58 × H 36 cm</p>",
+      "vendor": "OpenRoom",
+      "tags": [
+        "Coffee table",
+        "Ash",
+        "Pale ash",
+        "Japandi",
+        "Plinth"
+      ],
+      "priceUsd": "189.00",
+      "sku": "ash-plinth-table",
+      "imageUrl": "https://openroom-y20.pages.dev/demo/photo/products/ash-plinth-table.webp",
+      "imageAlt": "Ash Plinth Table",
+      "dimensionsCm": {
+        "width": 100,
+        "height": 36,
+        "depth": 58
+      }
+    },
+    {
+      "handle": "teak-oval-table",
+      "title": "Teak Oval Table",
+      "productType": "Coffee table",
+      "descriptionHtml": "<p>An oval teak top eases the walk around a tight seating group.</p><p>W 118 × D 64 × H 38 cm</p>",
+      "vendor": "OpenRoom",
+      "tags": [
+        "Coffee table",
+        "Teak",
+        "Mid century",
+        "Oval"
+      ],
+      "priceUsd": "239.00",
+      "sku": "teak-oval-table",
+      "imageUrl": "https://openroom-y20.pages.dev/demo/photo/products/teak-oval-table.webp",
+      "imageAlt": "Teak Oval Table",
+      "dimensionsCm": {
+        "width": 118,
+        "height": 38,
+        "depth": 64
+      }
+    },
+    {
+      "handle": "woven-jute-rug",
+      "title": "Woven Jute Rug",
+      "productType": "Rug",
+      "descriptionHtml": "<p>A warm handwoven jute rug with a simple bound edge.</p><p>W 240 × D 170 × H 1.2 cm</p>",
+      "vendor": "OpenRoom",
+      "tags": [
+        "Rug",
+        "Jute",
+        "Natural tan",
+        "Japandi",
+        "Natural fiber",
+        "Handwoven"
+      ],
+      "priceUsd": "349.00",
+      "sku": "woven-jute-rug",
+      "imageUrl": "https://openroom-y20.pages.dev/demo/photo/products/woven-jute-rug.webp",
+      "imageAlt": "Woven Jute Rug",
+      "dimensionsCm": {
+        "width": 240,
+        "height": 1.2,
+        "depth": 170
+      }
+    },
+    {
+      "handle": "wool-pebble-rug",
+      "title": "Wool Pebble Rug",
+      "productType": "Rug",
+      "descriptionHtml": "<p>A plush wool rug shaped with a softly irregular pebble edge.</p><p>W 230 × D 180 × H 2 cm</p>",
+      "vendor": "OpenRoom",
+      "tags": [
+        "Rug",
+        "Wool",
+        "Warm ivory",
+        "Modern organic",
+        "Irregular",
+        "Plush"
+      ],
+      "priceUsd": "529.00",
+      "sku": "wool-pebble-rug",
+      "imageUrl": "https://openroom-y20.pages.dev/demo/photo/products/wool-pebble-rug.webp",
+      "imageAlt": "Wool Pebble Rug",
+      "dimensionsCm": {
+        "width": 230,
+        "height": 2,
+        "depth": 180
+      }
+    },
+    {
+      "handle": "geometric-flatweave-rug",
+      "title": "Geometric Flatweave Rug",
+      "productType": "Rug",
+      "descriptionHtml": "<p>Angular rust and mustard forms animate a slim flatweave rug.</p><p>W 240 × D 170 × H 1 cm</p>",
+      "vendor": "OpenRoom",
+      "tags": [
+        "Rug",
+        "Wool and cotton",
+        "Rust multicolor",
+        "Mid century",
+        "Geometric",
+        "Flatweave"
+      ],
+      "priceUsd": "429.00",
+      "sku": "geometric-flatweave-rug",
+      "imageUrl": "https://openroom-y20.pages.dev/demo/photo/products/geometric-flatweave-rug.webp",
+      "imageAlt": "Geometric Flatweave Rug",
+      "dimensionsCm": {
+        "width": 240,
+        "height": 1,
+        "depth": 170
+      }
+    },
+    {
+      "handle": "undyed-wool-shag-rug",
+      "title": "Undyed Wool Shag Rug",
+      "productType": "Rug",
+      "descriptionHtml": "<p>A deep undyed pile that softens footfall and warms a bare floor.</p><p>W 250 × D 180 × H 2.5 cm</p>",
+      "vendor": "OpenRoom",
+      "tags": [
+        "Rug",
+        "Wool",
+        "Chalk",
+        "Modern organic",
+        "Undyed",
+        "High pile"
+      ],
+      "priceUsd": "589.00",
+      "sku": "undyed-wool-shag-rug",
+      "imageUrl": "https://openroom-y20.pages.dev/demo/photo/products/undyed-wool-shag-rug.webp",
+      "imageAlt": "Undyed Wool Shag Rug",
+      "dimensionsCm": {
+        "width": 250,
+        "height": 2.5,
+        "depth": 180
+      }
+    },
+    {
+      "handle": "charcoal-border-rug",
+      "title": "Charcoal Border Rug",
+      "productType": "Rug",
+      "descriptionHtml": "<p>A narrow charcoal border frames a hand-loomed field of soft grey.</p><p>W 240 × D 170 × H 1.4 cm</p>",
+      "vendor": "OpenRoom",
+      "tags": [
+        "Rug",
+        "Wool and linen",
+        "Soft grey",
+        "Japandi",
+        "Hand loomed",
+        "Bordered"
+      ],
+      "priceUsd": "469.00",
+      "sku": "charcoal-border-rug",
+      "imageUrl": "https://openroom-y20.pages.dev/demo/photo/products/charcoal-border-rug.webp",
+      "imageAlt": "Charcoal Border Rug",
+      "dimensionsCm": {
+        "width": 240,
+        "height": 1.4,
+        "depth": 170
+      }
+    },
+    {
+      "handle": "rice-paper-floor-lamp",
+      "title": "Rice Paper Floor Lamp",
+      "productType": "Floor lamp",
+      "descriptionHtml": "<p>A tall paper lantern casts a gentle glow from an ash frame.</p><p>W 36 × D 36 × H 158 cm</p>",
+      "vendor": "OpenRoom",
+      "tags": [
+        "Floor lamp",
+        "Rice paper and ash",
+        "Natural white",
+        "Japandi",
+        "Paper",
+        "Soft light"
+      ],
+      "priceUsd": "289.00",
+      "sku": "rice-paper-floor-lamp",
+      "imageUrl": "https://openroom-y20.pages.dev/demo/photo/products/rice-paper-floor-lamp.webp",
+      "imageAlt": "Rice Paper Floor Lamp",
+      "dimensionsCm": {
+        "width": 36,
+        "height": 158,
+        "depth": 36
+      }
+    },
+    {
+      "handle": "linen-dome-lamp",
+      "title": "Linen Dome Lamp",
+      "productType": "Floor lamp",
+      "descriptionHtml": "<p>A broad linen dome balances a softly sculpted plaster stem.</p><p>W 58 × D 58 × H 154 cm</p>",
+      "vendor": "OpenRoom",
+      "tags": [
+        "Floor lamp",
+        "Linen and plaster",
+        "Warm ivory",
+        "Modern organic",
+        "Linen",
+        "Sculptural"
+      ],
+      "priceUsd": "349.00",
+      "sku": "linen-dome-lamp",
+      "imageUrl": "https://openroom-y20.pages.dev/demo/photo/products/linen-dome-lamp.webp",
+      "imageAlt": "Linen Dome Lamp",
+      "dimensionsCm": {
+        "width": 58,
+        "height": 154,
+        "depth": 58
+      }
+    },
+    {
+      "handle": "brass-globe-lamp",
+      "title": "Brass Globe Lamp",
+      "productType": "Floor lamp",
+      "descriptionHtml": "<p>An opal globe tops a precise aged-brass stem and base.</p><p>W 34 × D 34 × H 162 cm</p>",
+      "vendor": "OpenRoom",
+      "tags": [
+        "Floor lamp",
+        "Brass and glass",
+        "Aged brass",
+        "Mid century",
+        "Brass",
+        "Opal glass"
+      ],
+      "priceUsd": "319.00",
+      "sku": "brass-globe-lamp",
+      "imageUrl": "https://openroom-y20.pages.dev/demo/photo/products/brass-globe-lamp.webp",
+      "imageAlt": "Brass Globe Lamp",
+      "dimensionsCm": {
+        "width": 34,
+        "height": 162,
+        "depth": 34
+      }
+    },
+    {
+      "handle": "oak-tripod-lamp",
+      "title": "Oak Tripod Lamp",
+      "productType": "Floor lamp",
+      "descriptionHtml": "<p>Three splayed oak legs carry a narrow linen shade at reading height.</p><p>W 46 × D 46 × H 150 cm</p>",
+      "vendor": "OpenRoom",
+      "tags": [
+        "Floor lamp",
+        "Oak and linen",
+        "Light oak",
+        "Japandi",
+        "Tripod"
+      ],
+      "priceUsd": "269.00",
+      "sku": "oak-tripod-lamp",
+      "imageUrl": "https://openroom-y20.pages.dev/demo/photo/products/oak-tripod-lamp.webp",
+      "imageAlt": "Oak Tripod Lamp",
+      "dimensionsCm": {
+        "width": 46,
+        "height": 150,
+        "depth": 46
+      }
+    },
+    {
+      "handle": "ceramic-column-lamp",
+      "title": "Ceramic Column Lamp",
+      "productType": "Floor lamp",
+      "descriptionHtml": "<p>A hand-thrown ceramic column grounds a wide cotton drum shade.</p><p>W 40 × D 40 × H 158 cm</p>",
+      "vendor": "OpenRoom",
+      "tags": [
+        "Floor lamp",
+        "Ceramic and cotton",
+        "Chalk",
+        "Modern organic",
+        "Ceramic",
+        "Matte glaze"
+      ],
+      "priceUsd": "329.00",
+      "sku": "ceramic-column-lamp",
+      "imageUrl": "https://openroom-y20.pages.dev/demo/photo/products/ceramic-column-lamp.webp",
+      "imageAlt": "Ceramic Column Lamp",
+      "dimensionsCm": {
+        "width": 40,
+        "height": 158,
+        "depth": 40
+      }
+    },
+    {
+      "handle": "linen-drum-table-lamp",
+      "title": "Linen Drum Table Lamp",
+      "productType": "Floor lamp",
+      "descriptionHtml": "<p>A short oak stem under a straight linen drum, sized for a table.</p><p>W 28 × D 28 × H 46 cm</p>",
+      "vendor": "OpenRoom",
+      "tags": [
+        "Floor lamp",
+        "Linen and oak",
+        "Natural flax",
+        "Japandi",
+        "Linen",
+        "Table height"
+      ],
+      "priceUsd": "89.00",
+      "sku": "linen-drum-table-lamp",
+      "imageUrl": "https://openroom-y20.pages.dev/demo/photo/products/linen-drum-table-lamp.webp",
+      "imageAlt": "Linen Drum Table Lamp",
+      "dimensionsCm": {
+        "width": 28,
+        "height": 46,
+        "depth": 28
+      }
+    },
+    {
+      "handle": "ceramic-gourd-table-lamp",
+      "title": "Ceramic Gourd Table Lamp",
+      "productType": "Floor lamp",
+      "descriptionHtml": "<p>A rounded ceramic gourd base carries a soft cotton shade.</p><p>W 34 × D 34 × H 54 cm</p>",
+      "vendor": "OpenRoom",
+      "tags": [
+        "Floor lamp",
+        "Ceramic and cotton",
+        "Chalk white",
+        "Modern organic",
+        "Ceramic",
+        "Table height"
+      ],
+      "priceUsd": "149.00",
+      "sku": "ceramic-gourd-table-lamp",
+      "imageUrl": "https://openroom-y20.pages.dev/demo/photo/products/ceramic-gourd-table-lamp.webp",
+      "imageAlt": "Ceramic Gourd Table Lamp",
+      "dimensionsCm": {
+        "width": 34,
+        "height": 54,
+        "depth": 34
+      }
+    },
+    {
+      "handle": "brass-stem-table-lamp",
+      "title": "Brass Stem Table Lamp",
+      "productType": "Floor lamp",
+      "descriptionHtml": "<p>A slim aged-brass stem lifts an opal shade to reading height.</p><p>W 30 × D 30 × H 58 cm</p>",
+      "vendor": "OpenRoom",
+      "tags": [
+        "Floor lamp",
+        "Brass and opal glass",
+        "Aged brass",
+        "Mid century",
+        "Brass",
+        "Table height"
+      ],
+      "priceUsd": "189.00",
+      "sku": "brass-stem-table-lamp",
+      "imageUrl": "https://openroom-y20.pages.dev/demo/photo/products/brass-stem-table-lamp.webp",
+      "imageAlt": "Brass Stem Table Lamp",
+      "dimensionsCm": {
+        "width": 30,
+        "height": 58,
+        "depth": 30
+      }
+    },
+    {
+      "handle": "ash-lounge-chair",
+      "title": "Ash Lounge Chair",
+      "productType": "Chair",
+      "descriptionHtml": "<p>Sculpted ash arms frame a restrained woven lounge cushion.</p><p>W 74 × D 82 × H 76 cm</p>",
+      "vendor": "OpenRoom",
+      "tags": [
+        "Chair",
+        "Ash and wool",
+        "Oatmeal",
+        "Japandi",
+        "Ash",
+        "Woven"
+      ],
+      "priceUsd": "799.00",
+      "sku": "ash-lounge-chair",
+      "imageUrl": "https://openroom-y20.pages.dev/demo/photo/products/ash-lounge-chair.webp",
+      "imageAlt": "Ash Lounge Chair",
+      "dimensionsCm": {
+        "width": 74,
+        "height": 76,
+        "depth": 82
+      }
+    },
+    {
+      "handle": "boucle-barrel-chair",
+      "title": "Boucle Barrel Chair",
+      "productType": "Chair",
+      "descriptionHtml": "<p>A compact barrel chair with a rounded, tactile boucle shell.</p><p>W 82 × D 80 × H 75 cm</p>",
+      "vendor": "OpenRoom",
+      "tags": [
+        "Chair",
+        "Boucle",
+        "Ivory",
+        "Modern organic",
+        "Rounded"
+      ],
+      "priceUsd": "899.00",
+      "sku": "boucle-barrel-chair",
+      "imageUrl": "https://openroom-y20.pages.dev/demo/photo/products/boucle-barrel-chair.webp",
+      "imageAlt": "Boucle Barrel Chair",
+      "dimensionsCm": {
+        "width": 82,
+        "height": 75,
+        "depth": 80
+      }
+    },
+    {
+      "handle": "cognac-sling-chair",
+      "title": "Cognac Sling Chair",
+      "productType": "Chair",
+      "descriptionHtml": "<p>Cognac leather is suspended across an angular walnut frame.</p><p>W 72 × D 80 × H 78 cm</p>",
+      "vendor": "OpenRoom",
+      "tags": [
+        "Chair",
+        "Leather and walnut",
+        "Cognac",
+        "Mid century",
+        "Leather",
+        "Walnut"
+      ],
+      "priceUsd": "949.00",
+      "sku": "cognac-sling-chair",
+      "imageUrl": "https://openroom-y20.pages.dev/demo/photo/products/cognac-sling-chair.webp",
+      "imageAlt": "Cognac Sling Chair",
+      "dimensionsCm": {
+        "width": 72,
+        "height": 78,
+        "depth": 80
+      }
+    },
+    {
+      "handle": "oak-paper-cord-chair",
+      "title": "Oak Paper Cord Chair",
+      "productType": "Chair",
+      "descriptionHtml": "<p>Hand-wound paper cord seats a slender, almost weightless oak frame.</p><p>W 62 × D 60 × H 74 cm</p>",
+      "vendor": "OpenRoom",
+      "tags": [
+        "Chair",
+        "Oak and paper cord",
+        "Natural cream",
+        "Japandi",
+        "Paper cord",
+        "Oak"
+      ],
+      "priceUsd": "649.00",
+      "sku": "oak-paper-cord-chair",
+      "imageUrl": "https://openroom-y20.pages.dev/demo/photo/products/oak-paper-cord-chair.webp",
+      "imageAlt": "Oak Paper Cord Chair",
+      "dimensionsCm": {
+        "width": 62,
+        "height": 74,
+        "depth": 60
+      }
+    },
+    {
+      "handle": "shearling-swivel-chair",
+      "title": "Shearling Swivel Chair",
+      "productType": "Chair",
+      "descriptionHtml": "<p>A softly padded shearling shell turns on a low, brushed steel base.</p><p>W 86 × D 84 × H 78 cm</p>",
+      "vendor": "OpenRoom",
+      "tags": [
+        "Chair",
+        "Shearling and steel",
+        "Bone",
+        "Modern organic",
+        "Shearling",
+        "Swivel"
+      ],
+      "priceUsd": "999.00",
+      "sku": "shearling-swivel-chair",
+      "imageUrl": "https://openroom-y20.pages.dev/demo/photo/products/shearling-swivel-chair.webp",
+      "imageAlt": "Shearling Swivel Chair",
+      "dimensionsCm": {
+        "width": 86,
+        "height": 78,
+        "depth": 84
+      }
+    },
+    {
+      "handle": "ceramic-olive-tree",
+      "title": "Ceramic Olive Tree",
+      "productType": "Plant",
+      "descriptionHtml": "<p>A graceful olive tree planted in an off-white ceramic vessel.</p><p>W 88 × D 82 × H 170 cm</p>",
+      "vendor": "OpenRoom",
+      "tags": [
+        "Plant",
+        "Live plant and ceramic",
+        "Silvery green",
+        "Japandi",
+        "Olive",
+        "Ceramic"
+      ],
+      "priceUsd": "189.00",
+      "sku": "ceramic-olive-tree",
+      "imageUrl": "https://openroom-y20.pages.dev/demo/photo/products/ceramic-olive-tree.webp",
+      "imageAlt": "Ceramic Olive Tree",
+      "dimensionsCm": {
+        "width": 88,
+        "height": 170,
+        "depth": 82
+      }
+    },
+    {
+      "handle": "stone-planter-ficus",
+      "title": "Stone Planter Ficus",
+      "productType": "Plant",
+      "descriptionHtml": "<p>A lush ficus rises from a tactile pale stone planter.</p><p>W 100 × D 90 × H 180 cm</p>",
+      "vendor": "OpenRoom",
+      "tags": [
+        "Plant",
+        "Live plant and stone",
+        "Leaf green",
+        "Modern organic",
+        "Ficus",
+        "Stone"
+      ],
+      "priceUsd": "229.00",
+      "sku": "stone-planter-ficus",
+      "imageUrl": "https://openroom-y20.pages.dev/demo/photo/products/stone-planter-ficus.webp",
+      "imageAlt": "Stone Planter Ficus",
+      "dimensionsCm": {
+        "width": 100,
+        "height": 180,
+        "depth": 90
+      }
+    },
+    {
+      "handle": "teak-planter-palm",
+      "title": "Teak Planter Palm",
+      "productType": "Plant",
+      "descriptionHtml": "<p>Arching palm fronds stand in a raised slatted teak planter.</p><p>W 110 × D 100 × H 185 cm</p>",
+      "vendor": "OpenRoom",
+      "tags": [
+        "Plant",
+        "Live plant and teak",
+        "Leaf green",
+        "Mid century",
+        "Palm",
+        "Teak"
+      ],
+      "priceUsd": "209.00",
+      "sku": "teak-planter-palm",
+      "imageUrl": "https://openroom-y20.pages.dev/demo/photo/products/teak-planter-palm.webp",
+      "imageAlt": "Teak Planter Palm",
+      "dimensionsCm": {
+        "width": 110,
+        "height": 185,
+        "depth": 100
+      }
+    },
+    {
+      "handle": "stoneware-snake-plant",
+      "title": "Stoneware Snake Plant",
+      "productType": "Plant",
+      "descriptionHtml": "<p>Upright sansevieria blades stand in a matte stoneware cylinder.</p><p>W 46 × D 46 × H 110 cm</p>",
+      "vendor": "OpenRoom",
+      "tags": [
+        "Plant",
+        "Live plant and stoneware",
+        "Deep green",
+        "Japandi",
+        "Sansevieria",
+        "Stoneware"
+      ],
+      "priceUsd": "129.00",
+      "sku": "stoneware-snake-plant",
+      "imageUrl": "https://openroom-y20.pages.dev/demo/photo/products/stoneware-snake-plant.webp",
+      "imageAlt": "Stoneware Snake Plant",
+      "dimensionsCm": {
+        "width": 46,
+        "height": 110,
+        "depth": 46
+      }
+    },
+    {
+      "handle": "rattan-basket-fern",
+      "title": "Rattan Basket Fern",
+      "productType": "Plant",
+      "descriptionHtml": "<p>A full nest fern spills over the rim of a hand-woven rattan basket.</p><p>W 70 × D 68 × H 95 cm</p>",
+      "vendor": "OpenRoom",
+      "tags": [
+        "Plant",
+        "Live plant and rattan",
+        "Leaf green",
+        "Modern organic",
+        "Fern",
+        "Rattan"
+      ],
+      "priceUsd": "149.00",
+      "sku": "rattan-basket-fern",
+      "imageUrl": "https://openroom-y20.pages.dev/demo/photo/products/rattan-basket-fern.webp",
+      "imageAlt": "Rattan Basket Fern",
+      "dimensionsCm": {
+        "width": 70,
+        "height": 95,
+        "depth": 68
+      }
+    },
+    {
+      "handle": "oak-drum-side-table",
+      "title": "Oak Drum Side Table",
+      "productType": "Side table",
+      "descriptionHtml": "<p>A solid oak drum with a softened top edge, sized for a sofa arm.</p><p>W 45 × D 45 × H 55 cm</p>",
+      "vendor": "OpenRoom",
+      "tags": [
+        "Side table",
+        "Oak",
+        "Light oak",
+        "Japandi",
+        "Drum"
+      ],
+      "priceUsd": "279.00",
+      "sku": "oak-drum-side-table",
+      "imageUrl": "https://openroom-y20.pages.dev/demo/photo/products/oak-drum-side-table.webp",
+      "imageAlt": "Oak Drum Side Table",
+      "dimensionsCm": {
+        "width": 45,
+        "height": 55,
+        "depth": 45
+      }
+    },
+    {
+      "handle": "travertine-cube-side-table",
+      "title": "Travertine Cube Side Table",
+      "productType": "Side table",
+      "descriptionHtml": "<p>A quarried travertine cube that serves as a table or an extra seat.</p><p>W 40 × D 40 × H 45 cm</p>",
+      "vendor": "OpenRoom",
+      "tags": [
+        "Side table",
+        "Travertine",
+        "Ivory",
+        "Modern organic",
+        "Stone",
+        "Cube"
+      ],
+      "priceUsd": "399.00",
+      "sku": "travertine-cube-side-table",
+      "imageUrl": "https://openroom-y20.pages.dev/demo/photo/products/travertine-cube-side-table.webp",
+      "imageAlt": "Travertine Cube Side Table",
+      "dimensionsCm": {
+        "width": 40,
+        "height": 45,
+        "depth": 40
+      }
+    },
+    {
+      "handle": "black-steel-tray-table",
+      "title": "Black Steel Tray Table",
+      "productType": "Side table",
+      "descriptionHtml": "<p>A lift-off tray in a slim blackened frame, light enough to move often.</p><p>W 42 × D 42 × H 56 cm</p>",
+      "vendor": "OpenRoom",
+      "tags": [
+        "Side table",
+        "Steel",
+        "Black",
+        "Mid century",
+        "Blackened steel",
+        "Tray"
+      ],
+      "priceUsd": "219.00",
+      "sku": "black-steel-tray-table",
+      "imageUrl": "https://openroom-y20.pages.dev/demo/photo/products/black-steel-tray-table.webp",
+      "imageAlt": "Black Steel Tray Table",
+      "dimensionsCm": {
+        "width": 42,
+        "height": 56,
+        "depth": 42
+      }
+    },
+    {
+      "handle": "walnut-pedestal-side-table",
+      "title": "Walnut Pedestal Side Table",
+      "productType": "Side table",
+      "descriptionHtml": "<p>A turned walnut pedestal lifts a small round top to armrest height.</p><p>W 38 × D 38 × H 58 cm</p>",
+      "vendor": "OpenRoom",
+      "tags": [
+        "Side table",
+        "Walnut",
+        "Mid century",
+        "Pedestal"
+      ],
+      "priceUsd": "329.00",
+      "sku": "walnut-pedestal-side-table",
+      "imageUrl": "https://openroom-y20.pages.dev/demo/photo/products/walnut-pedestal-side-table.webp",
+      "imageAlt": "Walnut Pedestal Side Table",
+      "dimensionsCm": {
+        "width": 38,
+        "height": 58,
+        "depth": 38
+      }
+    },
+    {
+      "handle": "rattan-nesting-side-table",
+      "title": "Rattan Nesting Side Table",
+      "productType": "Side table",
+      "descriptionHtml": "<p>Two woven rattan tops nest together and pull apart when guests arrive.</p><p>W 50 × D 50 × H 52 cm</p>",
+      "vendor": "OpenRoom",
+      "tags": [
+        "Side table",
+        "Rattan and ash",
+        "Natural tan",
+        "Japandi",
+        "Rattan",
+        "Nesting"
+      ],
+      "priceUsd": "249.00",
+      "sku": "rattan-nesting-side-table",
+      "imageUrl": "https://openroom-y20.pages.dev/demo/photo/products/rattan-nesting-side-table.webp",
+      "imageAlt": "Rattan Nesting Side Table",
+      "dimensionsCm": {
+        "width": 50,
+        "height": 52,
+        "depth": 50
+      }
+    },
+    {
+      "handle": "oak-ladder-shelf",
+      "title": "Oak Ladder Shelf",
+      "productType": "Bookshelf",
+      "descriptionHtml": "<p>Five graduated oak shelves on a slim frame that leans to the wall.</p><p>W 60 × D 36 × H 180 cm</p>",
+      "vendor": "OpenRoom",
+      "tags": [
+        "Bookshelf",
+        "Oak",
+        "Light oak",
+        "Japandi",
+        "Leaning"
+      ],
+      "priceUsd": "449.00",
+      "sku": "oak-ladder-shelf",
+      "imageUrl": "https://openroom-y20.pages.dev/demo/photo/products/oak-ladder-shelf.webp",
+      "imageAlt": "Oak Ladder Shelf",
+      "dimensionsCm": {
+        "width": 60,
+        "height": 180,
+        "depth": 36
+      }
+    },
+    {
+      "handle": "walnut-low-shelf",
+      "title": "Walnut Low Shelf",
+      "productType": "Bookshelf",
+      "descriptionHtml": "<p>A credenza-height walnut case for books, low enough to see across.</p><p>W 120 × D 38 × H 112 cm</p>",
+      "vendor": "OpenRoom",
+      "tags": [
+        "Bookshelf",
+        "Walnut",
+        "Mid century",
+        "Credenza height"
+      ],
+      "priceUsd": "899.00",
+      "sku": "walnut-low-shelf",
+      "imageUrl": "https://openroom-y20.pages.dev/demo/photo/products/walnut-low-shelf.webp",
+      "imageAlt": "Walnut Low Shelf",
+      "dimensionsCm": {
+        "width": 120,
+        "height": 112,
+        "depth": 38
+      }
+    },
+    {
+      "handle": "white-oak-cube-storage",
+      "title": "White Oak Cube Storage",
+      "productType": "Bookshelf",
+      "descriptionHtml": "<p>Nine open cubes in pale oak, sized for records and baskets.</p><p>W 90 × D 36 × H 150 cm</p>",
+      "vendor": "OpenRoom",
+      "tags": [
+        "Bookshelf",
+        "White oak",
+        "Pale oak",
+        "Modern organic",
+        "Modular"
+      ],
+      "priceUsd": "699.00",
+      "sku": "white-oak-cube-storage",
+      "imageUrl": "https://openroom-y20.pages.dev/demo/photo/products/white-oak-cube-storage.webp",
+      "imageAlt": "White Oak Cube Storage",
+      "dimensionsCm": {
+        "width": 90,
+        "height": 150,
+        "depth": 36
+      }
+    },
+    {
+      "handle": "steel-and-ash-etagere",
+      "title": "Steel and Ash Etagere",
+      "productType": "Bookshelf",
+      "descriptionHtml": "<p>Blackened steel uprights hold four floating ash shelves.</p><p>W 84 × D 34 × H 190 cm</p>",
+      "vendor": "OpenRoom",
+      "tags": [
+        "Bookshelf",
+        "Steel and ash",
+        "Black",
+        "Mid century",
+        "Blackened steel",
+        "Etagere"
+      ],
+      "priceUsd": "799.00",
+      "sku": "steel-and-ash-etagere",
+      "imageUrl": "https://openroom-y20.pages.dev/demo/photo/products/steel-and-ash-etagere.webp",
+      "imageAlt": "Steel and Ash Etagere",
+      "dimensionsCm": {
+        "width": 84,
+        "height": 190,
+        "depth": 34
+      }
+    },
+    {
+      "handle": "hinoki-open-bookcase",
+      "title": "Hinoki Open Bookcase",
+      "productType": "Bookshelf",
+      "descriptionHtml": "<p>An open-backed hinoki case that reads light against a plain wall.</p><p>W 96 × D 32 × H 176 cm</p>",
+      "vendor": "OpenRoom",
+      "tags": [
+        "Bookshelf",
+        "Hinoki",
+        "Natural cream",
+        "Japandi",
+        "Open back"
+      ],
+      "priceUsd": "949.00",
+      "sku": "hinoki-open-bookcase",
+      "imageUrl": "https://openroom-y20.pages.dev/demo/photo/products/hinoki-open-bookcase.webp",
+      "imageAlt": "Hinoki Open Bookcase",
+      "dimensionsCm": {
+        "width": 96,
+        "height": 176,
+        "depth": 32
+      }
+    }
+  ]
+}
