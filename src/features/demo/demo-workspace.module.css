@@ -47,8 +47,14 @@
   min-width: 0;
 }
 
+.roomName {
+  margin: 0;
+  font-size: 0.82rem;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
 .roomIdentity strong,
-.providerStatus strong,
 .roomTotal strong {
   font-size: 0.82rem;
   font-weight: 700;
@@ -56,7 +62,6 @@
 }
 
 .roomIdentity span,
-.providerStatus small,
 .roomTotal small {
   color: var(--muted-text);
   font-size: 0.68rem;
@@ -68,36 +73,12 @@
   height: 100%;
 }
 
-.providerStatus,
-.roomTotal {
-  display: flex;
-  align-items: center;
-  height: 38px;
-}
-
-.providerStatus {
-  gap: 9px;
-  padding: 0 20px;
-  border-right: 1px solid var(--warm-divider);
-}
-
-.providerStatus > span:last-child,
 .roomTotal {
   display: grid;
+  align-content: center;
   gap: 2px;
-}
-
-.statusDot {
-  width: 8px;
-  height: 8px;
-  border: 2px solid var(--paper);
-  border-radius: 50%;
-  background: var(--moss);
-  box-shadow: 0 0 0 1px var(--moss);
-}
-
-.roomTotal {
   min-width: 92px;
+  height: 38px;
   padding: 0 20px;
 }
 

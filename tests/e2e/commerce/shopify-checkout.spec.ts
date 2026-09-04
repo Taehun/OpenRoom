@@ -139,7 +139,7 @@ test("opens a Shopify cart permalink in a new tab without any request from OpenR
   await replaceWith(page, "floor_lamp", "rice-paper-floor-lamp");
 
   // The header cart is the room, so it opens the same draft the tool builds.
-  await page.getByRole("button", { name: "View cart" }).click();
+  await page.getByRole("button", { name: /^View cart/ }).click();
 
   const dialog = page.getByRole("dialog", { name: "Review your room" });
   await expect(dialog).toBeVisible();

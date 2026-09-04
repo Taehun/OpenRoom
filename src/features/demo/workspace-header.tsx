@@ -13,7 +13,6 @@ interface WorkspaceHeaderProps {
   dispatch: Dispatch<DemoAction>;
   /** Set only by the adaptive home page, which also hosts the guide. */
   guideHref?: string | undefined;
-  provider: string;
   roomTotalMinor: number;
   scene: Scene;
 }
@@ -34,7 +33,6 @@ export function WorkspaceHeader({
   canUndo,
   dispatch,
   guideHref,
-  provider,
   roomTotalMinor,
   scene,
 }: WorkspaceHeaderProps) {
@@ -48,19 +46,12 @@ export function WorkspaceHeader({
         </Link>
         <span className={styles.headerDivider} aria-hidden="true" />
         <div className={styles.roomIdentity}>
-          <strong>Living room</strong>
+          <h1 className={styles.roomName}>Living room</h1>
           <span>Revision {scene.revision}</span>
         </div>
       </div>
 
       <div className={styles.headerStatus}>
-        <div className={styles.providerStatus}>
-          <span className={styles.statusDot} aria-hidden="true" />
-          <span>
-            <small>Showing</small>
-            <strong>{provider}</strong>
-          </span>
-        </div>
         <div className={styles.roomTotal}>
           <small>Room total</small>
           <strong>{formatRoomTotal(roomTotalMinor)}</strong>
@@ -79,6 +70,7 @@ export function WorkspaceHeader({
           </a>
         ) : null}
         <button
+          aria-keyshortcuts="Meta+Z Control+Z"
           className={`md-button md-button--text ${styles.quietButton}`}
           disabled={!canUndo}
           onClick={() => dispatch({ type: "undo" })}
@@ -98,7 +90,11 @@ export function WorkspaceHeader({
           <span>Reset demo</span>
         </button>
         <button
-          aria-label="View cart"
+          aria-label={
+            cartCount > 0
+              ? `View cart, ${cartCount} item${cartCount === 1 ? "" : "s"}`
+              : "View cart, empty"
+          }
           className={`md-button md-button--filled ${styles.cartButton}`}
           onClick={() => dispatch({ type: "open-cart" })}
           ref={cartButtonRef}

@@ -238,7 +238,7 @@ test("opens an empty cart for a room that holds no catalog product yet", async (
   render(<DemoWorkspace />);
 
   // The seed room is placeholders only, so the badge is absent, not zero.
-  const viewCart = screen.getByRole("button", { name: "View cart" });
+  const viewCart = screen.getByRole("button", { name: /^View cart/ });
   expect(within(viewCart).queryByText(/^\d+$/)).toBeNull();
   await user.click(viewCart);
 
@@ -264,7 +264,7 @@ test("dismisses the approval announcement after four seconds", () => {
     fireEvent.click(
       screen.getByRole("button", { name: "Place Oak Frame Table in room" }),
     );
-    fireEvent.click(screen.getByRole("button", { name: "View cart" }));
+    fireEvent.click(screen.getByRole("button", { name: /^View cart/ }));
     const sheet = screen.getByRole("dialog", { name: "Review your room" });
     fireEvent.click(
       within(sheet).getByRole("button", { name: "Approve demo cart · $169" }),
@@ -291,7 +291,7 @@ test("counts the room's products in the badge and approves them without an exter
   render(<DemoWorkspace />);
   await previewOakFrameTable(user);
 
-  const viewCart = screen.getByRole("button", { name: "View cart" });
+  const viewCart = screen.getByRole("button", { name: /^View cart/ });
   expect(within(viewCart).getByText("1")).toBeVisible();
   await user.click(viewCart);
 
@@ -322,7 +322,7 @@ test("keeps keyboard focus inside the cart approval sheet", async () => {
   render(<DemoWorkspace />);
   await previewOakFrameTable(user);
 
-  await user.click(screen.getByRole("button", { name: "View cart" }));
+  await user.click(screen.getByRole("button", { name: /^View cart/ }));
 
   const sheet = screen.getByRole("dialog", { name: "Review your room" });
   const close = within(sheet).getByRole("button", {
@@ -348,7 +348,7 @@ test("hides the workspace from assistive technology and restores the cart trigge
   const user = userEvent.setup();
   render(<DemoWorkspace />);
 
-  const viewCart = screen.getByRole("button", { name: "View cart" });
+  const viewCart = screen.getByRole("button", { name: /^View cart/ });
   await user.click(viewCart);
 
   expect(
@@ -371,7 +371,7 @@ test("Escape closes the cart before clearing the selected object", async () => {
   });
   expect(coffeeTable).toHaveAttribute("aria-pressed", "true");
 
-  await user.click(screen.getByRole("button", { name: "View cart" }));
+  await user.click(screen.getByRole("button", { name: /^View cart/ }));
   await user.keyboard("{Escape}");
   expect(
     screen.queryByRole("dialog", { name: "Review your room" }),
