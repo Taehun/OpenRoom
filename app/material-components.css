@@ -92,10 +92,26 @@
   padding-inline: 16px;
 }
 
-/* Dense: for bars with a fixed height budget, such as the composer. */
+/*
+ * Dense: for bars with a fixed height budget, such as the composer. It keeps
+ * the 32px look and buys back the 40px pointer target with a transparent
+ * overlay, so the row's height budget is unchanged and the control is still
+ * comfortably hittable.
+ */
 .md-button--dense {
+  position: relative;
   height: 32px;
   padding-inline: 16px;
+  /* `.md-button` clips to the pill so the state layer stays inside it; the
+     target overlay has to reach past that edge, and the state layer is already
+     inset with an inherited radius, so nothing else needs the clip. */
+  overflow: visible;
+}
+
+.md-button--dense::after {
+  position: absolute;
+  content: "";
+  inset: -4px 0;
 }
 
 /*
