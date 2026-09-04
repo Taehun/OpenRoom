@@ -47,8 +47,7 @@ pnpm mcp:openroom ──── HTTP on 127.0.0.1 only ────► OpenRoom p
    ```
 
    Where that text lands depends on the client, because the client owns the
-   process: Claude Desktop writes it to its MCP server log, while Claude Code
-   and Codex CLI keep it out of the way. For those two, register the companion
+   process: The client keeps it out of the way, so register the companion
    behind the one-line stderr log wrapper under [Client
    configuration](#client-configuration) and read the code from the log file it
    appends to (`tail -f ~/openroom-mcp.log`). Starting a second companion in
@@ -140,17 +139,18 @@ Add this to `claude_desktop_config.json` (Settings → Developer → Edit Config
 {
   "mcpServers": {
     "openroom": {
-      "command": "pnpm",
+      "command": "sh",
       "args": [
-        "--silent",
-        "--dir",
-        "/Users/taehun/Projects/WebMCP",
-        "mcp:openroom"
+        "-c",
+        "exec pnpm --silent --dir /Users/taehun/Projects/WebMCP mcp:openroom 2>>\"$HOME/openroom-mcp.log\""
       ]
     }
   }
 }
 ```
+
+Read the pair code with `tail -f ~/openroom-mcp.log`, exactly as for Claude
+Code.
 
 ### Codex CLI
 

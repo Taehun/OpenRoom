@@ -124,15 +124,28 @@ describe("the one-screen guide", () => {
     ).toBeVisible();
 
     const connect = screen.getByRole("region", { name: "Connect an AI app" });
+    // Every card ends at the same demo, so one link sits under the grid.
     expect(
       within(connect).getAllByRole("link", { name: "Open the demo" }),
-    ).toHaveLength(3);
+    ).toHaveLength(1);
+    // Claude Desktop has no `mcp add`, so it gets the config block instead.
+    for (const card of ["Claude Code", "Claude Desktop", "Codex CLI"])
+      expect(within(connect).getByRole("article", { name: card })).toBeVisible();
     expect(within(connect).getByText(commandText(CONNECT_COMMANDS.claude))).toBeVisible();
     expect(within(connect).getByText(commandText(CONNECT_COMMANDS.codex))).toBeVisible();
-    // Each CLI card tails the log the registered command appends to.
+    expect(
+      within(connect).getByText(commandText(CONNECT_COMMANDS.claudeDesktop)),
+    ).toBeVisible();
+    // Each companion card tails the log its registered command appends to.
     expect(
       within(connect).getAllByText(commandText(CONNECT_COMMANDS.log)),
-    ).toHaveLength(2);
+    ).toHaveLength(3);
+    // The in-app browser card installs nothing; it hands over this address.
+    expect(
+      within(connect).getByRole("button", {
+        name: "Copy the OpenRoom address",
+      }),
+    ).toBeVisible();
     // The client starts the companion, so the guide never asks the reader to
     // run a second one: that fails with EADDRINUSE or pairs nothing.
     expect(within(connect).queryByText("pnpm mcp:openroom")).toBeNull();
@@ -250,9 +263,7 @@ describe("the one-screen guide", () => {
     );
     expect(screen.getByRole("button", { name: "Copied" })).toBeVisible();
 
-    const claudeCard = screen.getByRole("article", {
-      name: "Claude Code & Claude Desktop",
-    });
+    const claudeCard = screen.getByRole("article", { name: "Claude Code" });
     const copies = within(claudeCard).getAllByRole("button", { name: /^Copy Claude/ });
     expect(copies).toHaveLength(2);
     // The client launches the companion: the first step registers it behind
@@ -261,6 +272,20 @@ describe("the one-screen guide", () => {
     expect(writeText).toHaveBeenLastCalledWith(CONNECT_COMMANDS.claude);
     await user.click(copies[1]!);
     expect(writeText).toHaveBeenLastCalledWith(CONNECT_COMMANDS.log);
+
+    const desktopCard = screen.getByRole("article", { name: "Claude Desktop" });
+    await user.click(
+      within(desktopCard).getByRole("button", {
+        name: "Copy the Claude Desktop configuration",
+      }),
+    );
+    expect(writeText).toHaveBeenLastCalledWith(CONNECT_COMMANDS.claudeDesktop);
+
+    // The in-app browser card copies the address the reader is already on.
+    await user.click(
+      screen.getByRole("button", { name: "Copy the OpenRoom address" }),
+    );
+    expect(writeText).toHaveBeenLastCalledWith(window.location.origin);
   });
 
   it("lists the six agent tools from the core manifest", () => {
@@ -416,9 +441,10 @@ test("points a browser without WebMCP at the local companion dashboard", async (
   }))
     expect(dashboard).toHaveAttribute("href", "/?view=dashboard");
   expect(
-    within(connect).getByRole("article", {
-      name: "Claude Code & Claude Desktop",
-    }),
+    within(connect).getByRole("article", { name: "Claude Code" }),
+  ).toBeVisible();
+  expect(
+    within(connect).getByRole("article", { name: "Claude Desktop" }),
   ).toBeVisible();
   expect(screen.queryByRole("main", { name: "Room canvas" })).toBeNull();
 });
