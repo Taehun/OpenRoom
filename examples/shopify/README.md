@@ -350,7 +350,7 @@ collections directly from the theme, so it works before the menus are written.
 | `missing SHOPIFY_STORE_DOMAIN, …` (exit code 2) | The keys are not in the environment or in `.env.local` at the repository root. |
 | `<handle> is not in the store — run pnpm shop:seed` | `pnpm shop:variants` found no product at that handle. Seed first, or import the CSV. |
 | `Theme Check` reports `JSONMissingBlock` | A block type in a template JSON is not allowed by its parent block's schema. Read the parent's `{% schema %}` in `theme/blocks/` — static blocks are keyed by their own name and stay out of `block_order`. |
-| A setting silently reverts in the theme editor | Its value is not one of the options in `theme/config/settings_schema.json`. Theme Check does not validate setting values; compare against the schema before pushing. |
+| A setting silently reverts in the theme editor | Its value is not one of the options in `theme/config/settings_schema.json`. Theme Check does not validate setting values — `tests/unit/shopify-theme-settings.test.ts` does, so `pnpm test` catches it before a push. |
 | `pnpm shop:collections` says a collection is missing | The store was never seeded, or the category is new. Run `pnpm shop:seed` first — this script never creates collections. |
 
 ## Safety
