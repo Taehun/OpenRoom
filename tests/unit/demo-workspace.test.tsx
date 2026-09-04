@@ -865,7 +865,7 @@ test("keeps a rejected pairing inside the dialog", async () => {
   await waitFor(() =>
     expect(
       within(dialog).getByText(
-        "Pairing was rejected. Check the code and try again.",
+        "That code didn't match. Copy the newest six digits from ~/openroom-mcp.log and try again.",
       ),
     ).toBeVisible(),
   );
@@ -874,6 +874,59 @@ test("keeps a rejected pairing inside the dialog", async () => {
     screen.getByRole("status", { name: "Desktop AI app status" })
       .textContent,
   ).toBe("Desktop AI app: Not connected");
+});
+
+// Nothing was listening, so the code was never read: telling the operator to
+// check it sends them back to a log with nothing new in it.
+test("blames the missing companion rather than the code when nothing answers", async () => {
+  vi.spyOn(globalThis, "fetch").mockRejectedValue(
+    new TypeError("Failed to fetch"),
+  );
+  const user = userEvent.setup();
+  render(<DemoWorkspace />);
+
+  await user.click(openPairingDialog());
+  const dialog = screen.getByRole("dialog", { name: "Connect an AI app" });
+  const code = within(dialog).getByRole("textbox", { name: "Pairing code" });
+  await user.type(code, "123456");
+  await user.click(within(dialog).getByRole("button", { name: "Connect" }));
+
+  const note = await within(dialog).findByRole("alert");
+  expect(note).toHaveTextContent(
+    "Nothing answered on port 43110. Start a chat in your AI app so it launches the companion, then try again.",
+  );
+  expect(code).toHaveAttribute("aria-invalid", "true");
+  expect(code).toHaveAccessibleDescription(
+    "Type the six-digit code the companion wrote to ~/openroom-mcp.log. Nothing answered on port 43110. Start a chat in your AI app so it launches the companion, then try again.",
+  );
+  // The field takes the keyboard back with the code selected, and Connect is
+  // still there to press again.
+  expect(code).toHaveFocus();
+  expect(within(dialog).getByRole("button", { name: "Connect" })).toBeEnabled();
+});
+
+test("Enter submits the code", async () => {
+  const server = new FakeRelayServer();
+  vi.spyOn(globalThis, "fetch").mockImplementation(server.fetch);
+  const user = userEvent.setup();
+  render(<DemoWorkspace />);
+
+  await user.click(openPairingDialog());
+  await user.type(
+    within(
+      screen.getByRole("dialog", { name: "Connect an AI app" }),
+    ).getByRole("textbox", { name: "Pairing code" }),
+    "123456{Enter}",
+  );
+
+  await waitFor(() =>
+    expect(
+      screen.getByRole("status", { name: "Desktop AI app status" }).textContent,
+    ).toBe("Desktop AI app: Connected"),
+  );
+  expect(
+    screen.queryByRole("dialog", { name: "Connect an AI app" }),
+  ).not.toBeInTheDocument();
 });
 
 test("clears a stale failure and the code when the dialog is reopened", async () => {
@@ -893,7 +946,7 @@ test("clears a stale failure and the code when the dialog is reopened", async ()
   await waitFor(() =>
     expect(
       within(dialog).getByText(
-        "Pairing was rejected. Check the code and try again.",
+        "That code didn't match. Copy the newest six digits from ~/openroom-mcp.log and try again.",
       ),
     ).toBeVisible(),
   );
@@ -904,7 +957,7 @@ test("clears a stale failure and the code when the dialog is reopened", async ()
   const reopened = screen.getByRole("dialog", { name: "Connect an AI app" });
   expect(
     within(reopened).queryByText(
-      "Pairing was rejected. Check the code and try again.",
+      "That code didn't match. Copy the newest six digits from ~/openroom-mcp.log and try again.",
     ),
   ).not.toBeInTheDocument();
   expect(

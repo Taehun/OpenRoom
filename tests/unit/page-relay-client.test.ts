@@ -163,6 +163,28 @@ describe("PageRelayClient pairing", () => {
     expect(server.polls).toHaveLength(0);
   });
 
+  // A refused request never reached a relay, which the browser can see for
+  // itself — so it is never reported as a bad code.
+  test("separates an unreachable companion from a refused code", async () => {
+    const statuses: LocalMcpStatus[] = [];
+    const failure = vi.fn(async () => {
+      throw new TypeError("Failed to fetch");
+    });
+    const client = new PageRelayClient({
+      origin: PAGE_ORIGIN,
+      fetchImpl: failure as unknown as typeof fetch,
+      onCall: async () => okResult("unused"),
+      onStatus: (status) => statuses.push(status),
+    });
+
+    await expect(client.pair("123456", TEST_MANIFEST_HASH)).rejects.toMatchObject(
+      { code: "COMPANION_UNREACHABLE", message: "COMPANION_UNREACHABLE" },
+    );
+    expect(statuses).toEqual(["pairing", "not-connected"]);
+    // One request, the pair attempt; a failed pair never starts a poll.
+    expect(failure).toHaveBeenCalledTimes(1);
+  });
+
   test("rejects with INSECURE_CONTEXT when web crypto is unavailable", async () => {
     vi.stubGlobal("crypto", {});
     const { server, client } = createHarness();
