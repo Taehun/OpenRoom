@@ -483,7 +483,7 @@ Owner actions still open:
 
 ## 2026-09-04 early-morning changes (hackathon push)
 
-Merged and deployed to https://openroom.taehun.workers.dev, in order:
+Merged and deployed (the site then ran on Cloudflare Workers; it now runs on Pages), in order:
 
 - **Catalog expansion** (`b3e1bab`): `side_table` and `bookshelf` types; 40
   products (8 × 5) plus three table-height lamps (43 cutouts); `pnpm
@@ -558,3 +558,46 @@ Open: README/docs staleness sweep beyond the catalog counts (check
 `docs/local-mcp.md` lifecycle wording and `docs/asset-views.md` category list);
 re-run the QA panel (`Workflow` resume `wf_3bcd85e6-f1c`) for a fresh
 findings file; the remaining Minor items in `output/qa/findings.md`.
+
+## 2026-09-04 late morning: second design QA, then the move to Pages
+
+**Design QA pass 2** (`output/qa/findings-2.md`, from a 25-agent workflow):
+51 of the first pass's findings are gone, 66 still reproduce, 88 new ones were
+raised, 16 verified. Everything in Wave 1 and Wave 2 of its plan has landed:
+
+- **Regressions fixed:** the rotate handle was unreachable (the cutout's inline
+  z-index covered it — stacking now lives on the frame and the handle is
+  pointer-only); focus and selection now have separate ring vocabularies and
+  Escape hands focus back to the rail; a lamp on a table stands on the drawn
+  tabletop (`supportedTopOffset`).
+- **Chrome:** the object rail shows each piece's cutout with its name; the
+  header lost the provider block and the room name is the page's `h1`; the
+  cart sheet's empty state is one calm action; the composer lost its static
+  style chips.
+- **Guide:** the hero carries a caption, the banner says where the flag address
+  goes, and four connect cards (ChatGPT/Codex app, Claude Code, Claude Desktop
+  with its JSON, Codex CLI) replace the three that only worked for Claude Code.
+- **Interaction:** the Move tool is gone (Select drags and nudges), turning a
+  piece no longer walks it across the floor, radial pieces lose the rotate
+  handle, and the approximate-view pill moved into the inspector.
+- **Accessibility:** room shortcuts no longer fire inside the pairing dialog,
+  changes are announced, pairing failures name the real cause, and targets are
+  40 px with 12 px text.
+- **Seed room** (`1ae2179`): the lamp took the sofa's front-left corner (it
+  looked embedded in the sofa's arm), the table gained a 0.3 m walkway, and the
+  chair moved left. The plant stays behind the chair: the room is 2.72 m deep,
+  the sofa owns the back band, and moving the lamp there instead breaks
+  `expectLampVisibleBeyondChair`.
+
+**Deployment moved to Cloudflare Pages only.** The site is
+[openroom-webmcp.pages.dev](https://openroom-webmcp.pages.dev)
+(`openroom.pages.dev` and `open-room.pages.dev` belong to other accounts). The
+`openroom` Worker has been deleted, CI no longer deploys anything, and the
+owner wires the Pages Git integration up by hand. `app/manifest.ts` needs
+`export const dynamic = "force-static"` for the export; any new metadata route
+does too. The older `openroom` Pages project (openroom-y20.pages.dev) is still
+Git-connected and can be deleted once the new project is wired up.
+
+Open: the QA plan's Wave 3 (docs sweep, stage composition polish, agent-facing
+strings, radii/rhythm) in `output/qa/findings-2.md`; the Shopify seed kit has
+still never run against a real store.
