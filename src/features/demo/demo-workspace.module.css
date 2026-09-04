@@ -838,7 +838,9 @@
 .copyStatusError {
   position: absolute;
   right: 14px;
-  bottom: 13px;
+  /* The two-line failure note is taller at label-medium, so it is anchored
+     closer to the composer's edge and still clears the copy button. */
+  bottom: 6px;
   max-width: 168px;
   padding: 5px 7px;
   border-radius: var(--md-sys-shape-corner-extra-small);
