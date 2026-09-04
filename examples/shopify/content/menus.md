@@ -1,9 +1,10 @@
 # Navigation menus
 
-The app's Admin API scopes cover products and publications only, so menus
-cannot be written from this repository — `write_online_store_navigation` is not
-granted. Enter these by hand in **Online Store → Navigation**, or add the scope
-and turn this file into script input.
+`pnpm shop:content` writes both menus, provided the app has
+`write_online_store_navigation`. The structure it sends lives in
+`../src/navigation.ts`; this file is the readable mirror of it, and what to
+type into **Online Store → Navigation** by hand when the scope is absent. A
+unit test asserts the two agree on every collection handle.
 
 Shopify creates two menus on a new store: `main-menu` (handle `main-menu`) and
 `Footer menu` (handle `footer`). The theme's header uses `main-menu`; the

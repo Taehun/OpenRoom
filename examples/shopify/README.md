@@ -1,7 +1,7 @@
 # Shopify furniture store seed kit
 
-OpenRoom's `shopify` mode is token-free: it builds a cart permalink and points
-agents at the store's UCP MCP endpoint, and it never holds a credential.
+Connected OpenRoom commerce is token-free: it builds cart and product links,
+points agents at the store's UCP MCP endpoint, and never holds a credential.
 What it does need is a store that actually carries the 43 demo products, so the
 variant ids in `NEXT_PUBLIC_SHOPIFY_VARIANTS` resolve to something real.
 
@@ -136,29 +136,43 @@ it). This path needs no credential at all.
 5. Run `pnpm shop:variants --write` to build the map. It only reads, so an app
    with just `read_products` is enough for this path.
 
-## Switch OpenRoom to Shopify mode
+## Connect OpenRoom to this store
 
-Add these three to `.env.local` at the repository root:
+To make this store the build default, add these public values to `.env.local`
+at the repository root:
 
 ```bash
-NEXT_PUBLIC_COMMERCE_PROVIDER=shopify
 NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN=your-store.myshopify.com
 NEXT_PUBLIC_SHOPIFY_VARIANTS=…      # written by pnpm shop:variants --write
+NEXT_PUBLIC_SITE_ORIGIN=https://openroom.example
 ```
 
-All three are **inlined at build time**, so rebuild after changing any of them:
+The domain is what makes the build connected; without one, OpenRoom is
+unconfigured. The variant map and site origin are optional. These build values
+are **inlined at build time**, so rebuild after changing any of them:
 
 ```bash
 pnpm build          # or pnpm build:pages for the static export
 ```
 
-In `shopify` mode the approval sheet still opens locally for every
-`add_scene_to_cart`, and OpenRoom still makes no external request. **Continue to
-Shopify** opens `https://<store>/cart/<variantNumericId>:<qty>,…` in a new tab;
-products with no mapping are listed as `Not mapped to a Shopify variant` and
-left out. The tool's `draft.commerce` block carries the same lines plus
-`mcpEndpoint` (`https://<store>/api/ucp/mcp`) for an agent that would rather
-build the cart itself.
+The header store chip can switch the running page without a rebuild. It shows
+the connected domain, or **Connect a store** when unconfigured. Saving an
+address normalizes it, probes the store's cart tools, and remembers it in this
+browser; **Use the sample store** clears that choice and returns to the build
+default.
+
+When connected, the approval sheet opens locally for every
+`add_scene_to_cart`. **Continue to Shopify** opens
+`https://<store>/cart/<variantNumericId>:<qty>,…` in a new tab; products with no
+mapping are listed as `Not mapped to a Shopify variant`, and a room with no
+mapped variants offers per-product handle links instead. The tool's
+`draft.commerce` block carries the same lines plus `mcpEndpoint`
+(`https://<store>/api/ucp/mcp`) and a link for every requested product.
+
+OpenRoom's only external request is the unauthenticated `tools/list` probe sent
+when a person presses **Save** in the store popover. It sends no credential.
+Page load, editing, product search, and `add_scene_to_cart` issue no request to
+the store.
 
 Shopify stopped serving the old `/api/mcp` cart tools on 31 August 2026; that
 endpoint now lists only `search_shop_policies_and_faqs`, and `get_cart` answers
@@ -280,18 +294,43 @@ It never creates a collection — that is the seeder's job. A collection it
 cannot find is reported and skipped, which is what a store that was never
 seeded looks like. `--dry-run` prints the plan and sends nothing.
 
-### Menus and pages
+### `pnpm shop:content` — menus and pages
 
-These need two scopes the app does not have — `write_online_store_navigation`
-and `write_online_store_pages` — so they ship as source files to enter by hand:
+Shopify ships a new store with `main-menu` holding Home / Catalog / Contact and
+`footer` holding Search. The theme's header renders whatever `main-menu` holds,
+so until it is rewritten the storefront reads as an unfinished template no
+matter how good the theme is.
 
-- `content/menus.md` — the main and footer menus, with the collection handles
-  the seeder created.
-- `content/pages/` — About, Shipping, Returns, and Privacy, as HTML bodies to
-  paste into **Online Store → Pages**.
+This writes both, and the four pages they link to:
 
-Add those two scopes to the Dev Dashboard app and these become script input
-rather than copy-paste; nothing about the content changes.
+1. Upserts About, Shipping, Returns, and Privacy from `content/pages/*.md` —
+   the title comes from each file's `# Heading`, the body from the rest.
+2. Resolves the collection and page ids the menu items point at.
+3. Rewrites `main-menu` and `footer` **in place**. Updating rather than
+   creating matters: the theme is bound to those two handles, and a second menu
+   called `main-menu-1` would render nowhere.
+
+Menu items are typed, not hand-written URLs — a category is a `COLLECTION` item
+carrying the collection's resource id, so a link to something the store does
+not carry fails in the script instead of 404ing for a shopper.
+
+It needs **two scopes beyond the seeder's**:
+
+```text
+read_products,write_products,write_publications,write_online_store_navigation,write_online_store_pages
+```
+
+Add them in the Dev Dashboard (Versions → scopes → **Release**), reinstall the
+app on the store, and mint a fresh token. Without them the Admin API answers
+403 and the script says which scopes are missing.
+
+If you would rather not touch the scopes, `content/menus.md` and
+`content/pages/` are the same content in readable form — type them into
+**Online Store → Navigation** and **Pages**. A unit test keeps `menus.md` and
+`src/navigation.ts` agreeing on every collection handle.
+
+The footer's "Shop" column does not depend on any of this: it links the eight
+collections directly from the theme, so it works before the menus are written.
 
 ## Troubleshooting
 
@@ -317,9 +356,10 @@ rather than copy-paste; nothing about the content changes.
   in error messages. A token from the client credentials grant expires on its
   own after 24 hours, which limits the damage of a leaked one; the client
   secret does not, so treat it as the real credential.
-- OpenRoom itself never holds the token. The app's Shopify mode is three
-  `NEXT_PUBLIC_*` values, all of them public by construction, and it makes no
-  request to the store from its own code.
+- OpenRoom itself never holds the token. Its build default and browser-stored
+  choice are public store domains. The app issues only an unauthenticated
+  `tools/list` request when a person saves the store chip; page load, editing,
+  and `add_scene_to_cart` issue none.
 - Nothing in this folder runs in CI, and no test here reaches the network: the
   unit suite drives a fake Admin client, and `--dry-run` sends nothing.
 - Point this at a **development store**. It writes products, and it is not a
