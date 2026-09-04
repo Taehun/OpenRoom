@@ -8,6 +8,7 @@ import {
   within,
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { StrictMode } from "react";
 import { afterEach, expect, test, vi } from "vitest";
 import { createDemoScene } from "../../src/demo/demo-scene";
 import {
@@ -1131,10 +1132,15 @@ test("Back moves focus to the inspector title", async () => {
 });
 
 // The heading only catches focus a pressed control dropped: a click on the
-// photo keeps it on the cutout, and the first render never steals it.
+// photo keeps it on the cutout, and the first render never steals it — not
+// even under Strict Mode, which runs the effect twice on the same mount.
 test("leaves focus alone when the selection changes from the photo", async () => {
   const user = userEvent.setup();
-  render(<DemoWorkspace />);
+  render(
+    <StrictMode>
+      <DemoWorkspace />
+    </StrictMode>,
+  );
 
   expect(document.body).toHaveFocus();
 

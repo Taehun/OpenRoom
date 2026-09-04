@@ -337,22 +337,24 @@ function ActivityPanel({
 export function ContextPanel({ dispatch, scene, state }: ContextPanelProps) {
   const inspectorHeadingRef = useRef<HTMLHeadingElement | null>(null);
   const productsHeadingRef = useRef<HTMLHeadingElement | null>(null);
-  const mounted = useRef(false);
+  const shownMode = useRef(state.mode);
 
   /*
    * "Find alternatives" and "Back" unmount themselves, which drops focus to
    * <body>; the panel that replaces them takes it so the keyboard stays where
-   * the eye went. `document.activeElement` is the whole test: a cutout click
-   * or an object-rail click leaves focus on the control that was pressed, and
-   * the first render is skipped so the page never steals focus on load.
+   * the eye went. Two guards keep that from becoming a focus steal: the mode
+   * has to have actually changed (so neither the first render nor a repeated
+   * effect run in Strict Mode moves anything), and focus has to be on <body>
+   * (so a cutout or object-rail click keeps it on the control that was
+   * pressed).
    */
   useEffect(() => {
+    const changed = shownMode.current !== state.mode;
+    shownMode.current = state.mode;
+    if (!changed || document.activeElement !== document.body) return;
     const heading =
       state.mode === "products" ? productsHeadingRef : inspectorHeadingRef;
-    if (mounted.current && document.activeElement === document.body) {
-      heading.current?.focus({ preventScroll: true });
-    }
-    mounted.current = true;
+    heading.current?.focus({ preventScroll: true });
   }, [state.mode]);
 
   return (
