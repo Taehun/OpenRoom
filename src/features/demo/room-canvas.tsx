@@ -7,13 +7,14 @@ import {
 } from "react";
 import type { LocalMcpRelay } from "../../local-mcp/use-local-mcp-relay";
 import { getDocumentModelContext } from "../../webmcp/register-tools";
+import { getPhotoAsset } from "../photo/photo-assets";
 import { RoomPhotoStage } from "../photo/room-photo-stage";
 import { useSceneStore } from "../scene/scene-context";
 import type { Scene, SceneObjectType } from "../scene/scene-schema";
 import type { DemoAction, DemoState } from "./demo-types";
 import { LocalAgentStatus } from "./local-agent-status";
 import { OpenRoomIcon } from "./open-room-icon";
-import { OBJECT_ABBREVIATIONS, OBJECT_LABELS, objectDisplayName } from "./object-labels";
+import { OBJECT_LABELS, objectDisplayName } from "./object-labels";
 import styles from "./demo-workspace.module.css";
 
 const ROOM_OBJECTS = [
@@ -31,7 +32,7 @@ const COPY_STATUS_MS = 2500;
 const PRIMARY_PROMPT =
   "Redesign this room as a warm, minimal Japandi interior. Swap the dated pieces for catalog products that go together, keep the sofa on the left, and leave a clear path to the windows. Read the room again after each change.";
 
-export { OBJECT_ABBREVIATIONS, OBJECT_LABELS } from "./object-labels";
+export { OBJECT_LABELS } from "./object-labels";
 
 type CopyStatus =
   | { kind: "success"; message: "Prompt copied" }
@@ -160,25 +161,36 @@ export function RoomCanvas({
             {ROOM_OBJECTS.map((object) => {
               const isSelected = scene.selectedObjectId === object.id;
               const label = OBJECT_LABELS[object.type];
+              // The rail shows what the piece looks like right now, so a swap
+              // is visible without opening the inspector.
+              const sceneObject = scene.objects.find((o) => o.id === object.id);
+              const asset = sceneObject ? getPhotoAsset(sceneObject) : null;
 
               return (
                 <li key={object.id}>
                   <button
-                    aria-label={label}
                     aria-pressed={isSelected}
                     className={
                       isSelected
                         ? styles.objectButtonSelected
                         : styles.objectButton
                     }
+                    data-rail-object-id={object.id}
                     onClick={() => {
                       dispatch({ type: "select-object", objectId: object.id });
                       dispatch({ type: "show-inspector" });
                     }}
-                    title={label}
                     type="button"
                   >
-                    {OBJECT_ABBREVIATIONS[object.type]}
+                    <span aria-hidden="true" className={styles.objectThumb}>
+                      {asset ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img alt="" decoding="async" src={asset.src} />
+                      ) : (
+                        <OpenRoomIcon name="select" size={16} />
+                      )}
+                    </span>
+                    <span>{label}</span>
                   </button>
                 </li>
               );
@@ -234,14 +246,6 @@ export function RoomCanvas({
           <div className={styles.promptGuidance}>
             <p>{PRIMARY_PROMPT}</p>
             <div className={styles.composerChips}>
-              <div className={styles.promptSuggestions}>
-                <span className="md-chip md-chip--dense">
-                  Modern organic, soft neutral textures
-                </span>
-                <span className="md-chip md-chip--dense">
-                  Mid-century, warm walnut and brass
-                </span>
-              </div>
               <div className={styles.agentStatusRow}>
                 <div
                   aria-label="In-browser AI status"
@@ -253,15 +257,15 @@ export function RoomCanvas({
                 </div>
                 <LocalAgentStatus relay={localMcp} />
               </div>
+              <button
+                className={`md-button md-button--filled ${styles.agentButton}`}
+                onClick={copyPrompt}
+                type="button"
+              >
+                Copy redesign prompt
+              </button>
             </div>
           </div>
-          <button
-            className={`md-button md-button--filled ${styles.agentButton}`}
-            onClick={copyPrompt}
-            type="button"
-          >
-            Copy redesign prompt
-          </button>
           {copyStatus ? (
             <span
               aria-label="Prompt copy status"

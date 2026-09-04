@@ -17,19 +17,6 @@ export const OBJECT_LABELS: Readonly<Record<SceneObjectType, string>> = {
   unknown: "Object",
 };
 
-/** The object rail shows initials, one pair per Scene object type. */
-export const OBJECT_ABBREVIATIONS: Readonly<Record<SceneObjectType, string>> = {
-  sofa: "SO",
-  coffee_table: "CT",
-  rug: "RG",
-  floor_lamp: "FL",
-  chair: "CH",
-  plant: "PL",
-  side_table: "SI",
-  bookshelf: "BS",
-  unknown: "OB",
-};
-
 /** The product title when the piece is a catalog pick, else its type label. */
 export function objectDisplayName(object: {
   type: SceneObjectType;

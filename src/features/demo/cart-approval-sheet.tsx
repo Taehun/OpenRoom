@@ -176,15 +176,17 @@ export function CartApprovalSheet({
       >
         <header className={styles.sheetHeader}>
           <div>
-            <span className={styles.panelEyebrow}>Approval required</span>
+            <span className={styles.panelEyebrow}>
+              {isEmpty ? "Cart" : "Approval required"}
+            </span>
             <h2 id="cart-sheet-title">Review your room</h2>
           </div>
           <button
-            aria-label="Close cart review"
+            aria-label="Close cart"
             className={styles.iconButton}
             onClick={() => dispatch({ type: "close-cart" })}
             ref={closeButtonRef}
-            title="Close cart review (Escape)"
+            title="Close cart (Escape)"
             type="button"
           >
             <OpenRoomIcon name="close" />
@@ -201,7 +203,7 @@ export function CartApprovalSheet({
 
         {isEmpty ? (
           <p className={styles.cartEmpty}>
-            Nothing to order yet. Add products with Find alternatives or ask
+            Nothing to order yet. Swap a piece with Find alternatives, or ask
             your AI app.
           </p>
         ) : (
@@ -238,26 +240,30 @@ export function CartApprovalSheet({
           </ul>
         )}
 
-        <div className={styles.cartTotal}>
-          <span>
-            <strong>{isShopify ? "Catalog estimate" : "Estimated total"}</strong>
-            <small>
-              {isShopify
-                ? "Shopify shows the store's prices at checkout."
-                : "Taxes and delivery calculated later"}
-            </small>
-          </span>
-          <strong>{total} USD</strong>
-        </div>
+        {isEmpty ? null : (
+          <>
+            <div className={styles.cartTotal}>
+              <span>
+                <strong>{isShopify ? "Catalog estimate" : "Room total"}</strong>
+                <small>
+                  {isShopify
+                    ? "Shopify shows the store's prices at checkout."
+                    : "Taxes and delivery calculated later"}
+                </small>
+              </span>
+              <strong>{total} USD</strong>
+            </div>
 
-        <div className={styles.sheetDisclosure}>
-          <span aria-hidden="true">i</span>
-          <p>
-            {isShopify && storeDomain
-              ? `Checkout opens on ${storeDomain} in a new tab. OpenRoom stores no Shopify credentials and makes no request of its own.`
-              : "Demo only: approving closes this sheet and orders nothing."}
-          </p>
-        </div>
+            <div className={styles.sheetDisclosure}>
+              <span aria-hidden="true">i</span>
+              <p>
+                {isShopify && storeDomain
+                  ? `Checkout opens on ${storeDomain} in a new tab. OpenRoom stores no Shopify credentials and makes no request of its own.`
+                  : "Demo only: approving closes this sheet and orders nothing."}
+              </p>
+            </div>
+          </>
+        )}
 
         {notice ? <p className={styles.sheetNotice}>{notice}</p> : null}
 
@@ -277,16 +283,18 @@ export function CartApprovalSheet({
         ) : null}
 
         <div className={styles.sheetActions}>
-          <button
-            aria-label={isEmpty ? buttonLabel : `${buttonLabel} · ${total}`}
-            className={styles.commerceButton}
-            disabled={isEmpty || (isShopify && !canCheckout)}
-            onClick={handleContinue}
-            type="button"
-          >
-            <span>{buttonLabel}</span>
-            {isEmpty ? null : <strong>{total}</strong>}
-          </button>
+          {isEmpty ? null : (
+            <button
+              aria-label={`${buttonLabel} · ${total}`}
+              className={styles.commerceButton}
+              disabled={isShopify && !canCheckout}
+              onClick={handleContinue}
+              type="button"
+            >
+              <span>{buttonLabel}</span>
+              <strong>{total}</strong>
+            </button>
+          )}
           <button
             className={styles.cancelButton}
             onClick={() => dispatch({ type: "close-cart" })}

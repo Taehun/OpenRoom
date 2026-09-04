@@ -141,19 +141,19 @@ test("completes the deterministic spatial commerce UI journey", async ({
   ).toContainText("Revision 1 · table_01 · placeholder");
   // The cart is the room. The reset seed room holds placeholders only, so the
   // header carries no badge and the sheet says so instead of inventing lines.
-  const viewCart = page.getByRole("button", { name: "View cart" });
+  const viewCart = page.getByRole("button", { name: /^View cart/ });
   await expect(viewCart).toHaveText("View cart");
   await viewCart.click();
   const dialog = page.getByRole("dialog", { name: "Review your room" });
   await expect(dialog.getByRole("listitem")).toHaveCount(0);
   await expect(
     dialog.getByText(
-      "Nothing to order yet. Add products with Find alternatives or ask your AI app.",
+      "Nothing to order yet. Swap a piece with Find alternatives, or ask your AI app.",
     ),
   ).toBeVisible();
   await expect(
-    dialog.getByRole("button", { name: "Approve demo cart", exact: true }),
-  ).toBeDisabled();
+    dialog.getByRole("button", { name: /Approve demo cart/ }),
+  ).toHaveCount(0);
   await page.keyboard.press("Escape");
   await expect(dialog).toBeHidden();
 
@@ -181,7 +181,7 @@ test("keeps the room across a soft navigation to the home page and back", async 
 
   const diagnostics = page.getByRole("status", { name: "Scene diagnostics" });
   const roomCanvas = page.getByRole("main", { name: "Room canvas" });
-  const viewCart = page.getByRole("button", { name: "View cart" });
+  const viewCart = page.getByRole("button", { name: /^View cart/ });
   await expect(roomCanvas).toBeVisible();
 
   await page.getByRole("button", { name: "Find alternatives" }).click();
