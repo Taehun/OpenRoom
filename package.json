@@ -57,7 +57,7 @@
   },
   "devDependencies": {
     "@cloudflare/vite-plugin": "^1.54.2",
-    "@modelcontextprotocol/client": "^2.0.0",
+    "@modelcontextprotocol/client": "^2.2.0",
     "@playwright/test": "^1.62.1",
     "@tailwindcss/postcss": "^4",
     "@testing-library/jest-dom": "^7.0.1",
