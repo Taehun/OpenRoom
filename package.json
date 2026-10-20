@@ -44,7 +44,7 @@
     "deploy:pages": "wrangler pages deploy out --project-name openroom-webmcp --branch main --commit-dirty=true"
   },
   "dependencies": {
-    "@modelcontextprotocol/server": "^2.0.0",
+    "@modelcontextprotocol/server": "^2.3.0",
     "@vinext/cloudflare": "1.0.0-beta.6",
     "immer": "^11.1.18",
     "next": "16.3.3",
